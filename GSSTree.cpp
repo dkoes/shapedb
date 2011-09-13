@@ -11,6 +11,9 @@
 #include <iostream>
 
 
+const unsigned GSSTree::MaxSplit = 8; //number of children in each node
+
+
 void GSSTree::setBoundingBox(array<float,6>& box)
 {
 	float dims[3] = {0,0,0};
@@ -40,6 +43,11 @@ void GSSTree::add(const vector<MolSphere>& m)
 		mol.push_back(MolSphere(m[i].x-min[0], m[i].y-min[1], m[i].z-min[2],m[i].r));
 	}
 	OctTree oct(dim, maxres, mol);
+
+	//insert into the tree - recursively traverse full nodes along the most similar
+	//path, the insert into a partially full node.  If no such node exists, split
+	//the bottommost full node
+
 	cerr << oct.volume() << " " << oct.leaves() << "\n";
 }
 

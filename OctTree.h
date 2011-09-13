@@ -173,6 +173,12 @@ class OctTree
 
 
 public:
+
+	OctTree(): dimension(0), resolution(0)
+	{
+
+	}
+
 	OctTree(float dim, float res, const vector<MolSphere>& mol): dimension(dim), resolution(res)
 	{
 		Cube cube(dimension);
