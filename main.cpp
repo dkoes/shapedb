@@ -54,7 +54,7 @@ cl::opt<string> Input("in", cl::desc("Input file"), cl::Required);
 cl::opt<string> Output("out", cl::desc("Output file"), cl::Required);
 
 cl::opt<double> Distance("distance",
-		cl::desc("Distance for constraint earch (default 1A)."), cl::init(1.0));
+		cl::desc("Distance for constraint search (default 1A)."), cl::init(1.0));
 cl::opt<double> Resolution("resolution", cl::desc("Best resolution for shape database creation."),cl::init(1.0));
 
 int main(int argc, char *argv[])
