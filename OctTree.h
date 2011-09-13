@@ -43,7 +43,7 @@ public:
 	}
 
 	//return i'th octant
-	const Cube& getOctant(unsigned i) const
+	Cube getOctant(unsigned i) const
 	{
 		Cube res = *this;
 		res.dim /= 2.0;
@@ -124,30 +124,46 @@ class OctTree
 	struct OctNode
 	{
 		OctType type;
+		float dim; //this is slightly unnecessary, the dimension of this node
 		OctNode *children[8]; //pointers belong to this node
 
 		OctNode() :
-			type(Empty)
+			type(Empty), dim(0)
 		{
 			memset(children, 0, sizeof(children));
 		}
 
+		OctNode(const OctNode& rhs);
+
+		OctNode& operator=(const OctNode& rhs);
+
 		void deleteChildren()
 		{
-			for (unsigned i = 0; i < 8; i++)
+			if (type == Children)
 			{
-				if (children[i])
+				for (unsigned i = 0; i < 8; i++)
 				{
-					delete children[i];
-					children[i] = 0;
+					if (children[i])
+					{
+						delete children[i];
+						children[i] = 0;
+					}
 				}
 			}
+			type = Empty;
 		}
 
 		~OctNode()
 		{
 			deleteChildren();
 		}
+		void intersect(const OctNode *rhs);
+		void unionWith(const OctNode *rhs);
+		void truncate(double resolution);
+		void grow(double resolution);
+
+		float volume() const; //recursive volume calculation
+		unsigned leaves() const; //recursive leafs cnt
 	};
 
 	OctNode root;
@@ -155,8 +171,7 @@ class OctTree
 	//recursively generate an octtree
 	void create(OctNode *node, const Cube& cube, const vector<MolSphere>& mol);
 
-	//perform deep recursive copy
-	void copy(OctNode *dst, const OctNode *src);
+
 public:
 	OctTree(float dim, float res, const vector<MolSphere>& mol): dimension(dim), resolution(res)
 	{
@@ -164,11 +179,36 @@ public:
 		create(&root, cube, mol);
 	}
 
-	OctTree(const OctTree& rhs);
+	OctTree(const OctTree& rhs):dimension(rhs.dimension), resolution(rhs.resolution), root(rhs.root)
+	{
+
+	}
 
 	virtual ~OctTree()
 	{
+		root.deleteChildren();
 	}
+
+	//mogrifying intersection
+	void intersect(const OctTree& rhs) { root.intersect(&rhs.root); }
+	//mogrifying union
+	void unionWith(const OctTree& rhs) { root.unionWith(&rhs.root); }
+
+	//truncate (maximum included volume) to specified resolution
+	//only nodes that are >= resolution and full are kept
+	void truncate(double resolution) { root.truncate(resolution); }
+
+	//expand (minimum surrounding volume) so that any non-empty nodes <= resolution
+	//are made full
+	void grow(double resolution) { root.grow(resolution); }
+
+	//return total volume contained in octtree
+	float volume() const { return root.volume();}
+
+	//return number of leaves
+	unsigned leaves() const { return root.leaves(); }
+
+
 };
 
 #endif /* OCTTREE_H_ */

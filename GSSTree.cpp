@@ -6,7 +6,9 @@
  */
 
 #include "GSSTree.h"
+#include "OctTree.h"
 #include <math.h>
+#include <iostream>
 
 
 void GSSTree::setBoundingBox(array<float,6>& box)
@@ -27,19 +29,29 @@ void GSSTree::setBoundingBox(array<float,6>& box)
 }
 
 //add a single mol
-void GSSTree::add(const vector<MolSphere>& mol)
+void GSSTree::add(const vector<MolSphere>& m)
 {
+	//reposition mol
+	vector<MolSphere> mol;
+	mol.reserve(m.size());
 
+	for(unsigned i = 0, n = m.size(); i < n; i++)
+	{
+		mol.push_back(MolSphere(m[i].x-min[0], m[i].y-min[1], m[i].z-min[2],m[i].r));
+	}
+	OctTree oct(dim, maxres, mol);
+	cerr << oct.volume() << " " << oct.leaves() << "\n";
 }
 
 //nearest neighbor search, return closest set of molspheres
 void GSSTree::nn_search(const vector<MolSphere>& mol, vector<MolSphere>& res)
 {
-	abort(); //TODO
+	cerr << "Unimplemented: nn_search\n";
+	exit(-1);
 }
 
 
 void GSSTree::write(const filesystem::path& out)
 {
-	abort(); //TODO
-}
+	cerr << "Unimplemented: write\n";
+	exit(-1);}
