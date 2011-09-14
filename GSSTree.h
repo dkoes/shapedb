@@ -35,6 +35,7 @@ class GSSTree
 	};
 
 	struct GSSInternalNode;
+	struct GSSLeafNode;
 	struct GSSNode
 	{
 		GSSInternalNode *parent;
@@ -48,6 +49,10 @@ class GSSTree
 		}
 		virtual ~GSSNode();
 
+		//find "closest" object to tree and put data into data
+		virtual void findNearest(const OctTree& tree, float& distance, LeafData& data) = 0;
+
+		virtual void findInsertionPoint(const OctTree& tree, float& distance, GSSLeafNode*& leaf) = 0;
 	};
 
 	struct GSSInternalNode: public GSSNode
@@ -60,7 +65,7 @@ class GSSTree
 			children.reserve(MaxSplit);
 		}
 
-		~GSSInternalNode()
+		virtual ~GSSInternalNode()
 		{
 			for(unsigned i = 0, n = children.size(); i < n; i++)
 			{
@@ -71,6 +76,8 @@ class GSSTree
 		}
 
 		void update(GSSTree& gTree, unsigned whichChild, GSSNode *newnode);
+		virtual void findNearest(const OctTree& tree, float& distance, LeafData& data);
+		virtual void findInsertionPoint(const OctTree& tree, float& distance, GSSLeafNode*& leaf);
 
 		void addChild(GSSNode *child);
 	};
@@ -95,6 +102,8 @@ class GSSTree
 		}
 
 		void insert(GSSTree& gTree, const OctTree& tree, const LeafData& data);
+		virtual void findNearest(const OctTree& tree, float& distance, LeafData& data);
+		virtual void findInsertionPoint(const OctTree& tree, float& distance, GSSLeafNode*& leaf);
 
 	};
 
@@ -104,10 +113,13 @@ class GSSTree
 
 	void setBoundingBox(array<float,6>& box);
 
-	GSSInternalNode *root;
+	GSSNode *root;
 
 	static const unsigned MaxSplit;
 
+	static float leafDist(const OctTree* obj, const OctTree *leaf);
+	static float searchDist(const OctTree* obj, const OctTree *MIV, const OctTree *MSV, float& min, float& max);
+	static float splitDist(OctTree* leftMIV, OctTree* leftMSV, OctTree* rightMIV, OctTree* rightMSV);
 	static void split(const vector<OctTree*>& MIV, const vector<OctTree*>& MSV,
 			vector<unsigned>& s1, vector<unsigned>& s2);
 	void createRoot(GSSNode *left, GSSNode *right);
@@ -115,13 +127,13 @@ class GSSTree
 
 
 public:
-	GSSTree(filesystem::path& in); //initialize into memory from file; may mmap
 
 	//set the global min and max extents of the GSS tree and
 	//the highest resolution (default 1A)
 	GSSTree(array<float,6>& boundingbox, double maxr=1.0): maxres(maxr), root(NULL)
 	{
 		setBoundingBox(boundingbox);
+		root = new GSSLeafNode(dim, maxres);
 	}
 
 	virtual ~GSSTree() { delete root; root = NULL; }

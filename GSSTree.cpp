@@ -56,8 +56,11 @@ void GSSTree::add(const vector<MolSphere>& m)
 //nearest neighbor search, return closest set of molspheres
 void GSSTree::nn_search(const vector<MolSphere>& mol, vector<MolSphere>& res)
 {
-	cerr << "Unimplemented: nn_search\n";
-	exit(-1);
+	OctTree tree(dim, maxres, mol);
+	LeafData data;
+	float dist = HUGE_VAL;
+	root->findNearest(tree, dist, data);
+	swap(res, data.spheres);
 }
 
 
@@ -227,17 +230,37 @@ void GSSTree::GSSInternalNode::update(GSSTree& tree, unsigned whichChild, GSSNod
 void GSSTree::createRoot(GSSNode *left, GSSNode *right)
 {
 	assert(left == root);
-	root = new GSSInternalNode(dim, maxres);
+	GSSInternalNode* newroot = new GSSInternalNode(dim, maxres);
 	//update trees
-	*root->MIV = *left->MIV;
-	root->MIV->intersect(*right->MIV);
+	*newroot->MIV = *left->MIV;
+	newroot->MIV->intersect(*right->MIV);
 
-	*root->MSV = *left->MSV;
-	root->MSV->unionWith(*right->MSV);
+	*newroot->MSV = *left->MSV;
+	newroot->MSV->unionWith(*right->MSV);
 
 	//add two children
-	root->addChild(left);
-	root->addChild(right);
+	newroot->addChild(left);
+	newroot->addChild(right);
+
+	root = newroot;
+}
+
+
+//return a distance to a single leaf, should be compatible with search Dist
+float GSSTree::leafDist(const OctTree* obj, const OctTree *leaf)
+{
+	return 1 - obj->intersectVolume(*leaf)/obj->unionVolume(*leaf);
+}
+
+//return a "distance" between obj and MIV/MSV; the lower the distance
+//the higher the more likely a node should be searched
+//min and max should bookend the ultimate leaf distances
+float GSSTree::searchDist(const OctTree* obj, const OctTree *MIV, const OctTree *MSV, float& min, float& max)
+{
+	min = 1 - obj->intersectVolume(*MSV)/obj->unionVolume(*MIV);
+	max = 1 - obj->intersectVolume(*MIV)/obj->unionVolume(*MSV);
+
+	return min+max;
 }
 
 
@@ -245,13 +268,14 @@ void GSSTree::createRoot(GSSNode *left, GSSNode *right)
  * return a "distance" between approximations
  * for now, just the sum of the volume different of the MIVs and of the MSVs
  */
-static float nodeDist(OctTree* leftMIV, OctTree* leftMSV, OctTree* rightMIV, OctTree* rightMSV)
+float GSSTree::splitDist(OctTree* leftMIV, OctTree* leftMSV, OctTree* rightMIV, OctTree* rightMSV)
 {
 	float mind = leftMIV->intersectVolume(*rightMIV)/leftMIV->unionVolume(*rightMIV);
 	float maxd = leftMSV->intersectVolume(*rightMSV)/leftMSV->unionVolume(*rightMSV);
 
 	return mind+maxd;
 }
+
 
 /* Decide how to split a node.  For now, use the canonical quadratic split
  * where you find the two most "distant" nodes, and then greedily partition
@@ -276,7 +300,7 @@ void GSSTree::split(const vector<OctTree*>& MIV, const vector<OctTree*>& MSV,
 	{
 		for(unsigned j = i+1; j < N; j++)
 		{
-			float d = nodeDist(MIV[i],MSV[i],MIV[j],MSV[j]);
+			float d = splitDist(MIV[i],MSV[i],MIV[j],MSV[j]);
 			distances[i][j] = d;
 			distances[j][i] = d;
 			if(d > dist)
@@ -315,8 +339,8 @@ void GSSTree::split(const vector<OctTree*>& MIV, const vector<OctTree*>& MSV,
 			}
 			else
 			{
-				float di = nodeDist(&iMIV,&iMSV,MIV[i],MSV[i]);
-				float dj = nodeDist(&jMIV, &jMSV, MIV[i],MSV[i]);
+				float di = splitDist(&iMIV,&iMSV,MIV[i],MSV[i]);
+				float dj = splitDist(&jMIV, &jMSV, MIV[i],MSV[i]);
 
 				if(di < dj)
 				{
@@ -353,3 +377,95 @@ void GSSTree::split(const vector<OctTree*>& MIV, const vector<OctTree*>& MSV,
 }
 
 
+//find the object with the best distance in this node, if it's better than
+//the passed distance, update
+void GSSTree::GSSLeafNode::findNearest(const OctTree& tree, float& distance, LeafData& d)
+{
+	for(unsigned i = 0, n = trees.size(); i < n; i++)
+	{
+		float dist = leafDist(&tree, trees[i]);
+		if(dist < distance)
+		{
+			distance = dist;
+			d = data[i];
+		}
+	}
+}
+
+//if this leaf is a more appropriate place for tree, return self
+void GSSTree::GSSLeafNode::findInsertionPoint(const OctTree& tree, float& distance, GSSLeafNode*& leaf)
+{
+	if(trees.size() == 0)
+	{
+		distance = 0;
+		leaf = this;
+	}
+	else
+	{
+		float min, max;
+		float dist = searchDist(&tree, MIV, MSV, min, max);
+		if(dist < distance)
+		{
+			distance = dist;
+			leaf = this;
+		}
+	}
+}
+
+
+struct ScoreIndex
+{
+	unsigned index;
+	float score;
+	float min;
+
+	ScoreIndex() {}
+	ScoreIndex(unsigned i, float s, float m): index(i), score(s), min(m) {}
+
+	bool operator<(const ScoreIndex& si) const
+	{
+		return score < si.score;
+	}
+};
+//explore children to find closest value
+void GSSTree::GSSInternalNode::findNearest(const OctTree& tree, float& distance, LeafData& data)
+{
+	vector<ScoreIndex> SIs;
+	SIs.reserve(children.size());
+
+	for(unsigned i = 0, n = children.size(); i < n; i++)
+	{
+		float min = 0, max = 0;
+		float score = searchDist(&tree, children[i]->MIV, children[i]->MSV, min, max);
+		if(min < distance) //there's hope
+		{
+			SIs.push_back(ScoreIndex(i,score,min));
+		}
+	}
+
+	//explore in priority order
+	sort(SIs.begin(), SIs.end());
+
+	for(unsigned i = 0, n = SIs.size(); i < n; i++)
+	{
+		if(SIs[i].min < distance)
+		{
+			children[SIs[i].index]->findNearest(tree, distance, data);
+		}
+	}
+}
+
+//look for a good place for the data indexed by tree
+void GSSTree::GSSInternalNode::findInsertionPoint(const OctTree& tree, float& distance, GSSLeafNode*& leaf)
+{
+	float min, max;
+	float dist = searchDist(&tree, MIV, MSV, min, max);
+	if(dist < distance)
+	{
+		//if this tree might contain something better, look at all children -> really should sort this
+		for(unsigned i = 0, n = children.size(); i < n; i++)
+		{
+			children[i]->findInsertionPoint(tree, distance, leaf);
+		}
+	}
+}

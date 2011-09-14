@@ -44,7 +44,6 @@ cl::opt<CommandEnum>
 				cl::desc("Operation to perform:"),
 				cl::Required,
 				cl::values(clEnumVal(Create, "Create a molecule shape index."),
-
 				clEnumVal(NNSearch, "Nearest neighbor search")						,
 				clEnumVal(DCSearch, "Distance constraint search"),
 				clEnumVal(CreateSearch,"In memory database creation and search for testing"),
