@@ -82,28 +82,31 @@ OctTree::OctNode& OctTree::OctNode::operator=(const OctTree::OctNode& rhs)
 
 
 //recursively change this node to be intersected with rhs
-void OctTree::OctNode::intersect(const OctNode *rhs)
+bool OctTree::OctNode::intersect(const OctNode *rhs)
 {
 	if(rhs->type == Empty)
 	{
 		deleteChildren();
+		return true;
 	}
 	else if(rhs->type == Full || type == Empty)
 	{
 		//identity
-		return;
+		return false;
 	}
 	else if(type == Full)
 	{
 		//just copy
 		*this = *rhs;
+		return true;
 	}
 	else //both children
 	{
 		unsigned numEmpty = 0;
+		bool changed = false;
 		for(unsigned i = 0; i < 8; i++)
 		{
-			children[i]->intersect(rhs->children[i]);
+			changed |= children[i]->intersect(rhs->children[i]);
 			if(children[i]->type == Empty)
 				numEmpty++;
 		}
@@ -113,31 +116,35 @@ void OctTree::OctNode::intersect(const OctNode *rhs)
 		{
 			deleteChildren();
 		}
+		return changed;
 	}
 }
 
-void OctTree::OctNode::unionWith(const OctNode *rhs)
+bool OctTree::OctNode::unionWith(const OctNode *rhs)
 {
 	if(type == Full || rhs->type == Empty) //just identiy
 	{
-		return;
+		return false;
 	}
 	else if(rhs->type == Full)
 	{
 		deleteChildren();
 		type = Full;
+		return true;
 	}
 	else if(type == Empty)
 	{
 		//same as rhs
 		*this = *rhs;
+		return true;
 	}
 	else //both have children
 	{
 		unsigned numFull = 0;
+		bool changed = false;
 		for(unsigned i = 0; i < 8; i++)
 		{
-			children[i]->unionWith(rhs->children[i]);
+			changed |= children[i]->unionWith(rhs->children[i]);
 			if(children[i]->type == Full)
 				numFull++;
 		}
@@ -148,6 +155,7 @@ void OctTree::OctNode::unionWith(const OctNode *rhs)
 			deleteChildren();
 			type = Full;
 		}
+		return changed;
 	}
 }
 
@@ -222,4 +230,52 @@ unsigned OctTree::OctNode::leaves() const
 		ret += children[i]->leaves();
 	}
 	return ret;
+}
+
+//return volume of intersection
+float OctTree::OctNode::intersectVolume(const OctNode *rhs) const
+{
+	if(rhs->type == Empty)
+	{
+		return 0;
+	}
+	else if(rhs->type == Full || type == Empty)
+	{
+		return volume();
+	}
+	else if(type == Full)
+	{
+		return rhs->volume();
+	}
+	else //both children
+	{
+		float vol = 0;
+		for(unsigned i = 0; i < 8; i++)
+		{
+			vol += children[i]->intersectVolume(rhs->children[i]);
+		}
+		return vol;
+	}
+}
+
+//return volume of union
+float OctTree::OctNode::unionVolume(const OctNode *rhs) const
+{
+	if(type == Full || rhs->type == Empty) //just identiy
+	{
+		return volume();
+	}
+	else if(rhs->type == Full || type == Empty)
+	{
+		return rhs->volume();
+	}
+	else //both have children
+	{
+		float vol = 0;
+		for(unsigned i = 0; i < 8; i++)
+		{
+			vol += children[i]->unionVolume(rhs->children[i]);
+		}
+		return vol;
+	}
 }

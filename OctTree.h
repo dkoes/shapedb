@@ -137,6 +137,7 @@ class OctTree
 
 		OctNode& operator=(const OctNode& rhs);
 
+
 		void deleteChildren()
 		{
 			if (type == Children)
@@ -157,16 +158,20 @@ class OctTree
 		{
 			deleteChildren();
 		}
-		void intersect(const OctNode *rhs);
-		void unionWith(const OctNode *rhs);
+
+		//return true if changed
+		bool intersect(const OctNode *rhs);
+		bool unionWith(const OctNode *rhs);
 		void truncate(double resolution);
 		void grow(double resolution);
 
+		float intersectVolume(const OctNode *rhs) const;
+		float unionVolume(const OctNode *rhs) const;
 		float volume() const; //recursive volume calculation
 		unsigned leaves() const; //recursive leafs cnt
 	};
 
-	OctNode root;
+	OctNode *root;
 
 	//recursively generate an octtree
 	void create(OctNode *node, const Cube& cube, const vector<MolSphere>& mol);
@@ -174,45 +179,78 @@ class OctTree
 
 public:
 
-	OctTree(): dimension(0), resolution(0)
+	OctTree(): dimension(0), resolution(0), root(NULL)
 	{
+		root = new OctNode();
+	}
 
+	OctTree(float dim, float res): dimension(dim), resolution(res)
+	{
+		root = new OctNode();
 	}
 
 	OctTree(float dim, float res, const vector<MolSphere>& mol): dimension(dim), resolution(res)
 	{
 		Cube cube(dimension);
-		create(&root, cube, mol);
+		root = new OctNode();
+		create(root, cube, mol);
 	}
 
-	OctTree(const OctTree& rhs):dimension(rhs.dimension), resolution(rhs.resolution), root(rhs.root)
+	OctTree(const OctTree& rhs):dimension(rhs.dimension), resolution(rhs.resolution), root(NULL)
 	{
+		if(rhs.root)
+		{
+			root = new OctNode(*rhs.root);
+		}
+	}
 
+	OctTree& operator=(OctTree rhs)
+	{
+		swap(*this, rhs); //rhs passed by value
+		return *this;
 	}
 
 	virtual ~OctTree()
 	{
-		root.deleteChildren();
+		if(root)
+			delete root;
 	}
 
+    friend void swap(OctTree& first, OctTree& second)
+    {
+        // enable ADL (not necessary in our case, but good practice)
+        using std::swap;
+
+        swap(first.resolution, second.resolution);
+        swap(first.dimension, second.dimension);
+        swap(first.root, second.root);
+    }
+
 	//mogrifying intersection
-	void intersect(const OctTree& rhs) { root.intersect(&rhs.root); }
+	bool intersect(const OctTree& rhs) { return root->intersect(rhs.root); }
 	//mogrifying union
-	void unionWith(const OctTree& rhs) { root.unionWith(&rhs.root); }
+	bool unionWith(const OctTree& rhs) { return root->unionWith(rhs.root); }
 
 	//truncate (maximum included volume) to specified resolution
 	//only nodes that are >= resolution and full are kept
-	void truncate(double resolution) { root.truncate(resolution); }
+	void truncate(double resolution) { root->truncate(resolution); }
 
 	//expand (minimum surrounding volume) so that any non-empty nodes <= resolution
 	//are made full
-	void grow(double resolution) { root.grow(resolution); }
+	void grow(double resolution) { root->grow(resolution); }
+
+	//volume calculations that don't require creating a tmp tree
+	float intersectVolume(const OctTree& rhs) const { return root->intersectVolume(rhs.root); }
+	float unionVolume(const OctTree& rhs) const { return root->unionVolume(rhs.root); }
 
 	//return total volume contained in octtree
-	float volume() const { return root.volume();}
+	float volume() const { return root->volume();}
 
 	//return number of leaves
-	unsigned leaves() const { return root.leaves(); }
+	unsigned leaves() const { return root->leaves(); }
+
+	void clear() { root->deleteChildren(); }
+	void fill() { root->deleteChildren(); root->type = Full; }
 
 
 };
