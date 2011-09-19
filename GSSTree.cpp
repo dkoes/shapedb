@@ -7,6 +7,7 @@
 
 #include "GSSTree.h"
 #include "OctTree.h"
+#include "Timer.h"
 #include <math.h>
 #include <iostream>
 
@@ -55,7 +56,7 @@ void GSSTree::add(const vector<MolSphere>& m)
 	OctTree oct(dim, maxres, mol);
 
 	//insert into the tree - first find the leaf node to insert into, then
-	//performe the insertion
+	//perform the insertion
 
 	float dist = HUGE_VAL;
 	GSSLeafNode *leaf = NULL;
@@ -63,6 +64,8 @@ void GSSTree::add(const vector<MolSphere>& m)
 	assert(leaf != NULL);
 	leaf->insert(*this, oct, LeafData(m));
 }
+
+static unsigned leavesChecked = 0;
 
 //nearest neighbor search, return closest set of molspheres
 void GSSTree::nn_search(const vector<MolSphere>& m, vector<MolSphere>& res)
@@ -72,7 +75,10 @@ void GSSTree::nn_search(const vector<MolSphere>& m, vector<MolSphere>& res)
 	OctTree tree(dim, maxres, mol);
 	LeafData data;
 	float dist = HUGE_VAL;
+	leavesChecked = 0;
+	Timer t;
 	root->findNearest(tree, dist, data);
+	cout << "LeavesChecked " << leavesChecked << "/" << root->numLeaves() << "\t" << t.elapsed() << "\n";
 	swap(res, data.spheres);
 }
 
@@ -402,11 +408,11 @@ void GSSTree::split(const vector<OctTree*>& MIV, const vector<OctTree*>& MSV,
 
 }
 
-
 //find the object with the best distance in this node, if it's better than
 //the passed distance, update
 void GSSTree::GSSLeafNode::findNearest(const OctTree& tree, float& distance, LeafData& d)
 {
+	leavesChecked++;
 	for(unsigned i = 0, n = trees.size(); i < n; i++)
 	{
 		float dist = leafDist(&tree, trees[i]);

@@ -49,7 +49,7 @@ class GSSTree
 		unsigned which; //which child this is
 
 		GSSNode(float d, float r):parent(NULL), MIV(new OctTree(d,r)), MSV(new OctTree(d,r)), res(r),which(0) {
-
+			MIV->fill();
 		}
 		virtual ~GSSNode();
 
@@ -60,6 +60,7 @@ class GSSTree
 
 		virtual void printLeafInfo(unsigned depth) const = 0;
 		virtual unsigned size() const = 0;
+		virtual unsigned numLeaves() const = 0;
 	};
 
 	struct GSSInternalNode: public GSSNode
@@ -105,6 +106,16 @@ class GSSTree
 			}
 			return ret;
 		}
+
+		unsigned numLeaves() const
+		{
+			unsigned ret = 0;
+			for(unsigned i = 0, n = children.size(); i < n; i++)
+			{
+				ret += children[i]->numLeaves();
+			}
+			return ret;
+		}
 	};
 
 	struct GSSLeafNode: public GSSNode
@@ -139,6 +150,8 @@ class GSSTree
 		{
 			return trees.size();
 		}
+
+		unsigned numLeaves() const { return 1; }
 
 	};
 
@@ -181,8 +194,10 @@ public:
 
 	void write(const filesystem::path& out); //dump to file
 
-	void printLeafInfo() const { cout << root->MIV->volume() <<","<<root->MSV->volume() << "\n";root->printLeafInfo(0); cout << "\n"; } //for debugging
+	void printRootInfo() const { cout << root->MIV->volume() <<","<<root->MSV->volume() << "\n"; } //for debug
+	void printLeafInfo() const { root->printLeafInfo(0); cout << "\n"; } //for debugging
 	unsigned size() const { return root->size(); }
+	unsigned numLeaves() const { return root->numLeaves(); }
 };
 
 #endif /* GSSTREE_H_ */

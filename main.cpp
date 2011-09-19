@@ -91,6 +91,7 @@ int main(int argc, char *argv[])
 
 		//reread and generate molspheres to add to GSSTree
 		inmols.rewind();
+		unsigned cnt = 0;
 	    while (OEReadMolecule(inmols, mol))
 		{
 	    	OEAssignBondiVdWRadii(mol);
@@ -105,6 +106,10 @@ int main(int argc, char *argv[])
 					spheres.push_back(MolSphere(xyz[0], xyz[1], xyz[2], atom->GetRadius()));
 				}
 				gss.add(spheres);
+
+				cout << cnt << " ";
+				gss.printRootInfo();
+				cnt++;
 			}
 		}
 
@@ -126,8 +131,6 @@ int main(int argc, char *argv[])
 	    		mol.GetCoords(atom, xyz);
 	    		spheres.push_back(MolSphere(xyz[0], xyz[1], xyz[2], atom->GetRadius()));
 	    	}
-
-	    	gss.printLeafInfo();
 
 	    	vector<MolSphere> res;
 	    	gss.nn_search(spheres, res);
