@@ -33,29 +33,42 @@ void GSSTree::setBoundingBox(array<float,6>& box)
 		dim = 1;
 }
 
+// perform any transformations necessary to conver the input coordinate system
+//into the gss tree coordinate system
+void GSSTree::transformMol(const vector<MolSphere>& m, vector<MolSphere>& ret)
+{
+	ret.clear();
+	ret.reserve(m.size());
+
+	for(unsigned i = 0, n = m.size(); i < n; i++)
+	{
+		ret.push_back(MolSphere(m[i].x-min[0], m[i].y-min[1], m[i].z-min[2],m[i].r));
+	}
+}
+
 //add a single mol
 void GSSTree::add(const vector<MolSphere>& m)
 {
 	//reposition mol
 	vector<MolSphere> mol;
-	mol.reserve(m.size());
-
-	for(unsigned i = 0, n = m.size(); i < n; i++)
-	{
-		mol.push_back(MolSphere(m[i].x-min[0], m[i].y-min[1], m[i].z-min[2],m[i].r));
-	}
+	transformMol(m, mol);
 	OctTree oct(dim, maxres, mol);
 
-	//insert into the tree - recursively traverse full nodes along the most similar
-	//path, the insert into a partially full node.  If no such node exists, split
-	//the bottommost full node
+	//insert into the tree - first find the leaf node to insert into, then
+	//performe the insertion
 
-	cerr << oct.volume() << " " << oct.leaves() << "\n";
+	float dist = HUGE_VAL;
+	GSSLeafNode *leaf = NULL;
+	root->findInsertionPoint(oct, dist, leaf);
+	assert(leaf != NULL);
+	leaf->insert(*this, oct, LeafData(m));
 }
 
 //nearest neighbor search, return closest set of molspheres
-void GSSTree::nn_search(const vector<MolSphere>& mol, vector<MolSphere>& res)
+void GSSTree::nn_search(const vector<MolSphere>& m, vector<MolSphere>& res)
 {
+	vector<MolSphere> mol;
+	transformMol(m, mol);
 	OctTree tree(dim, maxres, mol);
 	LeafData data;
 	float dist = HUGE_VAL;
@@ -94,6 +107,10 @@ void GSSTree::GSSLeafNode::insert(GSSTree& gTree, const OctTree& tree, const Lea
 	}
 	else //must split
 	{
+		//first add tree
+		trees.push_back(new OctTree(tree));
+		data.push_back(LeafData(m));
+
 		//so that we can have one split function, have concept of MIV and MSV
 		//even at leaf
 		vector<unsigned> split1;
@@ -178,6 +195,9 @@ void GSSTree::GSSInternalNode::update(GSSTree& tree, unsigned whichChild, GSSNod
 			MIVs.reserve(MaxSplit);
 			MSVs.reserve(MaxSplit);
 
+			//add in new node briefly so it's part of the split
+			children.push_back(newnode);
+
 			for(unsigned i = 0, n = children.size(); i < n; i++)
 			{
 				MIVs.push_back(children[i]->MIV);
@@ -199,7 +219,10 @@ void GSSTree::GSSInternalNode::update(GSSTree& tree, unsigned whichChild, GSSNod
 			MSV->clear();
 			for(unsigned i = 0, n = split1.size(); i < n; i++)
 			{
-				addChild(oldchildren[split1[i]]);
+				GSSNode *child = oldchildren[split1[i]];
+				addChild(child);
+				MIV->intersect(*child->MIV);
+				MSV->unionWith(*child->MSV);
 			}
 
 			//same thing for the new node and split2
@@ -208,7 +231,10 @@ void GSSTree::GSSInternalNode::update(GSSTree& tree, unsigned whichChild, GSSNod
 			newinode->MSV->clear();
 			for(unsigned i = 0, n = split2.size(); i < n; i++)
 			{
-				newinode->addChild(oldchildren[split2[i]]);
+				GSSNode *child = oldchildren[split2[i]];
+				newinode->addChild(child);
+				newinode->MIV->intersect(*child->MIV);
+				newinode->MSV->unionWith(*child->MSV);
 			}
 			newnode = newinode;
 		}
@@ -218,7 +244,7 @@ void GSSTree::GSSInternalNode::update(GSSTree& tree, unsigned whichChild, GSSNod
 	{
 		parent->update(tree, which, newnode);
 	}
-	else if(newnode != NULL && parent != NULL) //need new root
+	else if(newnode != NULL && parent == NULL) //need new root
 	{
 		tree.createRoot(this, newnode);
 	}
@@ -469,3 +495,5 @@ void GSSTree::GSSInternalNode::findInsertionPoint(const OctTree& tree, float& di
 		}
 	}
 }
+
+

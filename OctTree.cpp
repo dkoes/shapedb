@@ -73,7 +73,7 @@ OctTree::OctNode& OctTree::OctNode::operator=(const OctTree::OctNode& rhs)
 	{
 		for(unsigned i = 0; i < 8; i++)
 		{
-			children[i] = rhs.children[i];
+			children[i] = new OctNode(*rhs.children[i]);
 		}
 	}
 

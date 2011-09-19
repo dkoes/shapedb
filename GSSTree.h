@@ -17,6 +17,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/array.hpp>
 #include <vector>
+#include <iostream>
 
 #include "MolSphere.h"
 #include "OctTree.h"
@@ -32,6 +33,9 @@ class GSSTree
 	struct LeafData
 	{
 		vector<MolSphere> spheres;
+
+		LeafData() {}
+		LeafData(const vector<MolSphere>& sph): spheres(sph) {}
 	};
 
 	struct GSSInternalNode;
@@ -53,6 +57,9 @@ class GSSTree
 		virtual void findNearest(const OctTree& tree, float& distance, LeafData& data) = 0;
 
 		virtual void findInsertionPoint(const OctTree& tree, float& distance, GSSLeafNode*& leaf) = 0;
+
+		virtual void printLeafInfo(unsigned depth) const = 0;
+		virtual unsigned size() const = 0;
 	};
 
 	struct GSSInternalNode: public GSSNode
@@ -80,6 +87,24 @@ class GSSTree
 		virtual void findInsertionPoint(const OctTree& tree, float& distance, GSSLeafNode*& leaf);
 
 		void addChild(GSSNode *child);
+
+		void printLeafInfo(unsigned depth) const
+		{
+			for(unsigned i = 0, n = children.size(); i < n; i++)
+			{
+				children[i]->printLeafInfo(depth+1);
+			}
+		}
+
+		unsigned size() const
+		{
+			unsigned ret = 0;
+			for(unsigned i = 0, n = children.size(); i < n; i++)
+			{
+				ret += children[i]->size();
+			}
+			return ret;
+		}
 	};
 
 	struct GSSLeafNode: public GSSNode
@@ -105,6 +130,16 @@ class GSSTree
 		virtual void findNearest(const OctTree& tree, float& distance, LeafData& data);
 		virtual void findInsertionPoint(const OctTree& tree, float& distance, GSSLeafNode*& leaf);
 
+		void printLeafInfo(unsigned depth) const
+		{
+			cout << depth << "(" << MIV->volume() << "," << MSV->volume() << "):" << trees.size() << " ";
+		}
+
+		unsigned size() const
+		{
+			return trees.size();
+		}
+
 	};
 
 	float maxres;
@@ -124,7 +159,7 @@ class GSSTree
 			vector<unsigned>& s1, vector<unsigned>& s2);
 	void createRoot(GSSNode *left, GSSNode *right);
 
-
+	void transformMol(const vector<MolSphere>& inspheres, vector<MolSphere>& outspheres);
 
 public:
 
@@ -145,6 +180,9 @@ public:
 	void nn_search(const vector<MolSphere>& mol, vector<MolSphere>& res);
 
 	void write(const filesystem::path& out); //dump to file
+
+	void printLeafInfo() const { cout << root->MIV->volume() <<","<<root->MSV->volume() << "\n";root->printLeafInfo(0); cout << "\n"; } //for debugging
+	unsigned size() const { return root->size(); }
 };
 
 #endif /* GSSTREE_H_ */

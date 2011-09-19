@@ -117,6 +117,7 @@ int main(int argc, char *argv[])
 	    	inmols.rewind();
 	    	//grab first mol
 	    	OEReadMolecule(inmols, mol);
+	    	OEAssignBondiVdWRadii(mol);
 	    	vector<MolSphere> spheres;
 	    	spheres.reserve(mol.NumAtoms());
 	    	for(OEIter<OEAtomBase> atom = mol.GetAtoms(); atom; ++atom)
@@ -125,6 +126,9 @@ int main(int argc, char *argv[])
 	    		mol.GetCoords(atom, xyz);
 	    		spheres.push_back(MolSphere(xyz[0], xyz[1], xyz[2], atom->GetRadius()));
 	    	}
+
+	    	gss.printLeafInfo();
+
 	    	vector<MolSphere> res;
 	    	gss.nn_search(spheres, res);
 	    	//just output in xyz w/o radii
