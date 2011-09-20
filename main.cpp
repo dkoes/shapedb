@@ -53,8 +53,10 @@ cl::opt<string> Input("in", cl::desc("Input file"), cl::Required);
 cl::opt<string> Output("out", cl::desc("Output file"), cl::Required);
 cl::opt<string> Database("db", cl::desc("Database file"));
 
-cl::opt<double> Distance("distance",
-		cl::desc("Distance for constraint search (default 1A)."), cl::init(1.0));
+cl::opt<double> LessDist("less",
+		cl::desc("Distance to reduce query mol by for constraint search (default 1A)."), cl::init(1.0));
+cl::opt<double> MoreDist("more",
+		cl::desc("Distance to increase query mol by for constraint search (default 1A)."), cl::init(1.0));
 cl::opt<double> Resolution("resolution", cl::desc("Best resolution for shape database creation."),cl::init(1.0));
 
 static void spherizeMol(OEMol& mol, vector<MolSphere>& spheres)
@@ -186,6 +188,41 @@ int main(int argc, char *argv[])
 
 	}
 	case DCSearch:
+	{
+		//read in database
+		GSSTree gss;
+		ifstream dbfile(Database.c_str());
+		if(!dbfile)
+		{
+			cerr << "Could not read database " << Database << "\n";
+			exit(-1);
+		}
+		gss.read(dbfile);
+
+		//read query molecule(s)
+		oemolistream inmols(Input);
+		OEMol mol;
+		ofstream out(Output.c_str());
+    	while(OEReadMolecule(inmols, mol))
+    	{
+    		vector<MolSphere> littlespheres, bigspheres;
+			spherizeMol(mol, littlespheres);
+			bigspheres = littlespheres;
+
+			//adjust radii
+			for(unsigned i = 0, n = littlespheres.size(); i < n; i++)
+			{
+				littlespheres[i].incrementRadius(-LessDist);
+				bigspheres[i].incrementRadius(MoreDist);
+			}
+
+			vector< vector<MolSphere> > res;
+			gss.dc_search(littlespheres, bigspheres, res);
+			//just output in xyz w/o radii
+			for(unsigned i = 0, n = res.size(); i < n; i++)
+				outputRes(out, res[i]);
+		}
+	}
 		break;
 	}
 	return 0;

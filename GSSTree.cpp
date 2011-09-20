@@ -129,6 +129,47 @@ void GSSTree::nn_search(const vector<MolSphere>& m, vector<MolSphere>& res)
 	}
 }
 
+void GSSTree::dc_search(const vector<MolSphere>& little, const vector<MolSphere>& big, vector<vector<MolSphere> >& res)
+{
+	vector<MolSphere> littleMol, bigMol;
+	transformMol(little, littleMol);
+	transformMol(big, bigMol);
+
+	OctTree smallTree(dim,maxres, littleMol);
+	OctTree bigTree(dim,maxres, bigMol);
+
+	leavesChecked = 0;
+	Timer t;
+	res.clear();
+	vector<LeafData> data;
+	root->findTweeners(smallTree, bigTree, data);
+	double elapsed = t.elapsed();
+	cout << "LeavesChecked "  << leavesChecked << " / " << root->numLeaves() << "\t" << elapsed << "\t" << data.size() << "\n";
+
+	for(unsigned i = 0, n = data.size(); i < n; i++)
+	{
+		res.push_back(data[i].spheres);
+	}
+
+	if(ScanCheck)
+	{
+		//check
+		t.restart();
+		leavesChecked = 0;
+		data.clear();
+		root->scanTweeners(smallTree, bigTree, data);
+		elapsed = t.elapsed();
+		cout << "LeavesScanned " << leavesChecked << " / " << root->numLeaves()
+								<< "\t" << elapsed << "\n";
+
+		if (data.size() != res.size()) //lame but easy check
+		{
+			cout << "Find and Scan differ!\n";
+		}
+	}
+}
+
+
 //output leaf data
 void GSSTree::LeafData::write(ostream& out) const
 {
@@ -257,6 +298,7 @@ void GSSTree::GSSLeafNode::read(istream& in, GSSInternalNode *parPtr)
 		trees[i] = new OctTree();
 		trees[i]->read(in);
 	}
+
 	for(unsigned i = 0; i < n; i++)
 	{
 		data[i].read(in);
@@ -472,6 +514,20 @@ void GSSTree::createRoot(GSSNode *left, GSSNode *right)
 }
 
 
+//return true if the object(s) represented by MIV/MSV might fit in between min and max
+bool GSSTree::fitsInbetween(const OctTree *MIV, const OctTree *MSV, const OctTree *min, const OctTree *max)
+{
+	//TODO: more efficient
+	//the MSV must completely enclose min
+	if(MSV->unionVolume(*min) != MSV->volume())
+		return false;
+	//MIV must be completely enclosed by max
+	if(MIV->intersectVolume(*max) != MIV->volume())
+		return false;
+
+	return true;
+}
+
 //return a distance to a single leaf, should be compatible with search Dist
 float GSSTree::leafDist(const OctTree* obj, const OctTree *leaf)
 {
@@ -618,6 +674,7 @@ void GSSTree::GSSLeafNode::scanNearest(const OctTree& tree, float& distance, Lea
 	findNearest(tree, distance, d); //this is just the same
 }
 
+
 //find the object with the best distance in this node, if it's better than
 //the passed distance, update
 void GSSTree::GSSLeafNode::findNearest(const OctTree& tree, float& distance, LeafData& d)
@@ -633,6 +690,26 @@ void GSSTree::GSSLeafNode::findNearest(const OctTree& tree, float& distance, Lea
 		}
 	}
 }
+
+//identify all objects that are exactly in between min and max
+void GSSTree::GSSLeafNode::scanTweeners(const OctTree& min, const OctTree& max, vector<LeafData>& res)
+{
+	findTweeners(min, max, res);
+}
+
+//identify all objects that are exactly in between min and max
+void GSSTree::GSSLeafNode::findTweeners(const OctTree& min, const OctTree& max, vector<LeafData>& res)
+{
+	leavesChecked++;
+	for(unsigned i = 0, n = trees.size(); i < n; i++)
+	{
+		if(fitsInbetween(trees[i], trees[i],&min,&max))
+		{
+			res.push_back(data[i]);
+		}
+	}
+}
+
 
 //if this leaf is a more appropriate place for tree, return self
 void GSSTree::GSSLeafNode::findInsertionPoint(const OctTree& tree, float& distance, GSSLeafNode*& leaf)
@@ -690,6 +767,30 @@ struct ScoreIndex
 		return score < si.score;
 	}
 };
+
+
+//identify all objects that are exactly in between min and max
+//brute force scan for debugging
+void GSSTree::GSSInternalNode::scanTweeners(const OctTree& min, const OctTree& max, vector<LeafData>& res)
+{
+	for(unsigned i = 0, n = children.size(); i < n; i++)
+	{
+		children[i]->scanTweeners(min, max, res);
+	}
+}
+
+//identify all objects that are exactly in between min and max
+//filter out children that can't possibly match
+void GSSTree::GSSInternalNode::findTweeners(const OctTree& min, const OctTree& max, vector<LeafData>& res)
+{
+	for(unsigned i = 0, n = children.size(); i < n; i++)
+	{
+		if(fitsInbetween(children[i]->MIV, children[i]->MSV, &min, &max))
+		{
+			children[i]->findTweeners(min, max, res);
+		}
+	}
+}
 
 //scan - ignore any bounding on the search
 void GSSTree::GSSInternalNode::scanNearest(const OctTree& tree, float& distance, LeafData& data)

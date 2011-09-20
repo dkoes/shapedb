@@ -22,6 +22,12 @@ struct MolSphere
 	bool operator==(const MolSphere& rhs) const {
 		return x == rhs.x && y == rhs.y && z == rhs.z && r == rhs.r;
 	}
+
+	void incrementRadius(float diff)
+	{
+		r += diff;
+		if(r < 0) r = 0;
+	}
 };
 
 

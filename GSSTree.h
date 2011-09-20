@@ -82,6 +82,9 @@ class GSSTree
 		//find "closest" object to tree and put data into data
 		virtual void findNearest(const OctTree& tree, float& distance, LeafData& data) = 0;
 
+		virtual void scanTweeners(const OctTree& min, const OctTree& max, vector<LeafData>& res) = 0;
+		virtual void findTweeners(const OctTree& min, const OctTree& max, vector<LeafData>& res) = 0;
+
 		virtual void findInsertionPoint(const OctTree& tree, float& distance, GSSLeafNode*& leaf) = 0;
 		//find k-best leaves for tree
 		virtual void findInsertionPoints(const OctTree& tree, vector<LeafDistPair>& kbest, unsigned k) = 0;
@@ -121,6 +124,8 @@ class GSSTree
 		void update(GSSTree& gTree, unsigned whichChild, GSSNode *newnode);
 		virtual void scanNearest(const OctTree& tree, float& distance, LeafData& data);
 		virtual void findNearest(const OctTree& tree, float& distance, LeafData& data);
+		virtual void scanTweeners(const OctTree& min, const OctTree& max, vector<LeafData>& res);
+		virtual void findTweeners(const OctTree& min, const OctTree& max, vector<LeafData>& res);
 		virtual void findInsertionPoint(const OctTree& tree, float& distance, GSSLeafNode*& leaf);
 		virtual void findInsertionPoints(const OctTree& tree, vector<LeafDistPair>& kbest, unsigned k);
 
@@ -182,7 +187,8 @@ class GSSTree
 		void insert(GSSTree& gTree, const OctTree& tree, const LeafData& data);
 		virtual void scanNearest(const OctTree& tree, float& distance, LeafData& data);
 		virtual void findNearest(const OctTree& tree, float& distance, LeafData& data);
-
+		virtual void scanTweeners(const OctTree& min, const OctTree& max, vector<LeafData>& res);
+		virtual void findTweeners(const OctTree& min, const OctTree& max, vector<LeafData>& res);
 		virtual void findInsertionPoint(const OctTree& tree, float& distance, GSSLeafNode*& leaf);
 		virtual void findInsertionPoints(const OctTree& tree, vector<LeafDistPair>& kbest, unsigned k);
 
@@ -211,6 +217,8 @@ class GSSTree
 	static const unsigned MaxSplit;
 
 	void setBoundingBox(array<float,6>& box);
+
+	static bool fitsInbetween(const OctTree *MIV, const OctTree *MSV, const OctTree *min, const OctTree *max);
 	static float leafDist(const OctTree* obj, const OctTree *leaf);
 	static float searchDist(const OctTree* obj, const OctTree *MIV, const OctTree *MSV, float& min, float& max);
 	static float splitDist(OctTree* leftMIV, OctTree* leftMSV, OctTree* rightMIV, OctTree* rightMSV);
@@ -242,6 +250,8 @@ public:
 
 	//nearest neighbor search, return closest set of molspheres
 	void nn_search(const vector<MolSphere>& mol, vector<MolSphere>& res);
+	//distance constrained search - inbetween little and big
+	void dc_search(const vector<MolSphere>& little, const vector<MolSphere>& big, vector<vector<MolSphere> >& res);
 
 	void write(ostream& out); //dump to file
 	void read(istream& in); //dump to file
