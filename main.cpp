@@ -51,10 +51,38 @@ cl::opt<CommandEnum>
 
 cl::opt<string> Input("in", cl::desc("Input file"), cl::Required);
 cl::opt<string> Output("out", cl::desc("Output file"), cl::Required);
+cl::opt<string> Database("db", cl::desc("Database file"));
 
 cl::opt<double> Distance("distance",
 		cl::desc("Distance for constraint search (default 1A)."), cl::init(1.0));
 cl::opt<double> Resolution("resolution", cl::desc("Best resolution for shape database creation."),cl::init(1.0));
+
+static void spherizeMol(OEMol& mol, vector<MolSphere>& spheres)
+{
+	OEAssignBondiVdWRadii(mol);
+	spheres.clear();
+	spheres.reserve(mol.NumAtoms());
+	for (OEIter<OEAtomBase> atom = mol.GetAtoms(); atom; ++atom)
+	{
+		float xyz[3];
+		mol.GetCoords(atom, xyz);
+		spheres.push_back(
+				MolSphere(xyz[0], xyz[1], xyz[2], atom->GetRadius()));
+	}
+
+}
+
+static void outputRes(ostream& out, const vector<MolSphere>& res)
+{
+	//just output in xyz w/o radii
+	out << res.size();
+	out << "\nTestShapeOutput\n";
+	for (unsigned i = 0, n = res.size(); i < n; i++)
+	{
+		out << "C " << res[i].x << " " << res[i].y << " "
+				<< res[i].z << "\n";
+	}
+}
 
 int main(int argc, char *argv[])
 {
@@ -91,7 +119,6 @@ int main(int argc, char *argv[])
 
 		//reread and generate molspheres to add to GSSTree
 		inmols.rewind();
-		unsigned cnt = 0;
 	    while (OEReadMolecule(inmols, mol))
 		{
 	    	OEAssignBondiVdWRadii(mol);
@@ -106,47 +133,58 @@ int main(int argc, char *argv[])
 					spheres.push_back(MolSphere(xyz[0], xyz[1], xyz[2], atom->GetRadius()));
 				}
 				gss.add(spheres);
-
-				cout << cnt << " ";
-				gss.printRootInfo();
-				cnt++;
 			}
 		}
 
 	    if(Command == Create)
 	    {
-	    	gss.write(filesystem::path(Output));
+	    	ofstream out(Output.c_str());
+	    	gss.write(out);
 	    }
 	    else //create and search (in mem test)
 	    {
 	    	inmols.rewind();
-	    	//grab first mol
-	    	OEReadMolecule(inmols, mol);
-	    	OEAssignBondiVdWRadii(mol);
-	    	vector<MolSphere> spheres;
-	    	spheres.reserve(mol.NumAtoms());
-	    	for(OEIter<OEAtomBase> atom = mol.GetAtoms(); atom; ++atom)
+			ofstream out(Output.c_str());
+	    	while(OEReadMolecule(inmols, mol))
 	    	{
-	    		float xyz[3];
-	    		mol.GetCoords(atom, xyz);
-	    		spheres.push_back(MolSphere(xyz[0], xyz[1], xyz[2], atom->GetRadius()));
-	    	}
+	    		vector<MolSphere> spheres;
+				spherizeMol(mol, spheres);
+				vector<MolSphere> res;
+				gss.nn_search(spheres, res);
+				//just output in xyz w/o radii
+				outputRes(out, res);
+			}
 
-	    	vector<MolSphere> res;
-	    	gss.nn_search(spheres, res);
-	    	//just output in xyz w/o radii
-	    	ofstream out(Output.c_str());
-	    	out << res.size();
-	    	out << "\nTestShapeOutput\n";
-	    	for(unsigned i = 0, n = res.size(); i < n; i++)
-	    	{
-	    		out << "C " << res[i].x << " " << res[i].y << " " << res[i].z << "\n";
-	    	}
 	    }
 	}
 		break;
 	case NNSearch:
+	{
+		//read in database
+		GSSTree gss;
+		ifstream dbfile(Database.c_str());
+		if(!dbfile)
+		{
+			cerr << "Could not read database " << Database << "\n";
+			exit(-1);
+		}
+		gss.read(dbfile);
 
+		//read query molecule(s)
+		oemolistream inmols(Input);
+		OEMol mol;
+		ofstream out(Output.c_str());
+    	while(OEReadMolecule(inmols, mol))
+    	{
+    		vector<MolSphere> spheres;
+			spherizeMol(mol, spheres);
+			vector<MolSphere> res;
+			gss.nn_search(spheres, res);
+			//just output in xyz w/o radii
+			outputRes(out, res);
+		}
+
+	}
 	case DCSearch:
 		break;
 	}

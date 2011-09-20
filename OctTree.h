@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+#include <iostream>
 
 using namespace std;
 
@@ -147,7 +148,7 @@ class OctTree
 					if (children[i])
 					{
 						delete children[i];
-						children[i] = 0;
+						children[i] = NULL;
 					}
 				}
 			}
@@ -169,6 +170,10 @@ class OctTree
 		float unionVolume(const OctNode *rhs) const;
 		float volume() const; //recursive volume calculation
 		unsigned leaves() const; //recursive leafs cnt
+
+		void write(ostream& out) const;
+		void read(istream& out);
+
 	};
 
 	OctNode *root;
@@ -252,7 +257,8 @@ public:
 	void clear() { root->deleteChildren(); }
 	void fill() { root->deleteChildren(); root->type = Full; }
 
-
+	void write(ostream& out) const;
+	void read(istream& in);
 };
 
 #endif /* OCTTREE_H_ */

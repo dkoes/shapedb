@@ -279,3 +279,65 @@ float OctTree::OctNode::unionVolume(const OctNode *rhs) const
 		return vol;
 	}
 }
+
+void OctTree::OctNode::write(ostream& out) const
+{
+
+	out.write((char*)&type, sizeof(type));
+	out.write((char*)&dim, sizeof(dim));
+
+	bool isSet[8];
+	for(unsigned i = 0; i < 8; i++)
+	{
+		isSet[i] = children[i] != NULL;
+	}
+
+	out.write((char*)isSet, sizeof(isSet));
+
+	for(unsigned i = 0; i < 8; i++)
+	{
+		if(children[i] != NULL)
+			children[i]->write(out);
+	}
+}
+
+void OctTree::OctNode::read(istream& in)
+{
+	deleteChildren();
+	in.read((char*)&type, sizeof(type));
+	in.read((char*)&dim, sizeof(dim));
+
+	bool isSet[8] = {0,};
+	in.read((char*)isSet, sizeof(isSet));
+
+	for(unsigned i = 0; i < 8; i++)
+	{
+		if(isSet[i])
+		{
+			children[i] = new OctNode();
+			children[i]->read(in);
+		}
+		else
+		{
+			children[i] = NULL;
+		}
+	}
+}
+
+//dump oct tree to a file in binary form
+void OctTree::write(ostream& out) const
+{
+	out.write((char*)&dimension, sizeof(dimension));
+	out.write((char*)&resolution, sizeof(resolution));
+
+	root->write(out);
+}
+
+//overwrite the current octree
+void OctTree::read(istream& in)
+{
+	in.read((char*)&dimension, sizeof(dimension));
+	in.read((char*)&resolution, sizeof(resolution));
+
+	root->read(in);
+}

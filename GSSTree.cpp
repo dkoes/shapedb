@@ -10,11 +10,14 @@
 #include "Timer.h"
 #include <math.h>
 #include <iostream>
+#include "CommandLine2/CommandLine.h"
 
+cl::opt<bool> ScanCheck("scancheck",cl::desc("Perform a full scan to check results"),cl::Hidden);
+cl::opt<unsigned> KBestInsertion("kinsert",cl::desc("Evaluate k insertion points"),cl::value_desc("k"),cl::init(0));
 
 const unsigned GSSTree::MaxSplit = 8; //number of children in each node
 
-GSSTree::GSSNode::~GSSNode() {}
+GSSTree::GSSNode::~GSSNode() { delete MSV; delete MIV; }
 
 
 void GSSTree::setBoundingBox(array<float,6>& box)
@@ -60,7 +63,33 @@ void GSSTree::add(const vector<MolSphere>& m)
 
 	float dist = HUGE_VAL;
 	GSSLeafNode *leaf = NULL;
-	root->findInsertionPoint(oct, dist, leaf);
+
+	if(KBestInsertion > 0)
+	{
+		vector<LeafDistPair> kbest;
+		root->findInsertionPoints(oct, kbest, KBestInsertion);
+
+		assert(kbest.size() > 0);
+		//find the one that creates the smallest change in the MIV/MSV of the leaf
+		unsigned besti = 0;
+		float smallestChange = HUGE_VAL;
+		for(unsigned i = 0, n = kbest.size(); i < n; i++)
+		{
+			float change = kbest[i].leaf->combinedVolumeChange(&oct, &oct);
+			if(change < smallestChange)
+			{
+				smallestChange = change;
+				besti = i;
+			}
+		}
+		assert(isfinite(smallestChange));
+		leaf = kbest[besti].leaf;
+	}
+	else //single best
+	{
+		root->findInsertionPoint(oct, dist, leaf);
+	}
+
 	assert(leaf != NULL);
 	leaf->insert(*this, oct, LeafData(m));
 }
@@ -78,15 +107,180 @@ void GSSTree::nn_search(const vector<MolSphere>& m, vector<MolSphere>& res)
 	leavesChecked = 0;
 	Timer t;
 	root->findNearest(tree, dist, data);
-	cout << "LeavesChecked " << leavesChecked << "/" << root->numLeaves() << "\t" << t.elapsed() << "\n";
+	double elapsed = t.elapsed();
+	cout << "LeavesChecked " << leavesChecked << " / " << root->numLeaves() << "\t" << elapsed << "\n";
 	swap(res, data.spheres);
+
+	if(ScanCheck)
+	{
+		//check
+		t.restart();
+		leavesChecked = 0;
+		dist = HUGE_VAL;
+		root->scanNearest(tree, dist, data);
+		elapsed = t.elapsed();
+		cout << "LeavesScanned " << leavesChecked << " / " << root->numLeaves()
+				<< "\t" << elapsed << "\n";
+
+		if (data.spheres != res)
+		{
+			cout << "Find and Scan differ!\n";
+		}
+	}
+}
+
+//output leaf data
+void GSSTree::LeafData::write(ostream& out) const
+{
+	unsigned n = spheres.size();
+	out.write((char*)&n, sizeof(n));
+	for(unsigned i = 0; i < n; i++)
+	{
+		out.write((char*)&spheres[i], sizeof(MolSphere));
+	}
+}
+
+//and input
+void GSSTree::LeafData::read(istream&  in)
+{
+	unsigned n = 0;
+	in.read((char*)&n, sizeof(n));
+	spheres.resize(n);
+	for(unsigned i = 0; i < n; i++)
+	{
+		in.read((char*)&spheres[i], sizeof(MolSphere));
+	}
+}
+
+//base class output
+void GSSTree::GSSNode::write(ostream& out) const
+{
+	streampos ret = out.tellp();
+
+	//write out kind of node
+	const GSSInternalNode* intnode = dynamic_cast<const GSSInternalNode*>(this);
+	bool isInternal = intnode != NULL;
+
+	out.write((char*)&isInternal, sizeof(isInternal));
+	out.write((char*)&res, sizeof(res));
+	out.write((char*)&which, sizeof(which));
+	//write out MIV/MSV
+	MIV->write(out);
+	MSV->write(out);
 }
 
 
-void GSSTree::write(const filesystem::path& out)
+GSSTree::GSSNode* GSSTree::GSSNode::readCreate(istream& in, GSSInternalNode *parPtr)
 {
-	cerr << "Unimplemented: write\n";
-	exit(-1);
+	bool isInternal = false;
+	in.read((char*)&isInternal, sizeof(isInternal));
+
+	if(isInternal)
+	{
+		GSSInternalNode *ret = new GSSInternalNode();
+		ret->read(in, parPtr);
+		return ret;
+	}
+	else
+	{
+		GSSLeafNode *ret = new GSSLeafNode();
+		ret->read(in, parPtr);
+		return ret;
+	}
+
+}
+
+void GSSTree::GSSNode::read(istream& in, GSSInternalNode *parPtr)
+{
+	parent = parPtr;
+	in.read((char*)&res, sizeof(res));
+	in.read((char*)&which, sizeof(which));
+	MIV->read(in);
+	MSV->read(in);
+}
+
+void GSSTree::GSSInternalNode::write(ostream& out) const
+{
+	GSSNode::write(out);
+
+	unsigned n = children.size();
+	out.write((char*)&n, sizeof(n));
+
+	for(unsigned i = 0; i < n; i++)
+	{
+		children[i]->write(out);
+	}
+}
+
+void GSSTree::GSSInternalNode::read(istream& in, GSSInternalNode *parPtr)
+{
+	GSSNode::read(in, parPtr);
+
+	unsigned n = 0;
+	in.read((char*)&n, sizeof(n));
+	children.resize(n, NULL);
+	for(unsigned i = 0; i < n; i++)
+	{
+		children[i] = GSSNode::readCreate(in, this);
+	}
+}
+
+//dump leaf node
+void GSSTree::GSSLeafNode::write(ostream& out) const
+{
+	GSSNode::write(out);
+
+	unsigned n = trees.size();
+	out.write((char*)&n, sizeof(n));
+	for(unsigned i = 0; i < n; i++)
+	{
+		trees[i]->write(out);
+	}
+
+	for(unsigned i = 0; i < n; i++)
+	{
+		data[i].write(out);
+	}
+}
+
+void GSSTree::GSSLeafNode::read(istream& in, GSSInternalNode *parPtr)
+{
+	GSSNode::read(in, parPtr);
+
+	unsigned n = 0;
+	in.read((char*)&n, sizeof(n));
+	trees.resize(n, NULL);
+	data.resize(n);
+
+	for(unsigned i = 0; i < n; i++)
+	{
+		trees[i] = new OctTree();
+		trees[i]->read(in);
+	}
+	for(unsigned i = 0; i < n; i++)
+	{
+		data[i].read(in);
+	}
+}
+
+
+//dump tree in binary to be read into memory later
+void GSSTree::write(ostream& out)
+{
+	out.write((char*)&maxres, sizeof(maxres));
+	out.write((char*)min, sizeof(min));
+	out.write((char*)&dim, sizeof(dim));
+	root->write(out);
+}
+
+//read completely into memory
+void GSSTree::read(istream& in)
+{
+	in.read((char*)&maxres, sizeof(maxres));
+	in.read((char*)min, sizeof(min));
+	in.read((char*)&dim, sizeof(dim));
+	if(root) delete root;
+	root = GSSNode::readCreate(in, NULL);
 }
 
 //insert data into leaf node, if there isn't enough room, split
@@ -408,6 +602,22 @@ void GSSTree::split(const vector<OctTree*>& MIV, const vector<OctTree*>& MSV,
 
 }
 
+//how much will the current MIV and MSV change after merging in miv ans msv?
+float GSSTree::GSSNode::combinedVolumeChange(OctTree *miv, OctTree *msv) const
+{
+	float deltamiv = MIV->volume() - MIV->intersectVolume(*miv);
+	float deltamsv = MSV->unionVolume(*msv) - MSV->volume();
+	return deltamiv + deltamsv;
+}
+
+
+//examine every object in the leaf and see if it has a better distance than distance,
+//if so, store data
+void GSSTree::GSSLeafNode::scanNearest(const OctTree& tree, float& distance, LeafData& d)
+{
+	findNearest(tree, distance, d); //this is just the same
+}
+
 //find the object with the best distance in this node, if it's better than
 //the passed distance, update
 void GSSTree::GSSLeafNode::findNearest(const OctTree& tree, float& distance, LeafData& d)
@@ -444,6 +654,27 @@ void GSSTree::GSSLeafNode::findInsertionPoint(const OctTree& tree, float& distan
 	}
 }
 
+//add this leaf if it's distance is better and truncate kbest if necessary
+void GSSTree::GSSLeafNode::findInsertionPoints(const OctTree& tree, vector<LeafDistPair>& kbest, unsigned k)
+{
+	float dist = 0;
+	if(trees.size() > 0)
+	{
+		float min, max;
+		dist = searchDist(&tree, MIV, MSV, min, max);
+	}
+
+	if(kbest.size() == 0 || kbest.back().distance > dist)
+	{
+		LeafDistPair pair(this, dist);
+		kbest.insert(lower_bound(kbest.begin(), kbest.end(), pair), pair);
+		if(kbest.size() > k) //truncate
+			kbest.resize(k);
+	}
+
+}
+
+
 
 struct ScoreIndex
 {
@@ -459,6 +690,16 @@ struct ScoreIndex
 		return score < si.score;
 	}
 };
+
+//scan - ignore any bounding on the search
+void GSSTree::GSSInternalNode::scanNearest(const OctTree& tree, float& distance, LeafData& data)
+{
+	for(unsigned i = 0, n = children.size(); i < n; i++)
+	{
+		children[i]->scanNearest(tree, distance, data);
+	}
+}
+
 //explore children to find closest value
 void GSSTree::GSSInternalNode::findNearest(const OctTree& tree, float& distance, LeafData& data)
 {
@@ -498,6 +739,25 @@ void GSSTree::GSSInternalNode::findInsertionPoint(const OctTree& tree, float& di
 		for(unsigned i = 0, n = children.size(); i < n; i++)
 		{
 			children[i]->findInsertionPoint(tree, distance, leaf);
+		}
+	}
+}
+
+void GSSTree::GSSInternalNode::findInsertionPoints(const OctTree& tree, vector<LeafDistPair>& kbest, unsigned k)
+{
+	float min, max;
+	float dist = searchDist(&tree, MIV, MSV, min, max);
+	float bestdist = HUGE_VAL;
+	if(kbest.size() == k && k > 0)
+	{
+		bestdist = kbest.back().distance;
+	}
+	if(dist < bestdist)
+	{
+		//if this tree might contain something better, look at all children -> really should sort this
+		for(unsigned i = 0, n = children.size(); i < n; i++)
+		{
+			children[i]->findInsertionPoints(tree, kbest, k);
 		}
 	}
 }

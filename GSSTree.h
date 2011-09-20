@@ -18,6 +18,7 @@
 #include <boost/array.hpp>
 #include <vector>
 #include <iostream>
+#include <cmath>
 
 #include "MolSphere.h"
 #include "OctTree.h"
@@ -36,10 +37,29 @@ class GSSTree
 
 		LeafData() {}
 		LeafData(const vector<MolSphere>& sph): spheres(sph) {}
+
+		void write(ostream& out) const;
+		void read(istream& in);
 	};
 
 	struct GSSInternalNode;
 	struct GSSLeafNode;
+
+	//class for storing leaves with a distance so we can sort
+	struct LeafDistPair
+	{
+		GSSLeafNode *leaf;
+		float distance;
+
+		LeafDistPair(): leaf(NULL), distance(HUGE_VAL) {}
+		LeafDistPair(GSSLeafNode *l, float d): leaf(l), distance(d) {}
+
+		bool operator<(const LeafDistPair& rhs) const
+		{
+			return distance < rhs.distance;
+		}
+	};
+
 	struct GSSNode
 	{
 		GSSInternalNode *parent;
@@ -48,19 +68,34 @@ class GSSTree
 		float res; // resolution
 		unsigned which; //which child this is
 
+		GSSNode(): parent(NULL), MIV(new OctTree(0,0)), MSV(new OctTree(0,0)), res(0), which(0)
+		{
+			MIV->fill();
+		}
 		GSSNode(float d, float r):parent(NULL), MIV(new OctTree(d,r)), MSV(new OctTree(d,r)), res(r),which(0) {
 			MIV->fill();
 		}
 		virtual ~GSSNode();
 
+		//examine every leaf to find nearest - for debugging and testing
+		virtual void scanNearest(const OctTree& tree, float& distance, LeafData& data) = 0;
 		//find "closest" object to tree and put data into data
 		virtual void findNearest(const OctTree& tree, float& distance, LeafData& data) = 0;
 
 		virtual void findInsertionPoint(const OctTree& tree, float& distance, GSSLeafNode*& leaf) = 0;
+		//find k-best leaves for tree
+		virtual void findInsertionPoints(const OctTree& tree, vector<LeafDistPair>& kbest, unsigned k) = 0;
 
 		virtual void printLeafInfo(unsigned depth) const = 0;
 		virtual unsigned size() const = 0;
 		virtual unsigned numLeaves() const = 0;
+
+		float combinedVolumeChange(OctTree *miv, OctTree *msv) const;
+
+		virtual void write(ostream& out) const;
+		virtual void read(istream& in, GSSInternalNode *parent);
+		static GSSNode* readCreate(istream& in, GSSInternalNode *parent);
+
 	};
 
 	struct GSSInternalNode: public GSSNode
@@ -73,19 +108,21 @@ class GSSTree
 			children.reserve(MaxSplit);
 		}
 
+		GSSInternalNode() {}
+
 		virtual ~GSSInternalNode()
 		{
 			for(unsigned i = 0, n = children.size(); i < n; i++)
 			{
 				delete children[i];
 			}
-			if(MIV) delete MIV;
-			if(MSV) delete MSV;
 		}
 
 		void update(GSSTree& gTree, unsigned whichChild, GSSNode *newnode);
+		virtual void scanNearest(const OctTree& tree, float& distance, LeafData& data);
 		virtual void findNearest(const OctTree& tree, float& distance, LeafData& data);
 		virtual void findInsertionPoint(const OctTree& tree, float& distance, GSSLeafNode*& leaf);
+		virtual void findInsertionPoints(const OctTree& tree, vector<LeafDistPair>& kbest, unsigned k);
 
 		void addChild(GSSNode *child);
 
@@ -116,6 +153,9 @@ class GSSTree
 			}
 			return ret;
 		}
+
+		virtual void write(ostream& out) const;
+		virtual void read(istream& in, GSSInternalNode *parPtr);
 	};
 
 	struct GSSLeafNode: public GSSNode
@@ -129,6 +169,8 @@ class GSSTree
 			data.reserve(MaxSplit);
 		}
 
+		GSSLeafNode() {}
+
 		~GSSLeafNode()
 		{
 			for(unsigned i = 0, n = trees.size(); i < n; i++)
@@ -138,8 +180,11 @@ class GSSTree
 		}
 
 		void insert(GSSTree& gTree, const OctTree& tree, const LeafData& data);
+		virtual void scanNearest(const OctTree& tree, float& distance, LeafData& data);
 		virtual void findNearest(const OctTree& tree, float& distance, LeafData& data);
+
 		virtual void findInsertionPoint(const OctTree& tree, float& distance, GSSLeafNode*& leaf);
+		virtual void findInsertionPoints(const OctTree& tree, vector<LeafDistPair>& kbest, unsigned k);
 
 		void printLeafInfo(unsigned depth) const
 		{
@@ -153,18 +198,19 @@ class GSSTree
 
 		unsigned numLeaves() const { return 1; }
 
+		virtual void write(ostream& out) const;
+		virtual void read(istream& in, GSSInternalNode *parPtr);
+
 	};
 
 	float maxres;
 	float min[3];
 	float dim;
-
-	void setBoundingBox(array<float,6>& box);
-
 	GSSNode *root;
 
 	static const unsigned MaxSplit;
 
+	void setBoundingBox(array<float,6>& box);
 	static float leafDist(const OctTree* obj, const OctTree *leaf);
 	static float searchDist(const OctTree* obj, const OctTree *MIV, const OctTree *MSV, float& min, float& max);
 	static float splitDist(OctTree* leftMIV, OctTree* leftMSV, OctTree* rightMIV, OctTree* rightMSV);
@@ -184,6 +230,11 @@ public:
 		root = new GSSLeafNode(dim, maxres);
 	}
 
+	GSSTree(): maxres(0), root(NULL)
+	{
+		//basically can just read in
+	}
+
 	virtual ~GSSTree() { delete root; root = NULL; }
 
 	//add a single mol
@@ -192,7 +243,8 @@ public:
 	//nearest neighbor search, return closest set of molspheres
 	void nn_search(const vector<MolSphere>& mol, vector<MolSphere>& res);
 
-	void write(const filesystem::path& out); //dump to file
+	void write(ostream& out); //dump to file
+	void read(istream& in); //dump to file
 
 	void printRootInfo() const { cout << root->MIV->volume() <<","<<root->MSV->volume() << "\n"; } //for debug
 	void printLeafInfo() const { root->printLeafInfo(0); cout << "\n"; } //for debugging
