@@ -49,8 +49,8 @@ cl::opt<CommandEnum>
 				clEnumVal(CreateSearch,"In memory database creation and search for testing"),
 				clEnumValEnd) );
 
-cl::opt<string> Input("in", cl::desc("Input file"), cl::Required);
-cl::opt<string> Output("out", cl::desc("Output file"), cl::Required);
+cl::opt<string> Input("in", cl::desc("Input file"));
+cl::opt<string> Output("out", cl::desc("Output file"));
 cl::opt<string> Database("db", cl::desc("Database file"));
 
 cl::opt<double> LessDist("less",
@@ -58,6 +58,9 @@ cl::opt<double> LessDist("less",
 cl::opt<double> MoreDist("more",
 		cl::desc("Distance to increase query mol by for constraint search (default 1A)."), cl::init(1.0));
 cl::opt<double> Resolution("resolution", cl::desc("Best resolution for shape database creation."),cl::init(1.0));
+
+cl::opt<string> IncludeMol("incmol", cl::desc("Molecule to use for minimum included volume"));
+cl::opt<string> ExcludeMol("exmol", cl::desc("Molecule to use for excluded volume"));
 
 static void spherizeMol(OEMol& mol, vector<MolSphere>& spheres)
 {
@@ -187,6 +190,7 @@ int main(int argc, char *argv[])
 		}
 
 	}
+	break;
 	case DCSearch:
 	{
 		//read in database
@@ -198,29 +202,72 @@ int main(int argc, char *argv[])
 			exit(-1);
 		}
 		gss.read(dbfile);
+		ofstream out(Output.c_str());
 
 		//read query molecule(s)
-		oemolistream inmols(Input);
-		OEMol mol;
-		ofstream out(Output.c_str());
-    	while(OEReadMolecule(inmols, mol))
-    	{
-    		vector<MolSphere> littlespheres, bigspheres;
-			spherizeMol(mol, littlespheres);
-			bigspheres = littlespheres;
-
-			//adjust radii
-			for(unsigned i = 0, n = littlespheres.size(); i < n; i++)
+		if(IncludeMol.size() > 0 || ExcludeMol.size() > 0)
+		{
+			//use explicit volumes
+			oemolistream inmol(IncludeMol);
+			oemolistream exmol(ExcludeMol);
+			if(!inmol && !exmol)
 			{
-				littlespheres[i].incrementRadius(-LessDist);
-				bigspheres[i].incrementRadius(MoreDist);
+				cerr << "Error reading inclusive/exclusive molecules\n";
+				exit(-1);
+			}
+			vector<MolSphere> insphere, exsphere;
+			if(inmol)
+			{
+				OEMol mol;
+				OEReadMolecule(inmol, mol);
+				spherizeMol(mol, insphere);
+				//adjust radii
+				for (unsigned i = 0, n = insphere.size(); i < n; i++)
+				{
+					insphere[i].incrementRadius(-LessDist);
+				}
+			}
+			if(exmol)
+			{
+				OEMol mol;
+				OEReadMolecule(exmol, mol);
+				spherizeMol(mol, exsphere);
+				//adjust radii
+				for (unsigned i = 0, n = exsphere.size(); i < n; i++)
+				{
+					exsphere[i].incrementRadius(-MoreDist);
+				}
 			}
 
-			vector< vector<MolSphere> > res;
-			gss.dc_search(littlespheres, bigspheres, res);
+			vector<vector<MolSphere> > res;
+			gss.inex_search(insphere, exsphere, res);
 			//just output in xyz w/o radii
-			for(unsigned i = 0, n = res.size(); i < n; i++)
+			for (unsigned i = 0, n = res.size(); i < n; i++)
 				outputRes(out, res[i]);
+		}
+		else // range from single molecules
+		{
+			oemolistream inmols(Input);
+			OEMol mol;
+			while (OEReadMolecule(inmols, mol))
+			{
+				vector<MolSphere> littlespheres, bigspheres;
+				spherizeMol(mol, littlespheres);
+				bigspheres = littlespheres;
+
+				//adjust radii
+				for (unsigned i = 0, n = littlespheres.size(); i < n; i++)
+				{
+					littlespheres[i].incrementRadius(-LessDist);
+					bigspheres[i].incrementRadius(MoreDist);
+				}
+
+				vector<vector<MolSphere> > res;
+				gss.dc_search(littlespheres, bigspheres, res);
+				//just output in xyz w/o radii
+				for (unsigned i = 0, n = res.size(); i < n; i++)
+					outputRes(out, res[i]);
+			}
 		}
 	}
 		break;

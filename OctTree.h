@@ -113,6 +113,8 @@ public:
 
 };
 
+/* Pointer based oct tree. Tree is represented by node pointers
+*/
 class OctTree
 {
 	float dimension; //sits within a cube of this dimension, power of 2
@@ -125,11 +127,10 @@ class OctTree
 	struct OctNode
 	{
 		OctType type;
-		float dim; //this is slightly unnecessary, the dimension of this node
 		OctNode *children[8]; //pointers belong to this node
 
 		OctNode() :
-			type(Empty), dim(0)
+			type(Empty)
 		{
 			memset(children, 0, sizeof(children));
 		}
@@ -161,14 +162,15 @@ class OctTree
 		}
 
 		//return true if changed
+		void invert();
 		bool intersect(const OctNode *rhs);
 		bool unionWith(const OctNode *rhs);
-		void truncate(double resolution);
-		void grow(double resolution);
+		void truncate(double resolution, float dim);
+		void grow(double resolution, float dim);
 
-		float intersectVolume(const OctNode *rhs) const;
-		float unionVolume(const OctNode *rhs) const;
-		float volume() const; //recursive volume calculation
+		float intersectVolume(const OctNode *rhs, float dim) const;
+		float unionVolume(const OctNode *rhs, float dim) const;
+		float volume(float dim) const; //recursive volume calculation
 		unsigned leaves() const; //recursive leafs cnt
 
 		void write(ostream& out) const;
@@ -231,6 +233,9 @@ public:
         swap(first.root, second.root);
     }
 
+    //invert filled and unfilled
+    void invert() { return root->invert(); }
+
 	//mogrifying intersection
 	bool intersect(const OctTree& rhs) { return root->intersect(rhs.root); }
 	//mogrifying union
@@ -238,24 +243,128 @@ public:
 
 	//truncate (maximum included volume) to specified resolution
 	//only nodes that are >= resolution and full are kept
-	void truncate(double resolution) { root->truncate(resolution); }
+	void truncate(double resolution) { root->truncate(resolution, dimension); }
 
 	//expand (minimum surrounding volume) so that any non-empty nodes <= resolution
 	//are made full
-	void grow(double resolution) { root->grow(resolution); }
+	void grow(double resolution) { root->grow(resolution, dimension); }
 
 	//volume calculations that don't require creating a tmp tree
-	float intersectVolume(const OctTree& rhs) const { return root->intersectVolume(rhs.root); }
-	float unionVolume(const OctTree& rhs) const { return root->unionVolume(rhs.root); }
+	float intersectVolume(const OctTree& rhs) const { return root->intersectVolume(rhs.root, dimension); }
+	float unionVolume(const OctTree& rhs) const { return root->unionVolume(rhs.root, dimension); }
 
 	//return total volume contained in octtree
-	float volume() const { return root->volume();}
+	float volume() const { return root->volume(dimension);}
 
 	//return number of leaves
 	unsigned leaves() const { return root->leaves(); }
 
 	void clear() { root->deleteChildren(); }
 	void fill() { root->deleteChildren(); root->type = Full; }
+
+	void write(ostream& out) const;
+	void read(istream& in);
+};
+
+/* linearlized oct tree - tree is represented as a vector of values
+ * we manage to not store children nodes this way, but always have to
+ * iterate over the whole thing (no shortcuts)
+ * */
+class LinearOctTree
+{
+	float dimension;
+	float resolution;
+
+	enum Type {Empty, Full};
+	struct OctVal
+	{
+		Type flag:1;
+		unsigned level: 7;
+
+		OctVal(): flag(Empty), level(0) {}
+		OctVal(Type t, unsigned l): flag(t), level(l) {}
+	}__attribute__((__packed__));
+
+	vector<OctVal> tree;
+	//store the volume of a cube at a given level
+	vector<float> levelVolumes;
+
+	void setLevelVolumes();
+	//generate a linear oct tree from a mol
+	void create(const Cube& cube, unsigned level, const vector<MolSphere>& mol);
+
+	//shared code of intersection and union
+	bool operation(const LinearOctTree& rhs, bool doUnion);
+	float volOperation(const LinearOctTree& rhs, bool doUnion) const;
+
+	static unsigned absorbTreeAtLevel(const vector<OctVal>& T, unsigned pos, unsigned level);
+	static unsigned appendTreeAtLevel(const vector<OctVal>& T, unsigned pos, unsigned level, vector<OctVal>& appendto);
+	unsigned volumeOfTreeAtLevel(const vector<OctVal>& T, unsigned pos, unsigned level, float& vol) const;
+
+public:
+	LinearOctTree(): dimension(0), resolution(0)
+	{
+		clear();
+	}
+
+	LinearOctTree(float dim, float res): dimension(dim), resolution(res)
+	{
+		setLevelVolumes();
+		clear();
+	}
+
+	LinearOctTree(float dim, float res, const vector<MolSphere>& mol): dimension(dim), resolution(res)
+	{
+		setLevelVolumes();
+		Cube cube(dimension);
+		create(cube, 0, mol);
+	}
+
+	LinearOctTree(const LinearOctTree& rhs):dimension(rhs.dimension), resolution(rhs.resolution),tree(rhs.tree),levelVolumes(rhs.levelVolumes)
+	{
+	}
+
+	LinearOctTree& operator=(LinearOctTree rhs)
+	{
+		swap(*this, rhs); //rhs passed by value
+		return *this;
+	}
+
+	virtual ~LinearOctTree()
+	{
+	}
+
+    friend void swap(LinearOctTree& first, LinearOctTree& second)
+    {
+        // enable ADL (not necessary in our case, but good practice)
+        using std::swap;
+
+        swap(first.resolution, second.resolution);
+        swap(first.dimension, second.dimension);
+        swap(first.tree, second.tree);
+        swap(first.levelVolumes, second.levelVolumes);
+    }
+
+    //invert filled and unfilled
+    void invert();
+
+	//mogrifying intersection
+	bool intersect(const LinearOctTree& rhs);
+	//mogrifying union
+	bool unionWith(const LinearOctTree& rhs);
+
+	//volume calculations that don't require creating a tmp tree
+	float intersectVolume(const LinearOctTree& rhs) const;
+	float unionVolume(const LinearOctTree& rhs) const;
+
+	//return total volume contained in octtree
+	float volume() const;
+
+	//return number of leaves
+	unsigned leaves() const { return tree.size(); }
+
+	void clear() { tree.clear(); tree.push_back(OctVal(Empty,0));}
+	void fill() { tree.clear(); tree.push_back(OctVal(Full,0)); }
 
 	void write(ostream& out) const;
 	void read(istream& in);

@@ -6,7 +6,6 @@
  */
 
 #include "GSSTree.h"
-#include "OctTree.h"
 #include "Timer.h"
 #include <math.h>
 #include <iostream>
@@ -56,7 +55,7 @@ void GSSTree::add(const vector<MolSphere>& m)
 	//reposition mol
 	vector<MolSphere> mol;
 	transformMol(m, mol);
-	OctTree oct(dim, maxres, mol);
+	LinearOctTree oct(dim, maxres, mol);
 
 	//insert into the tree - first find the leaf node to insert into, then
 	//perform the insertion
@@ -101,7 +100,7 @@ void GSSTree::nn_search(const vector<MolSphere>& m, vector<MolSphere>& res)
 {
 	vector<MolSphere> mol;
 	transformMol(m, mol);
-	OctTree tree(dim, maxres, mol);
+	LinearOctTree tree(dim, maxres, mol);
 	LeafData data;
 	float dist = HUGE_VAL;
 	leavesChecked = 0;
@@ -129,15 +128,8 @@ void GSSTree::nn_search(const vector<MolSphere>& m, vector<MolSphere>& res)
 	}
 }
 
-void GSSTree::dc_search(const vector<MolSphere>& little, const vector<MolSphere>& big, vector<vector<MolSphere> >& res)
+void GSSTree::tree_range_search(const LinearOctTree& smallTree, const LinearOctTree& bigTree, vector<vector<MolSphere>  >& res)
 {
-	vector<MolSphere> littleMol, bigMol;
-	transformMol(little, littleMol);
-	transformMol(big, bigMol);
-
-	OctTree smallTree(dim,maxres, littleMol);
-	OctTree bigTree(dim,maxres, bigMol);
-
 	leavesChecked = 0;
 	Timer t;
 	res.clear();
@@ -160,7 +152,7 @@ void GSSTree::dc_search(const vector<MolSphere>& little, const vector<MolSphere>
 		root->scanTweeners(smallTree, bigTree, data);
 		elapsed = t.elapsed();
 		cout << "LeavesScanned " << leavesChecked << " / " << root->numLeaves()
-								<< "\t" << elapsed << "\n";
+								<< "\t" << elapsed << "\t" << data.size() << "\n";
 
 		if (data.size() != res.size()) //lame but easy check
 		{
@@ -168,6 +160,32 @@ void GSSTree::dc_search(const vector<MolSphere>& little, const vector<MolSphere>
 		}
 	}
 }
+
+void GSSTree::dc_search(const vector<MolSphere>& little, const vector<MolSphere>& big, vector<vector<MolSphere> >& res)
+{
+	vector<MolSphere> littleMol, bigMol;
+	transformMol(little, littleMol);
+	transformMol(big, bigMol);
+
+	LinearOctTree smallTree(dim,maxres, littleMol);
+	LinearOctTree bigTree(dim,maxres, bigMol);
+
+	tree_range_search(smallTree, bigTree, res);
+}
+
+void GSSTree::inex_search(const vector<MolSphere>& inc, const vector<MolSphere>& exc, vector<vector<MolSphere> >& res)
+{
+	vector<MolSphere> littleMol, bigMol;
+	transformMol(inc, littleMol);
+	transformMol(exc, bigMol);
+
+	LinearOctTree smallTree(dim,maxres, littleMol);
+	LinearOctTree bigTree(dim,maxres, bigMol);
+	bigTree.invert();
+
+	tree_range_search(smallTree, bigTree, res);
+}
+
 
 
 //output leaf data
@@ -295,7 +313,7 @@ void GSSTree::GSSLeafNode::read(istream& in, GSSInternalNode *parPtr)
 
 	for(unsigned i = 0; i < n; i++)
 	{
-		trees[i] = new OctTree();
+		trees[i] = new LinearOctTree();
 		trees[i]->read(in);
 	}
 
@@ -327,7 +345,7 @@ void GSSTree::read(istream& in)
 
 //insert data into leaf node, if there isn't enough room, split
 //call update on parents if need-be
-void GSSTree::GSSLeafNode::insert(GSSTree& gTree, const OctTree& tree, const LeafData& m)
+void GSSTree::GSSLeafNode::insert(GSSTree& gTree, const LinearOctTree& tree, const LeafData& m)
 {
 	if(data.size() < MaxSplit)
 	{
@@ -335,7 +353,7 @@ void GSSTree::GSSLeafNode::insert(GSSTree& gTree, const OctTree& tree, const Lea
 
 		assert(data.size() == trees.size());
 		//easy case, just add
-		trees.push_back(new OctTree(tree));
+		trees.push_back(new LinearOctTree(tree));
 		data.push_back(LeafData(m));
 
 		//update MIV/MSV
@@ -350,7 +368,7 @@ void GSSTree::GSSLeafNode::insert(GSSTree& gTree, const OctTree& tree, const Lea
 	else //must split
 	{
 		//first add tree
-		trees.push_back(new OctTree(tree));
+		trees.push_back(new LinearOctTree(tree));
 		data.push_back(LeafData(m));
 
 		//so that we can have one split function, have concept of MIV and MSV
@@ -374,7 +392,7 @@ void GSSTree::GSSLeafNode::insert(GSSTree& gTree, const OctTree& tree, const Lea
 			newnode->MIV->intersect(*trees[index]);
 		}
 		//now mogirfy to split1
-		vector<OctTree*> tmptrees; tmptrees.reserve(MaxSplit);
+		vector<LinearOctTree*> tmptrees; tmptrees.reserve(MaxSplit);
 		vector<LeafData> tmpdata(split1.size());
 
 		MIV->fill();
@@ -433,7 +451,7 @@ void GSSTree::GSSInternalNode::update(GSSTree& tree, unsigned whichChild, GSSNod
 		else //must split
 		{
 			//setup split structures
-			vector<OctTree*> MIVs, MSVs;
+			vector<LinearOctTree*> MIVs, MSVs;
 			MIVs.reserve(MaxSplit);
 			MSVs.reserve(MaxSplit);
 
@@ -515,7 +533,7 @@ void GSSTree::createRoot(GSSNode *left, GSSNode *right)
 
 
 //return true if the object(s) represented by MIV/MSV might fit in between min and max
-bool GSSTree::fitsInbetween(const OctTree *MIV, const OctTree *MSV, const OctTree *min, const OctTree *max)
+bool GSSTree::fitsInbetween(const LinearOctTree *MIV, const LinearOctTree *MSV, const LinearOctTree *min, const LinearOctTree *max)
 {
 	//TODO: more efficient
 	//the MSV must completely enclose min
@@ -529,7 +547,7 @@ bool GSSTree::fitsInbetween(const OctTree *MIV, const OctTree *MSV, const OctTre
 }
 
 //return a distance to a single leaf, should be compatible with search Dist
-float GSSTree::leafDist(const OctTree* obj, const OctTree *leaf)
+float GSSTree::leafDist(const LinearOctTree* obj, const LinearOctTree *leaf)
 {
 	return 1 - obj->intersectVolume(*leaf)/obj->unionVolume(*leaf);
 }
@@ -537,7 +555,7 @@ float GSSTree::leafDist(const OctTree* obj, const OctTree *leaf)
 //return a "distance" between obj and MIV/MSV; the lower the distance
 //the higher the more likely a node should be searched
 //min and max should bookend the ultimate leaf distances
-float GSSTree::searchDist(const OctTree* obj, const OctTree *MIV, const OctTree *MSV, float& min, float& max)
+float GSSTree::searchDist(const LinearOctTree* obj, const LinearOctTree *MIV, const LinearOctTree *MSV, float& min, float& max)
 {
 	min = 1 - obj->intersectVolume(*MSV)/obj->unionVolume(*MIV);
 	max = 1 - obj->intersectVolume(*MIV)/obj->unionVolume(*MSV);
@@ -550,7 +568,7 @@ float GSSTree::searchDist(const OctTree* obj, const OctTree *MIV, const OctTree 
  * return a "distance" between approximations
  * for now, just the sum of the volume different of the MIVs and of the MSVs
  */
-float GSSTree::splitDist(OctTree* leftMIV, OctTree* leftMSV, OctTree* rightMIV, OctTree* rightMSV)
+float GSSTree::splitDist(LinearOctTree* leftMIV, LinearOctTree* leftMSV, LinearOctTree* rightMIV, LinearOctTree* rightMSV)
 {
 	float mind = leftMIV->intersectVolume(*rightMIV)/leftMIV->unionVolume(*rightMIV);
 	float maxd = leftMSV->intersectVolume(*rightMSV)/leftMSV->unionVolume(*rightMSV);
@@ -563,7 +581,7 @@ float GSSTree::splitDist(OctTree* leftMIV, OctTree* leftMSV, OctTree* rightMIV, 
  * where you find the two most "distant" nodes, and then greedily partition
  * using those.
  */
-void GSSTree::split(const vector<OctTree*>& MIV, const vector<OctTree*>& MSV,
+void GSSTree::split(const vector<LinearOctTree*>& MIV, const vector<LinearOctTree*>& MSV,
 		vector<unsigned>& s1, vector<unsigned>& s2)
 {
 	assert(MIV.size() == MSV.size());
@@ -597,12 +615,12 @@ void GSSTree::split(const vector<OctTree*>& MIV, const vector<OctTree*>& MSV,
 	assert(besti != bestj);
 
 	//seed with besti and bestj
-	OctTree iMIV = *MIV[besti];
-	OctTree iMSV = *MSV[besti];
+	LinearOctTree iMIV = *MIV[besti];
+	LinearOctTree iMSV = *MSV[besti];
 	s1.push_back(besti);
 
-	OctTree jMIV = *MIV[bestj];
-	OctTree jMSV = *MSV[bestj];
+	LinearOctTree jMIV = *MIV[bestj];
+	LinearOctTree jMSV = *MSV[bestj];
 	s2.push_back(bestj);
 
 	for(unsigned i = 0; i < N; i++)
@@ -659,7 +677,7 @@ void GSSTree::split(const vector<OctTree*>& MIV, const vector<OctTree*>& MSV,
 }
 
 //how much will the current MIV and MSV change after merging in miv ans msv?
-float GSSTree::GSSNode::combinedVolumeChange(OctTree *miv, OctTree *msv) const
+float GSSTree::GSSNode::combinedVolumeChange(LinearOctTree *miv, LinearOctTree *msv) const
 {
 	float deltamiv = MIV->volume() - MIV->intersectVolume(*miv);
 	float deltamsv = MSV->unionVolume(*msv) - MSV->volume();
@@ -669,7 +687,7 @@ float GSSTree::GSSNode::combinedVolumeChange(OctTree *miv, OctTree *msv) const
 
 //examine every object in the leaf and see if it has a better distance than distance,
 //if so, store data
-void GSSTree::GSSLeafNode::scanNearest(const OctTree& tree, float& distance, LeafData& d)
+void GSSTree::GSSLeafNode::scanNearest(const LinearOctTree& tree, float& distance, LeafData& d)
 {
 	findNearest(tree, distance, d); //this is just the same
 }
@@ -677,7 +695,7 @@ void GSSTree::GSSLeafNode::scanNearest(const OctTree& tree, float& distance, Lea
 
 //find the object with the best distance in this node, if it's better than
 //the passed distance, update
-void GSSTree::GSSLeafNode::findNearest(const OctTree& tree, float& distance, LeafData& d)
+void GSSTree::GSSLeafNode::findNearest(const LinearOctTree& tree, float& distance, LeafData& d)
 {
 	leavesChecked++;
 	for(unsigned i = 0, n = trees.size(); i < n; i++)
@@ -692,13 +710,13 @@ void GSSTree::GSSLeafNode::findNearest(const OctTree& tree, float& distance, Lea
 }
 
 //identify all objects that are exactly in between min and max
-void GSSTree::GSSLeafNode::scanTweeners(const OctTree& min, const OctTree& max, vector<LeafData>& res)
+void GSSTree::GSSLeafNode::scanTweeners(const LinearOctTree& min, const LinearOctTree& max, vector<LeafData>& res)
 {
 	findTweeners(min, max, res);
 }
 
 //identify all objects that are exactly in between min and max
-void GSSTree::GSSLeafNode::findTweeners(const OctTree& min, const OctTree& max, vector<LeafData>& res)
+void GSSTree::GSSLeafNode::findTweeners(const LinearOctTree& min, const LinearOctTree& max, vector<LeafData>& res)
 {
 	leavesChecked++;
 	for(unsigned i = 0, n = trees.size(); i < n; i++)
@@ -712,7 +730,7 @@ void GSSTree::GSSLeafNode::findTweeners(const OctTree& min, const OctTree& max, 
 
 
 //if this leaf is a more appropriate place for tree, return self
-void GSSTree::GSSLeafNode::findInsertionPoint(const OctTree& tree, float& distance, GSSLeafNode*& leaf)
+void GSSTree::GSSLeafNode::findInsertionPoint(const LinearOctTree& tree, float& distance, GSSLeafNode*& leaf)
 {
 	if(trees.size() == 0)
 	{
@@ -732,7 +750,7 @@ void GSSTree::GSSLeafNode::findInsertionPoint(const OctTree& tree, float& distan
 }
 
 //add this leaf if it's distance is better and truncate kbest if necessary
-void GSSTree::GSSLeafNode::findInsertionPoints(const OctTree& tree, vector<LeafDistPair>& kbest, unsigned k)
+void GSSTree::GSSLeafNode::findInsertionPoints(const LinearOctTree& tree, vector<LeafDistPair>& kbest, unsigned k)
 {
 	float dist = 0;
 	if(trees.size() > 0)
@@ -771,7 +789,7 @@ struct ScoreIndex
 
 //identify all objects that are exactly in between min and max
 //brute force scan for debugging
-void GSSTree::GSSInternalNode::scanTweeners(const OctTree& min, const OctTree& max, vector<LeafData>& res)
+void GSSTree::GSSInternalNode::scanTweeners(const LinearOctTree& min, const LinearOctTree& max, vector<LeafData>& res)
 {
 	for(unsigned i = 0, n = children.size(); i < n; i++)
 	{
@@ -781,7 +799,7 @@ void GSSTree::GSSInternalNode::scanTweeners(const OctTree& min, const OctTree& m
 
 //identify all objects that are exactly in between min and max
 //filter out children that can't possibly match
-void GSSTree::GSSInternalNode::findTweeners(const OctTree& min, const OctTree& max, vector<LeafData>& res)
+void GSSTree::GSSInternalNode::findTweeners(const LinearOctTree& min, const LinearOctTree& max, vector<LeafData>& res)
 {
 	for(unsigned i = 0, n = children.size(); i < n; i++)
 	{
@@ -793,7 +811,7 @@ void GSSTree::GSSInternalNode::findTweeners(const OctTree& min, const OctTree& m
 }
 
 //scan - ignore any bounding on the search
-void GSSTree::GSSInternalNode::scanNearest(const OctTree& tree, float& distance, LeafData& data)
+void GSSTree::GSSInternalNode::scanNearest(const LinearOctTree& tree, float& distance, LeafData& data)
 {
 	for(unsigned i = 0, n = children.size(); i < n; i++)
 	{
@@ -802,7 +820,7 @@ void GSSTree::GSSInternalNode::scanNearest(const OctTree& tree, float& distance,
 }
 
 //explore children to find closest value
-void GSSTree::GSSInternalNode::findNearest(const OctTree& tree, float& distance, LeafData& data)
+void GSSTree::GSSInternalNode::findNearest(const LinearOctTree& tree, float& distance, LeafData& data)
 {
 	vector<ScoreIndex> SIs;
 	SIs.reserve(children.size());
@@ -830,7 +848,7 @@ void GSSTree::GSSInternalNode::findNearest(const OctTree& tree, float& distance,
 }
 
 //look for a good place for the data indexed by tree
-void GSSTree::GSSInternalNode::findInsertionPoint(const OctTree& tree, float& distance, GSSLeafNode*& leaf)
+void GSSTree::GSSInternalNode::findInsertionPoint(const LinearOctTree& tree, float& distance, GSSLeafNode*& leaf)
 {
 	float min, max;
 	float dist = searchDist(&tree, MIV, MSV, min, max);
@@ -844,7 +862,7 @@ void GSSTree::GSSInternalNode::findInsertionPoint(const OctTree& tree, float& di
 	}
 }
 
-void GSSTree::GSSInternalNode::findInsertionPoints(const OctTree& tree, vector<LeafDistPair>& kbest, unsigned k)
+void GSSTree::GSSInternalNode::findInsertionPoints(const LinearOctTree& tree, vector<LeafDistPair>& kbest, unsigned k)
 {
 	float min, max;
 	float dist = searchDist(&tree, MIV, MSV, min, max);
