@@ -104,8 +104,12 @@ int main(int argc, char *argv[])
 		float ctr[3], ext[3];
 	    array<float,6> box = { {FLT_MAX,FLT_MAX,FLT_MAX,FLT_MIN,FLT_MIN,FLT_MIN} };
 
+	    vector<vector<MolSphere> > allmols;
+
 	    while (OEReadMolecule(inmols, mol))
 		{
+	    	OEAssignBondiVdWRadii(mol);
+
 			for (OEIter<OEConfBase> conf = mol.GetConfs(); conf; ++conf)
 			{
 				OEGetCenterAndExtents(conf, ctr, ext);
@@ -115,20 +119,7 @@ int main(int argc, char *argv[])
 				box[3] = max(box[4], ctr[1] + ext[1]);
 				box[4] = min(box[2], ctr[2] - ext[2]);
 				box[5] = max(box[5], ctr[2] + ext[2]);
-			}
 
-		}
-
-	    //create gss tree
-	    GSSTree gss(box, Resolution);
-
-		//reread and generate molspheres to add to GSSTree
-		inmols.rewind();
-	    while (OEReadMolecule(inmols, mol))
-		{
-	    	OEAssignBondiVdWRadii(mol);
-			for (OEIter<OEConfBase> conf = mol.GetConfs(); conf; ++conf)
-			{
 				vector<MolSphere> spheres;
 				spheres.reserve(conf->NumAtoms());
 				for(OEIter<OEAtomBase> atom = conf->GetAtoms(); atom; ++atom)
@@ -137,9 +128,14 @@ int main(int argc, char *argv[])
 					conf->GetCoords(atom, xyz);
 					spheres.push_back(MolSphere(xyz[0], xyz[1], xyz[2], atom->GetRadius()));
 				}
-				gss.add(spheres);
+				allmols.push_back(spheres);
 			}
+
 		}
+
+	    //create gss tree
+	    GSSTree gss(box, Resolution);
+	    gss.load(allmols);
 
 	    if(Command == Create)
 	    {

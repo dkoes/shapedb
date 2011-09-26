@@ -409,6 +409,68 @@ void LinearOctTree::setLevelVolumes()
 	}
 }
 
+//find the position that points to the subtree specified by coord, or the highest leaf
+unsigned LinearOctTree::traverseOctantCoord(const vector<OctVal>& T, const vector<unsigned>& coord)
+{
+	unsigned pos = 0;
+	for(unsigned i = 0, n = coord.size(); i < n; i++)
+	{
+		//i is the level, coord[i] is what octant in the next level to look at
+		if(T[pos].level == i)
+		{
+			return pos;
+		}
+		else
+		{
+			for(unsigned j = 0, m = coord[i]; j < m; j++)
+			{
+				pos = absorbTreeAtLevel(T, pos, i+1);
+			}
+		}
+	}
+	return pos;
+}
+
+//there are 256 possible bit patterns within a single octant, this will return
+//the appropriate pattern for the specified coordinates
+unsigned LinearOctTree::getOctantPattern(const vector<unsigned>& coord) const
+{
+	//get a cursor to the correct position
+	if(tree.size() == 0)
+		return 0;
+	unsigned level = coord.size();
+	unsigned pos = traverseOctantCoord(tree, coord);
+
+	if(tree[pos].level <= level)
+	{
+		//request octant is subsummed
+		if(tree[pos].flag == Empty)
+			return 0;
+		else
+			return 255;
+	}
+	else
+	{
+		unsigned nextlevel = level+1;
+		unsigned ret = 0;
+		for(unsigned i = 0; i < 8; i++)
+		{
+			if(tree[pos].level == nextlevel) //exactly matches an octant
+			{
+				if(tree[pos].flag == Full)
+					ret |= (1<<i);
+			}
+			else if(tree[pos].level > nextlevel) //something there
+			{
+				ret |= (1<<i);
+			}
+			pos = absorbTreeAtLevel(tree, pos, nextlevel);
+		}
+		return ret;
+	}
+}
+
+
 //create a linear oct tree recursively
 void LinearOctTree::create(const Cube& cube, unsigned level,
 		const vector<MolSphere>& mol)

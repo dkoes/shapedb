@@ -13,6 +13,10 @@
 
 cl::opt<bool> ScanCheck("scancheck",cl::desc("Perform a full scan to check results"),cl::Hidden);
 cl::opt<unsigned> KBestInsertion("kinsert",cl::desc("Evaluate k insertion points"),cl::value_desc("k"),cl::init(0));
+cl::opt<bool> KBestReshuffle("reshuffle", cl::desc("Reshuffle using k insertion points on split"), cl::init(false));
+cl::opt<unsigned> ReshuffleLimit("reshuffle-limit", cl::desc("Limit number of reshufflings"), cl::init(0));
+cl::opt<bool> InsertionLoad("insert-load",cl::desc("Load be simply inserting"), cl::init(false));
+
 
 const unsigned GSSTree::MaxSplit = 8; //number of children in each node
 
@@ -34,6 +38,14 @@ void GSSTree::setBoundingBox(array<float,6>& box)
 	dim = pow(2, ceil(log(dim)/log(2)));
 	if(dim < 1)
 		dim = 1;
+
+	float div = dim;
+	maxlevel = 0;
+	while(div > maxres)
+	{
+		maxlevel++;
+		div /=2;
+	}
 }
 
 // perform any transformations necessary to conver the input coordinate system
@@ -63,9 +75,9 @@ void GSSTree::add(const vector<MolSphere>& m)
 	float dist = HUGE_VAL;
 	GSSLeafNode *leaf = NULL;
 
+	vector<LeafDistPair> kbest;
 	if(KBestInsertion > 0)
 	{
-		vector<LeafDistPair> kbest;
 		root->findInsertionPoints(oct, kbest, KBestInsertion);
 
 		assert(kbest.size() > 0);
@@ -83,6 +95,9 @@ void GSSTree::add(const vector<MolSphere>& m)
 		}
 		assert(isfinite(smallestChange));
 		leaf = kbest[besti].leaf;
+
+		if(!KBestReshuffle)
+			kbest.clear();
 	}
 	else //single best
 	{
@@ -90,8 +105,472 @@ void GSSTree::add(const vector<MolSphere>& m)
 	}
 
 	assert(leaf != NULL);
-	leaf->insert(*this, oct, LeafData(m));
+	leaf->insert(*this, oct, LeafData(m), kbest);
 }
+
+//initialize the index
+GSSTree::PartitionData::PartitionData()
+{
+
+}
+
+//compute shannon entropy of bit pattern distribution
+// entropy = - Sum(p_i * log(p_i))
+double GSSTree::Partitioner::shannonEntropy(unsigned *patternCnts, unsigned total)
+{
+	double res = 0;
+	double tot = total;
+	for(unsigned i = 0; i < 256; i++)
+	{
+		double pi = patternCnts[i]/tot;
+		if(pi > 0)
+		{
+			res += pi*log(pi);
+		}
+	}
+
+	return -res;
+}
+
+//enumerate all octants at this level
+//TODO: be smarter - some can be ignored
+void GSSTree::Partitioner::getOctants(unsigned level, bool splitMSV, vector< vector<unsigned> >& octants)
+{
+	//the number of octants grows exponentially with the level, for now
+	//do the brute force approach, but eventually replace with a fraction ptr-based octtree
+	//approach that traverse only the variable-presence octants
+	octants.clear();
+	octants.push_back( vector<unsigned>());
+	for(unsigned l = 0; l <= level; l++)
+	{
+		vector< vector<unsigned> > newoctants;
+		newoctants.reserve(octants.size() * 8);
+		for(unsigned i = 0; i < 8; i++)
+		{
+			for(unsigned j = 0, n = octants.size(); j < n; j++)
+			{
+				newoctants.push_back(octants[j]);
+				newoctants.back().push_back(i);
+			}
+		}
+		octants.swap(newoctants);
+	}
+}
+
+// find an octant at the specified level that is "good"
+// if splitMSV is true, look only at MSV patterns, otherwise MIV
+// put result in octantcoord
+bool GSSTree::Partitioner::findOctant(unsigned level, bool splitMSV, vector<unsigned>& octantcoord)
+{
+	//some ideas for "best" octant
+	//-largest variance in volume
+	//-most populated bit patterns
+	//-shannon index of bit patterns
+	//-other diversity indices of bit patterns
+
+	vector< vector<unsigned> > octants;
+	getOctants(level, splitMSV, octants);
+
+	double bestval = 0;
+	unsigned besto = 0;
+	for(unsigned o = 0, no = octants.size(); o < no; o++)
+	{
+		unsigned patternCnts[256] ={ 0, };
+		unsigned total = 0;
+		for (unsigned i = 0, n = tindex.size(); i < n; i++)
+		{
+			unsigned index = tindex[i];
+			unsigned which = 0;
+			if (splitMSV)
+				which = partdata->getMSV(index)->getOctantPattern(octants[o]);
+			else
+				which = partdata->getMIV(index)->getOctantPattern(octants[o]);
+			patternCnts[which]++;
+			total++;
+		}
+
+		//various metrics are possible, probably just evaluate
+		//shannon entropy and volume (faster?)
+		double entropy = shannonEntropy(patternCnts, total);
+		if(entropy > bestval)
+		{
+			bestval = entropy;
+			besto = o;
+		}
+	}
+
+	if(bestval == 0)
+		return false; //all the same at this level
+
+	octantcoord = octants[besto];
+	return true;
+}
+
+//create sub partitions based on the octant bit pattern at the specified coord
+void GSSTree::Partitioner::partitionOnOctant(const vector<unsigned>& octantcoord, bool splitMSV, vector<Partitioner>& parts)
+{
+	int pos[256];
+	memset(pos, -1, sizeof(pos));
+
+	parts.clear();
+	parts.reserve(256);
+	for(unsigned i = 0, n = tindex.size(); i < n; i++)
+	{
+		unsigned index = tindex[i];
+		unsigned which = 0;
+		if (splitMSV)
+			which = partdata->getMSV(index)->getOctantPattern(octantcoord);
+		else
+			which = partdata->getMIV(index)->getOctantPattern(octantcoord);
+
+		if(pos[which] < 0) //create new partition
+		{
+			pos[which] = parts.size();
+			parts.push_back(Partitioner(partdata));
+		}
+
+		parts[which].addSingle(*this, i);
+	}
+}
+
+//merge from into this, must have the same data
+//does no checking for duplicates
+void GSSTree::Partitioner::add(const Partitioner& from)
+{
+	assert(partdata == from.partdata);
+	for(unsigned i = 0, n = from.size(); i < n; i++)
+		tindex.push_back(from.tindex[i]);
+}
+
+//add a single bit of partition data from from, updating structures as necessary
+void GSSTree::Partitioner::addSingle(const Partitioner& from, unsigned fromindex)
+{
+	tindex.push_back(from.tindex[fromindex]);
+}
+
+//pack the partition into clusters such that no cluster has more than max members
+//presumably clusters should have no fewer than max/2 and there should be an
+//effort made to keep the clusters dense, yet informative
+//TODO: make efficient, evaluate clustering schemes
+void GSSTree::Partitioner::packClusters(unsigned max, vector<Partitioner>& clusters)
+{
+	//compute pairwise distances between all members
+	unsigned N = tindex.size();
+	float distances[N][N];
+	vector<vector<unsigned> > clusts; clusts.reserve(1+size() / max);
+	for(unsigned i = 0; i < N; i++)
+	{
+		distances[i][i] = 0;
+		const LinearOctTree *imiv = partdata->getMIV(i);
+		const LinearOctTree *imsv = partdata->getMSV(i);
+		for(unsigned j = 0; j < i; j++)
+		{
+			const LinearOctTree *jmiv = partdata->getMIV(j);
+			const LinearOctTree *jmsv = partdata->getMSV(j);
+			distances[i][j] = distances[j][i] = splitDist(imiv, imsv, jmiv,jmsv);
+		}
+		clusts.push_back(vector<unsigned>());
+		clusts.back().push_back(i);
+	}
+
+	//iteratively merge all clusters until we run into size limit
+	while(clusts.size() > 1)
+	{
+		//find two clusters with smallest complete linkage distance
+		//(minimize the maximum distance)
+		float mindist = HUGE_VAL;
+		unsigned besti = 0;
+		unsigned bestj = 0;
+		for(unsigned i = 0, n = clusts.size(); i < n; i++)
+		{
+			for(unsigned j = 0; j < i; j++)
+			{
+				float maxdist = 0;
+				//find the max distance between i and j
+				for(unsigned I = 0, ni = clusts[i].size(); I < ni; I++)
+				{
+					for(unsigned J = 0, nj = clusts[j].size(); J < nj; j++)
+					{
+						float d = distances[clusts[i][I]][clusts[j][J]];
+						if(d > maxdist)
+						{
+							maxdist = d;
+						}
+					}
+				}
+				if(maxdist < mindist && clusts[i].size() + clusts[j].size() <= max)
+				{
+					mindist = maxdist;
+					besti = i;
+					bestj = j;
+				}
+			}
+		}
+
+		if(besti == bestj)
+			break; //couldn't merge any
+
+		//move besti and bestj to end of vector
+		unsigned last = clusts.size() -1;
+		if(bestj == last)
+		{
+			swap(clusts[besti], clusts[last-1]);
+		}
+		else
+		{
+			swap(clusts[besti],clusts[last]);
+			swap(clusts[bestj],clusts[last-1]);
+		}
+
+		//insert into second to last
+		clusts[last-1].insert(clusts[last-1].end(), clusts[last].begin(), clusts[last].end());
+		clusts.pop_back(); //remove
+	}
+
+	//now create partitions
+	clusters.clear();
+	clusters.reserve(clusts.size());
+	for(unsigned i = 0, n = clusts.size(); i < n; i++)
+	{
+		clusters.push_back(Partitioner(partdata));
+		for(unsigned j = 0, m = clusts[i].size(); j < m; j++)
+		{
+			clusters.back().addSingle(*this, clusts[i][j]);
+		}
+	}
+}
+
+//create a leaf node from the contents of partitioner, does not check size
+GSSTree::GSSLeafNode* GSSTree::leafFromPartition(Partitioner& partitioner, LeafPartitionData& leafdata)
+{
+	GSSLeafNode *newnode = new GSSLeafNode(dim, maxres);
+
+	for(unsigned i = 0, n = partitioner.size(); i < n; i++)
+	{
+		newnode->trees.push_back(leafdata.getTree(partitioner.getDataIndex(i)));
+		newnode->data.push_back(leafdata.getData(partitioner.getDataIndex(i)));
+	}
+	newnode->selfUpdate(); //update MIV/MSV
+
+	return newnode;
+}
+
+//create an internal node from the contents of partitioner, does not check size
+GSSTree::GSSInternalNode* GSSTree::nodeFromPartition(Partitioner& partitioner, NodePartitionData& nodedata)
+{
+	GSSInternalNode *newnode = new GSSInternalNode(dim, maxres);
+
+	for(unsigned i = 0, n = partitioner.size(); i < n; i++)
+	{
+		newnode->children.push_back(nodedata.getNode(partitioner.getDataIndex(i)));
+	}
+	newnode->selfUpdate(); //update MIV/MSV
+
+	return newnode;
+}
+
+/*
+ * Take all the trees indexed by tindex, segregate them
+ */
+void GSSTree::partitionLeaves(Partitioner& partitioner, LeafPartitionData& leafdata, unsigned level, bool splitMSV, vector<GSSNode*>& nodes)
+{
+	if(partitioner.size() == 0)
+		return;
+	if(partitioner.size() < MaxSplit)
+	{
+		//create a node
+		nodes.push_back(leafFromPartition(partitioner, leafdata));
+		return;
+	}
+
+	//identify octant to split on
+	vector<unsigned> octantcoord;
+	while(level <= maxlevel)
+	{
+		if(partitioner.findOctant(level, splitMSV, octantcoord))
+			break;
+		splitMSV = !splitMSV;
+		if(partitioner.findOctant(level, splitMSV, octantcoord))
+			break;
+		level++;
+	}
+
+	//check for cases where we should just agglomerate
+	if(level > maxlevel)
+	{
+		vector< Partitioner > clusters;
+		partitioner.packClusters(MaxSplit, clusters);
+		for(unsigned i = 0, n = clusters.size(); i < n; i++)
+		{
+			nodes.push_back(leafFromPartition(clusters[i], leafdata));
+		}
+	}
+	else
+	{
+		//first partition based on the occupancy pattern of the specified octant
+		vector<Partitioner> parts;
+		partitioner.partitionOnOctant(octantcoord, splitMSV, parts);
+
+		//select which bins to recursively split and which to combine
+		//into a single group to be clustered into leaves
+		vector<unsigned> partitionMore;
+		Partitioner mergedPartition(&leafdata);
+
+		for(unsigned i = 0, n = parts.size(); i < n; i++)
+		{
+			if(parts[i].size() == 0)
+				continue;
+			if(parts[i].size() < MaxSplit/2)
+			{
+				mergedPartition.add(parts[i]);
+			}
+			else
+			{
+				partitionMore.push_back(i);
+			}
+		}
+
+		//create leaves from small groups
+		vector< Partitioner > clusters;
+		mergedPartition.packClusters(MaxSplit, clusters);
+		for(unsigned i = 0, n = clusters.size(); i < n; i++)
+		{
+			nodes.push_back(leafFromPartition(clusters[i], leafdata));
+		}
+
+		//split on octants with large partitions
+		for(unsigned i = 0, n = partitionMore.size(); i < n; i++)
+		{
+			partitionLeaves(parts[partitionMore[i]],leafdata, level, splitMSV, nodes);
+		}
+	}
+}
+
+//partition nodes to build another level
+//very similar to partition leaves, but different data structures
+//also, opportunaty for different algorithmic choices
+void GSSTree::generateNextLevel(Partitioner& partitioner, NodePartitionData& nodedata, unsigned level, bool splitMSV, vector<GSSNode*>& nodes)
+{
+	if(partitioner.size() == 0)
+		return;
+	if(partitioner.size() < MaxSplit)
+	{
+		//create a node
+		nodes.push_back(nodeFromPartition(partitioner, nodedata));
+		return;
+	}
+
+	//identify octant to split on
+	vector<unsigned> octantcoord;
+	while(level <= maxlevel)
+	{
+		if(partitioner.findOctant(level, splitMSV, octantcoord))
+			break;
+		splitMSV = !splitMSV;
+		if(partitioner.findOctant(level, splitMSV, octantcoord))
+			break;
+		level++;
+	}
+
+	//check for cases where we should just agglomerate
+	if(level > maxlevel)
+	{
+		vector< Partitioner > clusters;
+		partitioner.packClusters(MaxSplit, clusters);
+		for(unsigned i = 0, n = clusters.size(); i < n; i++)
+		{
+			nodes.push_back(nodeFromPartition(clusters[i], nodedata));
+		}
+	}
+	else
+	{
+		//first partition based on the occupancy pattern of the specified octant
+		vector<Partitioner> parts;
+		partitioner.partitionOnOctant(octantcoord, splitMSV, parts);
+
+		//select which bins to recursively split and which to combine
+		//into a single group to be clustered into leaves
+		vector<unsigned> partitionMore;
+		Partitioner mergedPartition(&nodedata);
+
+		for(unsigned i = 0, n = parts.size(); i < n; i++)
+		{
+			if(parts[i].size() == 0)
+				continue;
+			if(parts[i].size() < MaxSplit/2)
+			{
+				mergedPartition.add(parts[i]);
+			}
+			else
+			{
+				partitionMore.push_back(i);
+			}
+		}
+
+		//create leaves from small groups
+		vector< Partitioner > clusters;
+		mergedPartition.packClusters(MaxSplit, clusters);
+		for(unsigned i = 0, n = clusters.size(); i < n; i++)
+		{
+			nodes.push_back(nodeFromPartition(clusters[i], nodedata));
+		}
+
+		//split on octants with large partitions
+		for(unsigned i = 0, n = partitionMore.size(); i < n; i++)
+		{
+			partitionLeaves(parts[partitionMore[i]],nodedata, level, splitMSV, nodes);
+		}
+	}
+}
+
+
+void GSSTree::load(const vector<vector<MolSphere> >& mols)
+{
+	if (InsertionLoad)
+	{
+		//simply add molecules one at a time
+		for (unsigned i = 0, n = mols.size(); i < n; i++)
+		{
+			add(mols[i]);
+		}
+	}
+	else
+	{
+		//bulk loading
+
+		//recursively partition trees by splitting on low resolution representations
+
+		vector<LinearOctTree*> trees;
+		vector<LeafData> data;
+		trees.reserve(mols.size());
+		data.reserve(mols.size());
+		for(unsigned i = 0, n = mols.size(); i < n; i++)
+		{
+			trees.push_back(new LinearOctTree(dim, maxres, mols[i]));
+			data.push_back(LeafData(mols[i]));
+		}
+
+		LeafPartitionData leafdata(&trees, &data);
+		Partitioner leafpartition(&leafdata);
+		vector<GSSNode*> nodes;
+		vector<unsigned> octant;
+		partitionLeaves(leafpartition, leafdata, 0, true, nodes);
+		trees.clear(); //now stored in nodes
+		data.clear();
+
+		while(nodes.size() > 1)
+		{
+			NodePartitionData nodedata(&nodes);
+			Partitioner nodepartition(&nodedata);
+			vector<GSSNode*> nextlevel;
+			generateNextLevel(nodepartition, nodedata, 0, true, nextlevel);
+			swap(nextlevel, nodes);
+		}
+		assert(nodes.size() == 1);
+		root = nodes[0];
+	}
+}
+
 
 static unsigned leavesChecked = 0;
 
@@ -343,9 +822,42 @@ void GSSTree::read(istream& in)
 	root = GSSNode::readCreate(in, NULL);
 }
 
+//evaluate the goodness of moving to from->to
+//this is _expensive_ as we compute the change in volume
+//for MIV/MSV of both leaves
+float GSSTree::deltaFit(const GSSLeafNode *to, GSSLeafNode *from, unsigned t)
+{
+	//never remove the last tree from a node
+	if(from->trees.size() <= 1)
+		return 0;
+
+	//compute MIV/MSV of from node without t
+	LinearOctTree nMIV(dim, maxres);
+	LinearOctTree nMSV(dim, maxres);
+	nMIV.fill();
+
+	for(unsigned i = 0, n = from->trees.size(); i < n; i++)
+	{
+		if(i != t)
+		{
+			nMIV.intersect(*from->trees[i]);
+			nMSV.unionWith(*from->trees[i]);
+		}
+	}
+
+	float fromMIV = nMIV.volume() - from->MIV->volume();
+	float fromMSV = from->MSV->volume() - nMSV.volume();
+
+	float fromCombined = fromMIV+fromMSV;
+	float toCombined = to->combinedVolumeChange(from->trees[t], from->trees[t]);
+
+	//only favorable if we tighten from more than we expand to
+	return fromCombined - toCombined;
+}
+
 //insert data into leaf node, if there isn't enough room, split
 //call update on parents if need-be
-void GSSTree::GSSLeafNode::insert(GSSTree& gTree, const LinearOctTree& tree, const LeafData& m)
+void GSSTree::GSSLeafNode::insert(GSSTree& gTree, const LinearOctTree& tree, const LeafData& m, vector<LeafDistPair>& kbest)
 {
 	if(data.size() < MaxSplit)
 	{
@@ -415,6 +927,61 @@ void GSSTree::GSSLeafNode::insert(GSSTree& gTree, const LinearOctTree& tree, con
 		{
 			gTree.createRoot(this, newnode);
 		}
+
+		//if the kbest leaves were passed in, refine all the contents
+		//of these leaves be evaluating whether or not each individual
+		//tree would be more specific to one of the split nodes and moving it
+		//if so - this is not cheap
+		int cnt = ReshuffleLimit;
+		if(kbest.size() > 0 && newnode != NULL)
+		{
+			for(unsigned i = 0, n = kbest.size(); i < n; i++)
+			{
+				if(cnt <= 0)
+					break;
+				GSSLeafNode *altleaf = kbest[i].leaf;
+				if(altleaf == this)
+					continue;
+
+				//don't resplit, just stop if full
+				if(trees.size() >= MaxSplit && newnode->trees.size() >= MaxSplit)
+					break;
+
+				bool changed1 = false, changed2 = false;
+				for(int i = 0; i < (int)altleaf->trees.size(); i++)
+				{
+					float deltaFit1 = gTree.deltaFit(this, altleaf, i);
+					float deltaFit2 = gTree.deltaFit(newnode, altleaf, i);
+
+					//must be positive to be better fit
+					if(deltaFit1 > 0 || deltaFit2 > 0)
+					{
+						if(deltaFit1 > deltaFit2 && trees.size() < MaxSplit)
+						{
+							//move to this node
+							moveTreeFrom(altleaf, i);
+							changed1 = true;
+							i--; //has been deleted
+							cnt--;
+						}
+						else if(newnode->trees.size() < MaxSplit)
+						{
+							//move to new node
+							newnode->moveTreeFrom(altleaf, i);
+							changed2 = true;
+							i--;
+							cnt--;
+						}
+					}
+				}
+
+				if(changed1 && parent != NULL) //update up the tree
+					parent->fullUpdate();
+				if(changed2 && newnode->parent != NULL)
+					newnode->parent->fullUpdate();
+
+			}
+		}
 	}
 
 }
@@ -425,6 +992,42 @@ void GSSTree::GSSInternalNode::addChild(GSSNode *child)
 	child->parent = this;
 	child->which = children.size();
 	children.push_back(child);
+}
+
+//complete update all the way up the tree
+void GSSTree::GSSNode::fullUpdate()
+{
+	selfUpdate();
+	if(parent != NULL)
+		parent->fullUpdate();
+}
+
+//update our MIV/MSV from scratch (necessary when removing)
+//do not recurse upwards
+void GSSTree::GSSLeafNode::selfUpdate()
+{
+	MIV->fill();
+	MSV->clear();
+
+	for(unsigned i = 0, n = trees.size(); i < n; i++)
+	{
+		MIV->intersect(*trees[i]);
+		MSV->unionWith(*trees[i]);
+	}
+}
+
+//update our MIV/MSV from scratch (necessary when removing)
+//do not recurse upwards
+void GSSTree::GSSInternalNode::selfUpdate()
+{
+	MIV->fill();
+	MSV->clear();
+
+	for(unsigned i = 0, n = children.size(); i < n; i++)
+	{
+		MIV->intersect(*children[i]->MIV);
+		MSV->unionWith(*children[i]->MSV);
+	}
 }
 
 //recurse UP the tree updating MIV/MSV and splitting as necessary
@@ -568,7 +1171,7 @@ float GSSTree::searchDist(const LinearOctTree* obj, const LinearOctTree *MIV, co
  * return a "distance" between approximations
  * for now, just the sum of the volume different of the MIVs and of the MSVs
  */
-float GSSTree::splitDist(LinearOctTree* leftMIV, LinearOctTree* leftMSV, LinearOctTree* rightMIV, LinearOctTree* rightMSV)
+float GSSTree::splitDist(const LinearOctTree* leftMIV, const LinearOctTree* leftMSV, const LinearOctTree* rightMIV, const LinearOctTree* rightMSV)
 {
 	float mind = leftMIV->intersectVolume(*rightMIV)/leftMIV->unionVolume(*rightMIV);
 	float maxd = leftMSV->intersectVolume(*rightMSV)/leftMSV->unionVolume(*rightMSV);
@@ -676,7 +1279,7 @@ void GSSTree::split(const vector<LinearOctTree*>& MIV, const vector<LinearOctTre
 
 }
 
-//how much will the current MIV and MSV change after merging in miv ans msv?
+//how much will the current MIV and MSV change after merging in miv and msv?
 float GSSTree::GSSNode::combinedVolumeChange(LinearOctTree *miv, LinearOctTree *msv) const
 {
 	float deltamiv = MIV->volume() - MIV->intersectVolume(*miv);
@@ -767,6 +1370,28 @@ void GSSTree::GSSLeafNode::findInsertionPoints(const LinearOctTree& tree, vector
 			kbest.resize(k);
 	}
 
+}
+
+//move the t'th tree of from into this, removing from from
+//updates the local MIV/MSV, but does not recurse up the tree
+void GSSTree::GSSLeafNode::moveTreeFrom(GSSLeafNode* from, unsigned t)
+{
+	assert(t < from->trees.size());
+
+	swap(from->trees[t],from->trees.back());
+	swap(from->data[t], from->data.back());
+
+	trees.push_back(from->trees.back());
+	data.push_back(from->data.back());
+
+	from->trees.pop_back();
+	from->data.pop_back();
+
+	from->selfUpdate();
+
+	//update MIV/MSV
+	MIV->intersect(*trees.back());
+	MSV->unionWith(*trees.back());
 }
 
 

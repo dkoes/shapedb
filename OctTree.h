@@ -300,6 +300,7 @@ class LinearOctTree
 	static unsigned absorbTreeAtLevel(const vector<OctVal>& T, unsigned pos, unsigned level);
 	static unsigned appendTreeAtLevel(const vector<OctVal>& T, unsigned pos, unsigned level, vector<OctVal>& appendto);
 	unsigned volumeOfTreeAtLevel(const vector<OctVal>& T, unsigned pos, unsigned level, float& vol) const;
+	static unsigned traverseOctantCoord(const vector<OctVal>& T, const vector<unsigned>& coord);
 
 public:
 	LinearOctTree(): dimension(0), resolution(0)
@@ -368,6 +369,8 @@ public:
 
 	void write(ostream& out) const;
 	void read(istream& in);
+
+	unsigned getOctantPattern(const vector<unsigned>& coord) const;
 };
 
 #endif /* OCTTREE_H_ */
