@@ -91,7 +91,7 @@ class GSSTree
 
 	};
 
-	class NodePartitionData: public LeafPartitionData
+	class NodePartitionData: public PartitionData
 	{
 		const vector<GSSNode*> *nodes;
 	public:
@@ -109,6 +109,8 @@ class GSSTree
 		{
 			return (*nodes)[i]->MIV;
 		}
+
+		unsigned size() const { return nodes != NULL ? nodes->size() : 0; }
 	};
 
 	/*
@@ -121,13 +123,18 @@ class GSSTree
 	protected:
 		vector<unsigned> tindex;
 		const PartitionData *partdata;
-		void init(unsigned n);
+
 	public:
 
 		Partitioner(): partdata(NULL) {}
 
 		//initialize initial partition
 		Partitioner(const PartitionData *part): partdata(part)
+		{
+
+		}
+
+		void initFromData()
 		{
 			tindex.reserve(partdata->size());
 			for(unsigned i = 0, n = partdata->size(); i < n; i++)
@@ -341,7 +348,7 @@ class GSSTree
 	GSSLeafNode* leafFromPartition(Partitioner& partitioner, LeafPartitionData& leafdata);
 	void partitionLeaves(Partitioner& partitioner, LeafPartitionData& leafdata, unsigned level, bool splitMSV, vector<GSSNode*>& nodes);
 	GSSInternalNode* nodeFromPartition(Partitioner& partitioner, NodePartitionData& nodedata);
-	void generateNextLevel(Partitioner& partitioner, NodePartitionData& nodedata,unsigned level, bool splitMSV,  vector<GSSNode*>& nodes);
+	void partitionNodes(Partitioner& partitioner, NodePartitionData& nodedata,unsigned level, bool splitMSV,  vector<GSSNode*>& nodes);
 
 
 public:

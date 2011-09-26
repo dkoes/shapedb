@@ -9,6 +9,7 @@
 #include "Timer.h"
 #include <math.h>
 #include <iostream>
+#include <cstdio>
 #include "CommandLine2/CommandLine.h"
 
 cl::opt<bool> ScanCheck("scancheck",cl::desc("Perform a full scan to check results"),cl::Hidden);
@@ -229,7 +230,7 @@ void GSSTree::Partitioner::partitionOnOctant(const vector<unsigned>& octantcoord
 			parts.push_back(Partitioner(partdata));
 		}
 
-		parts[which].addSingle(*this, i);
+		parts[pos[which]].addSingle(*this, i);
 	}
 }
 
@@ -261,12 +262,12 @@ void GSSTree::Partitioner::packClusters(unsigned max, vector<Partitioner>& clust
 	for(unsigned i = 0; i < N; i++)
 	{
 		distances[i][i] = 0;
-		const LinearOctTree *imiv = partdata->getMIV(i);
-		const LinearOctTree *imsv = partdata->getMSV(i);
+		const LinearOctTree *imiv = partdata->getMIV(tindex[i]);
+		const LinearOctTree *imsv = partdata->getMSV(tindex[i]);
 		for(unsigned j = 0; j < i; j++)
 		{
-			const LinearOctTree *jmiv = partdata->getMIV(j);
-			const LinearOctTree *jmsv = partdata->getMSV(j);
+			const LinearOctTree *jmiv = partdata->getMIV(tindex[j]);
+			const LinearOctTree *jmsv = partdata->getMSV(tindex[j]);
 			distances[i][j] = distances[j][i] = splitDist(imiv, imsv, jmiv,jmsv);
 		}
 		clusts.push_back(vector<unsigned>());
@@ -289,7 +290,7 @@ void GSSTree::Partitioner::packClusters(unsigned max, vector<Partitioner>& clust
 				//find the max distance between i and j
 				for(unsigned I = 0, ni = clusts[i].size(); I < ni; I++)
 				{
-					for(unsigned J = 0, nj = clusts[j].size(); J < nj; j++)
+					for(unsigned J = 0, nj = clusts[j].size(); J < nj; J++)
 					{
 						float d = distances[clusts[i][I]][clusts[j][J]];
 						if(d > maxdist)
@@ -376,6 +377,7 @@ void GSSTree::partitionLeaves(Partitioner& partitioner, LeafPartitionData& leafd
 {
 	if(partitioner.size() == 0)
 		return;
+
 	if(partitioner.size() < MaxSplit)
 	{
 		//create a node
@@ -449,7 +451,7 @@ void GSSTree::partitionLeaves(Partitioner& partitioner, LeafPartitionData& leafd
 //partition nodes to build another level
 //very similar to partition leaves, but different data structures
 //also, opportunaty for different algorithmic choices
-void GSSTree::generateNextLevel(Partitioner& partitioner, NodePartitionData& nodedata, unsigned level, bool splitMSV, vector<GSSNode*>& nodes)
+void GSSTree::partitionNodes(Partitioner& partitioner, NodePartitionData& nodedata, unsigned level, bool splitMSV, vector<GSSNode*>& nodes)
 {
 	if(partitioner.size() == 0)
 		return;
@@ -518,7 +520,7 @@ void GSSTree::generateNextLevel(Partitioner& partitioner, NodePartitionData& nod
 		//split on octants with large partitions
 		for(unsigned i = 0, n = partitionMore.size(); i < n; i++)
 		{
-			partitionLeaves(parts[partitionMore[i]],nodedata, level, splitMSV, nodes);
+			partitionNodes(parts[partitionMore[i]],nodedata, level, splitMSV, nodes);
 		}
 	}
 }
@@ -546,12 +548,16 @@ void GSSTree::load(const vector<vector<MolSphere> >& mols)
 		data.reserve(mols.size());
 		for(unsigned i = 0, n = mols.size(); i < n; i++)
 		{
-			trees.push_back(new LinearOctTree(dim, maxres, mols[i]));
-			data.push_back(LeafData(mols[i]));
+			vector<MolSphere> mol;
+			transformMol(mols[i], mol);
+
+			trees.push_back(new LinearOctTree(dim, maxres, mol));
+			data.push_back(LeafData(mol));
 		}
 
 		LeafPartitionData leafdata(&trees, &data);
 		Partitioner leafpartition(&leafdata);
+		leafpartition.initFromData();
 		vector<GSSNode*> nodes;
 		vector<unsigned> octant;
 		partitionLeaves(leafpartition, leafdata, 0, true, nodes);
@@ -562,8 +568,9 @@ void GSSTree::load(const vector<vector<MolSphere> >& mols)
 		{
 			NodePartitionData nodedata(&nodes);
 			Partitioner nodepartition(&nodedata);
+			nodepartition.initFromData();
 			vector<GSSNode*> nextlevel;
-			generateNextLevel(nodepartition, nodedata, 0, true, nextlevel);
+			partitionNodes(nodepartition, nodedata, 0, true, nextlevel);
 			swap(nextlevel, nodes);
 		}
 		assert(nodes.size() == 1);
