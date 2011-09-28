@@ -19,9 +19,11 @@
 #include <vector>
 #include <iostream>
 #include <cmath>
+#include <climits>
 
 #include "MolSphere.h"
 #include "OctTree.h"
+#include "OctTreeFactory.h"
 
 using namespace boost;
 using namespace std;
@@ -51,23 +53,23 @@ class GSSTree
 		PartitionData();
 		virtual unsigned size() const = 0;
 
-		virtual const LinearOctTree* getMSV(unsigned i) const = 0;
-		virtual const LinearOctTree* getMIV(unsigned i) const = 0;
+		virtual const OctTree* getMSV(unsigned i) const = 0;
+		virtual const OctTree* getMIV(unsigned i) const = 0;
 	};
 
 	class LeafPartitionData: public PartitionData
 	{
-		const vector<LinearOctTree*> *trees;
+		const vector<OctTree*> *trees;
 		const vector<LeafData> *data;
 	public:
 
 		LeafPartitionData(): trees(NULL), data(NULL) {}
-		LeafPartitionData(const vector<LinearOctTree*> *Ts, const vector<LeafData> *Ds): trees(Ts), data(Ds)
+		LeafPartitionData(const vector<OctTree*> *Ts, const vector<LeafData> *Ds): trees(Ts), data(Ds)
 		{
 			assert(trees->size() == data->size());
 		}
 
-		LinearOctTree* getTree(unsigned i)
+		OctTree* getTree(unsigned i)
 		{
 			return (*trees)[i];
 		}
@@ -77,12 +79,12 @@ class GSSTree
 			return (*data)[i];
 		}
 
-		virtual const LinearOctTree* getMSV(unsigned i) const
+		virtual const OctTree* getMSV(unsigned i) const
 		{
 			return (*trees)[i];
 		}
 
-		virtual const LinearOctTree* getMIV(unsigned i) const
+		virtual const OctTree* getMIV(unsigned i) const
 		{
 			return (*trees)[i];
 		}
@@ -100,12 +102,12 @@ class GSSTree
 
 		GSSNode* getNode(unsigned i) { return (*nodes)[i]; }
 
-		virtual const LinearOctTree* getMSV(unsigned i) const
+		virtual const OctTree* getMSV(unsigned i) const
 		{
 			return (*nodes)[i]->MSV;
 		}
 
-		virtual const LinearOctTree* getMIV(unsigned i) const
+		virtual const OctTree* getMIV(unsigned i) const
 		{
 			return (*nodes)[i]->MIV;
 		}
@@ -168,20 +170,30 @@ class GSSTree
 			return distance < rhs.distance;
 		}
 	};
+	struct Stats
+	{
+		unsigned min;
+		unsigned max;
+		unsigned total;
+		unsigned cnt;
+		unsigned singletonCnt;
+
+		Stats(): min(UINT_MAX), max(0), total(0), cnt(0), singletonCnt(0) {}
+	};
 
 	struct GSSNode
 	{
 		GSSInternalNode *parent;
-		LinearOctTree *MIV; //maximum included volume
-		LinearOctTree *MSV; //minimum surrounding volume
+		OctTree *MIV; //maximum included volume
+		OctTree *MSV; //minimum surrounding volume
 		float res; // resolution
 		unsigned which; //which child this is
 
-		GSSNode(): parent(NULL), MIV(new LinearOctTree(0,0)), MSV(new LinearOctTree(0,0)), res(0), which(0)
+		GSSNode(const OctTreeFactory& octGen): parent(NULL), MIV(octGen.newOctTree(0,0)), MSV(octGen.newOctTree(0,0)), res(0), which(0)
 		{
 			MIV->fill();
 		}
-		GSSNode(float d, float r):parent(NULL), MIV(new LinearOctTree(d,r)), MSV(new LinearOctTree(d,r)), res(r),which(0) {
+		GSSNode(const OctTreeFactory& octGen, float d, float r):parent(NULL), MIV(octGen.newOctTree(d,r)), MSV(octGen.newOctTree(d,r)), res(r),which(0) {
 			MIV->fill();
 		}
 		virtual ~GSSNode();
@@ -189,27 +201,28 @@ class GSSTree
 		virtual void selfUpdate() = 0;
 		void fullUpdate();
 		//examine every leaf to find nearest - for debugging and testing
-		virtual void scanNearest(const LinearOctTree& tree, float& distance, LeafData& data) = 0;
+		virtual void scanNearest(const OctTree* tree, float& distance, LeafData& data) = 0;
 		//find "closest" object to tree and put data into data
-		virtual void findNearest(const LinearOctTree& tree, float& distance, LeafData& data) = 0;
+		virtual void findNearest(const OctTree* tree, float& distance, LeafData& data) = 0;
 
-		virtual void scanTweeners(const LinearOctTree& min, const LinearOctTree& max, vector<LeafData>& res) = 0;
-		virtual void findTweeners(const LinearOctTree& min, const LinearOctTree& max, vector<LeafData>& res) = 0;
+		virtual void scanTweeners(const OctTree* min, const OctTree* max, vector<LeafData>& res) = 0;
+		virtual void findTweeners(const OctTree* min, const OctTree* max, vector<LeafData>& res) = 0;
 
-		virtual void findInsertionPoint(const LinearOctTree& tree, float& distance, GSSLeafNode*& leaf) = 0;
+		virtual void findInsertionPoint(const OctTree*tree, float& distance, GSSLeafNode*& leaf) = 0;
 		//find k-best leaves for tree
-		virtual void findInsertionPoints(const LinearOctTree& tree, vector<LeafDistPair>& kbest, unsigned k) = 0;
+		virtual void findInsertionPoints(const OctTree* tree, vector<LeafDistPair>& kbest, unsigned k) = 0;
 
 		virtual void printLeafInfo(unsigned depth) const = 0;
 		virtual unsigned size() const = 0;
 		virtual unsigned numLeaves() const = 0;
 
-		float combinedVolumeChange(LinearOctTree *miv, LinearOctTree *msv) const;
+		float combinedVolumeChange(const OctTree *miv, const OctTree *msv) const;
 
 		virtual void write(ostream& out) const;
 		virtual void read(istream& in, GSSInternalNode *parent);
-		static GSSNode* readCreate(istream& in, GSSInternalNode *parent);
+		static GSSNode* readCreate(const OctTreeFactory& octGen, istream& in, GSSInternalNode *parent);
 
+		virtual unsigned getStats(Stats& leaves, Stats& nodes) const = 0;
 	};
 
 	struct GSSInternalNode: public GSSNode
@@ -217,12 +230,12 @@ class GSSTree
 
 		vector<GSSNode*> children;
 
-		GSSInternalNode(float d, float r): GSSNode(d, r)
+		GSSInternalNode(const OctTreeFactory& octGen, float d, float r): GSSNode(octGen, d, r)
 		{
 			children.reserve(MaxSplit);
 		}
 
-		GSSInternalNode() {}
+		GSSInternalNode(const OctTreeFactory& octGen): GSSNode(octGen) {}
 
 		virtual ~GSSInternalNode()
 		{
@@ -234,12 +247,12 @@ class GSSTree
 
 		void update(GSSTree& gTree, unsigned whichChild, GSSNode *newnode);
 		void selfUpdate();
-		virtual void scanNearest(const LinearOctTree& tree, float& distance, LeafData& data);
-		virtual void findNearest(const LinearOctTree& tree, float& distance, LeafData& data);
-		virtual void scanTweeners(const LinearOctTree& min, const LinearOctTree& max, vector<LeafData>& res);
-		virtual void findTweeners(const LinearOctTree& min, const LinearOctTree& max, vector<LeafData>& res);
-		virtual void findInsertionPoint(const LinearOctTree& tree, float& distance, GSSLeafNode*& leaf);
-		virtual void findInsertionPoints(const LinearOctTree& tree, vector<LeafDistPair>& kbest, unsigned k);
+		virtual void scanNearest(const OctTree* tree, float& distance, LeafData& data);
+		virtual void findNearest(const OctTree* tree, float& distance, LeafData& data);
+		virtual void scanTweeners(const OctTree* min, const OctTree* max, vector<LeafData>& res);
+		virtual void findTweeners(const OctTree* min, const OctTree* max, vector<LeafData>& res);
+		virtual void findInsertionPoint(const OctTree* tree, float& distance, GSSLeafNode*& leaf);
+		virtual void findInsertionPoints(const OctTree* tree, vector<LeafDistPair>& kbest, unsigned k);
 
 		void addChild(GSSNode *child);
 
@@ -272,21 +285,24 @@ class GSSTree
 		}
 
 		virtual void write(ostream& out) const;
-		virtual void read(istream& in, GSSInternalNode *parPtr);
+		virtual void read(const OctTreeFactory& octGen, istream& in, GSSInternalNode *parPtr);
+
+		unsigned getStats(Stats& leaves, Stats& nodes) const;
+
 	};
 
 	struct GSSLeafNode: public GSSNode
 	{
-		vector<LinearOctTree*> trees;
+		vector<OctTree*> trees;
 		vector<LeafData> data;
 
-		GSSLeafNode(float d, float r): GSSNode(d, r)
+		GSSLeafNode(const OctTreeFactory& octGen, float d, float r): GSSNode(octGen, d, r)
 		{
 			trees.reserve(MaxSplit);
 			data.reserve(MaxSplit);
 		}
 
-		GSSLeafNode() {}
+		GSSLeafNode(const OctTreeFactory& octGen): GSSNode(octGen) {}
 
 		~GSSLeafNode()
 		{
@@ -297,13 +313,13 @@ class GSSTree
 		}
 
 		void selfUpdate();
-		void insert(GSSTree& gTree, const LinearOctTree& tree, const LeafData& data, vector<LeafDistPair>& kbest);
-		virtual void scanNearest(const LinearOctTree& tree, float& distance, LeafData& data);
-		virtual void findNearest(const LinearOctTree& tree, float& distance, LeafData& data);
-		virtual void scanTweeners(const LinearOctTree& min, const LinearOctTree& max, vector<LeafData>& res);
-		virtual void findTweeners(const LinearOctTree& min, const LinearOctTree& max, vector<LeafData>& res);
-		virtual void findInsertionPoint(const LinearOctTree& tree, float& distance, GSSLeafNode*& leaf);
-		virtual void findInsertionPoints(const LinearOctTree& tree, vector<LeafDistPair>& kbest, unsigned k);
+		void insert(GSSTree& gTree, OctTree* tree, const LeafData& data, vector<LeafDistPair>& kbest);
+		virtual void scanNearest(const OctTree* tree, float& distance, LeafData& data);
+		virtual void findNearest(const OctTree* tree, float& distance, LeafData& data);
+		virtual void scanTweeners(const OctTree* min, const OctTree* max, vector<LeafData>& res);
+		virtual void findTweeners(const OctTree* min, const OctTree* max, vector<LeafData>& res);
+		virtual void findInsertionPoint(const OctTree* tree, float& distance, GSSLeafNode*& leaf);
+		virtual void findInsertionPoints(const OctTree* tree, vector<LeafDistPair>& kbest, unsigned k);
 
 		void moveTreeFrom(GSSLeafNode* from, unsigned t);
 
@@ -320,7 +336,9 @@ class GSSTree
 		unsigned numLeaves() const { return 1; }
 
 		virtual void write(ostream& out) const;
-		virtual void read(istream& in, GSSInternalNode *parPtr);
+		virtual void read(const OctTreeFactory& octGen, istream& in, GSSInternalNode *parPtr);
+
+		unsigned getStats(Stats& leaves, Stats& nodes) const;
 
 	};
 
@@ -330,16 +348,17 @@ class GSSTree
 	unsigned maxlevel;
 	GSSNode *root;
 
+	OctTreeFactory octGen;
 	static const unsigned MaxSplit;
 
 	void setBoundingBox(array<float,6>& box);
 
 	float deltaFit(const GSSLeafNode* to, GSSLeafNode* from, unsigned t);
-	static bool fitsInbetween(const LinearOctTree *MIV, const LinearOctTree *MSV, const LinearOctTree *min, const LinearOctTree *max);
-	static float leafDist(const LinearOctTree* obj, const LinearOctTree *leaf);
-	static float searchDist(const LinearOctTree* obj, const LinearOctTree *MIV, const LinearOctTree *MSV, float& min, float& max);
-	static float splitDist(const LinearOctTree* leftMIV, const LinearOctTree* leftMSV, const LinearOctTree* rightMIV, const LinearOctTree* rightMSV);
-	static void split(const vector<LinearOctTree*>& MIV, const vector<LinearOctTree*>& MSV,
+	static bool fitsInbetween(const OctTree *MIV, const OctTree *MSV, const OctTree *min, const OctTree *max);
+	static float leafDist(const OctTree* obj, const OctTree *leaf);
+	static float searchDist(const OctTree* obj, const OctTree *MIV, const OctTree *MSV, float& min, float& max);
+	static float splitDist(const OctTree* leftMIV, const OctTree* leftMSV, const OctTree* rightMIV, const OctTree* rightMSV);
+	static void split(const vector<OctTree*>& MIV, const vector<OctTree*>& MSV,
 			vector<unsigned>& s1, vector<unsigned>& s2);
 	void createRoot(GSSNode *left, GSSNode *right);
 
@@ -350,15 +369,14 @@ class GSSTree
 	GSSInternalNode* nodeFromPartition(Partitioner& partitioner, NodePartitionData& nodedata);
 	void partitionNodes(Partitioner& partitioner, NodePartitionData& nodedata,unsigned level, bool splitMSV,  vector<GSSNode*>& nodes);
 
-
 public:
 
 	//set the global min and max extents of the GSS tree and
 	//the highest resolution (default 1A)
-	GSSTree(array<float,6>& boundingbox, double maxr=1.0): maxres(maxr), root(NULL)
+	GSSTree(const OctTreeFactory& octfact, array<float,6>& boundingbox, double maxr=1.0): maxres(maxr), root(NULL), octGen(octfact)
 	{
 		setBoundingBox(boundingbox);
-		root = new GSSLeafNode(dim, maxres);
+		root = new GSSLeafNode(octGen, dim, maxres);
 	}
 
 	GSSTree(): maxres(0), root(NULL)
@@ -380,7 +398,7 @@ public:
 	//inclusion/exclusion search with explicit volumes
 	void inex_search(const vector<MolSphere>& inc, const vector<MolSphere>& exc, vector<vector<MolSphere> >& res);
 	//constrained search with trees as input
-	void tree_range_search(const LinearOctTree& smallTree, const LinearOctTree& bigTree, vector<vector<MolSphere>  >& res);
+	void tree_range_search(const OctTree* smallTree, const OctTree* bigTree, vector<vector<MolSphere>  >& res);
 
 	void write(ostream& out); //dump to file
 	void read(istream& in); //dump to file
@@ -389,6 +407,8 @@ public:
 	void printLeafInfo() const { root->printLeafInfo(0); cout << "\n"; } //for debugging
 	unsigned size() const { return root->size(); }
 	unsigned numLeaves() const { return root->numLeaves(); }
+
+	void printStats() const; //for debugging
 };
 
 #endif /* GSSTREE_H_ */

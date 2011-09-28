@@ -62,6 +62,8 @@ cl::opt<double> Resolution("resolution", cl::desc("Best resolution for shape dat
 cl::opt<string> IncludeMol("incmol", cl::desc("Molecule to use for minimum included volume"));
 cl::opt<string> ExcludeMol("exmol", cl::desc("Molecule to use for excluded volume"));
 
+cl::opt<bool> Verbose("v", cl::desc("Verbose output"));
+
 static void spherizeMol(OEMol& mol, vector<MolSphere>& spheres)
 {
 	OEAssignBondiVdWRadii(mol);
@@ -134,7 +136,8 @@ int main(int argc, char *argv[])
 		}
 
 	    //create gss tree
-	    GSSTree gss(box, Resolution);
+	    OctTreeFactory octGen;
+	    GSSTree gss(octGen, box, Resolution);
 	    gss.load(allmols);
 
 	    if(Command == Create)
@@ -198,6 +201,10 @@ int main(int argc, char *argv[])
 			exit(-1);
 		}
 		gss.read(dbfile);
+
+		if(Verbose)
+			gss.printStats();
+
 		ofstream out(Output.c_str());
 
 		//read query molecule(s)
