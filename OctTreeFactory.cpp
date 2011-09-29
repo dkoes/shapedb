@@ -6,14 +6,21 @@
  */
 
 #include "OctTreeFactory.h"
+#include "LinearOctTree.h"
+#include "PtrOctTree.h"
+#include "ArrayOctTree.h"
 
-OctTreeFactory::OctTreeFactory()
+OctTree* OctTreeFactory::newOctTree(float dim, float res,
+		const vector<MolSphere>& mol) const
 {
-	// TODO Auto-generated constructor stub
-
-}
-
-OctTreeFactory::~OctTreeFactory()
-{
-	// TODO Auto-generated destructor stub
+	switch (type)
+	{
+	case Linear:
+		return new LinearOctTree(dim, res, mol);
+	case Pointer:
+		return new PtrOctTree(dim, res, mol);
+	case Array:
+		return new ArrayOctTree(dim, res, mol);
+	}
+	return NULL;
 }

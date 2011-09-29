@@ -24,7 +24,7 @@ cl::opt<bool> KBestReshuffle("reshuffle", cl::desc("Reshuffle using k insertion 
 cl::opt<unsigned> ReshuffleLimit("reshuffle-limit", cl::desc("Limit number of reshufflings"), cl::init(0));
 cl::opt<bool> InsertionLoad("insert-load",cl::desc("Load be simply inserting"), cl::init(false));
 
-cl::opt<unsigned> LeafPack("leaf-pack", cl::desc("Cutoff to trigger leaf packing"), cl::init(0));
+cl::opt<unsigned> LeafPack("leaf-pack", cl::desc("Cutoff to trigger leaf packing"), cl::init(256));
 cl::opt<unsigned> NodePack("node-pack", cl::desc("Cutoff to trigger leaf packing"), cl::init(0));
 
 cl::opt<unsigned> LeafMerge("leaf-merge", cl::desc("Cutoff to merge small leaf clusters"), cl::init(4));
@@ -198,9 +198,9 @@ bool GSSTree::Partitioner::findOctant(unsigned level, bool splitMSV, vector<unsi
 			unsigned index = tindex[i];
 			unsigned which = 0;
 			if (splitMSV)
-				which = partdata->getMSV(index)->getOctantPattern(octants[o]);
+				which = partdata->getMSV(index)->getOctantPattern(octants[o], true);
 			else
-				which = partdata->getMIV(index)->getOctantPattern(octants[o]);
+				which = partdata->getMIV(index)->getOctantPattern(octants[o], false);
 			patternCnts[which]++;
 			total++;
 		}
@@ -235,9 +235,9 @@ void GSSTree::Partitioner::partitionOnOctant(const vector<unsigned>& octantcoord
 		unsigned index = tindex[i];
 		unsigned which = 0;
 		if (splitMSV)
-			which = partdata->getMSV(index)->getOctantPattern(octantcoord);
+			which = partdata->getMSV(index)->getOctantPattern(octantcoord, true);
 		else
-			which = partdata->getMIV(index)->getOctantPattern(octantcoord);
+			which = partdata->getMIV(index)->getOctantPattern(octantcoord, false);
 
 		if(pos[which] < 0) //create new partition
 		{
@@ -290,7 +290,6 @@ void GSSTree::Partitioner::packClusters(unsigned max, vector<Partitioner>& clust
 		}
 		clusts.push_back(vector<unsigned>());
 		clusts.back().push_back(i);
-		cout << "DIST " << i << " of " << N << "\n";
 	}
 
 	//iteratively merge all clusters until we run into size limit
@@ -853,6 +852,7 @@ void GSSTree::write(ostream& out)
 	out.write((char*)&maxres, sizeof(maxres));
 	out.write((char*)min, sizeof(min));
 	out.write((char*)&dim, sizeof(dim));
+	octGen.write(out);
 	root->write(out);
 }
 
@@ -862,6 +862,7 @@ void GSSTree::read(istream& in)
 	in.read((char*)&maxres, sizeof(maxres));
 	in.read((char*)min, sizeof(min));
 	in.read((char*)&dim, sizeof(dim));
+	octGen.read(in);
 	if(root) delete root;
 	root = GSSNode::readCreate(octGen, in, NULL);
 }

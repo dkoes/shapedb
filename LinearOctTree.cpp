@@ -95,7 +95,7 @@ unsigned LinearOctTree::traverseOctantCoord(const vector<OctVal>& T, const vecto
 
 //there are 256 possible bit patterns within a single octant, this will return
 //the appropriate pattern for the specified coordinates
-unsigned LinearOctTree::getOctantPattern(const vector<unsigned>& coord) const
+unsigned LinearOctTree::getOctantPattern(const vector<unsigned>& coord, bool MSV) const
 {
 	//get a cursor to the correct position
 	if(tree.size() == 0)
@@ -124,7 +124,8 @@ unsigned LinearOctTree::getOctantPattern(const vector<unsigned>& coord) const
 			}
 			else if(tree[pos].level > nextlevel) //something there
 			{
-				ret |= (1<<i);
+				if(MSV)
+					ret |= (1<<i); //has some full children, but not all
 			}
 			pos = absorbTreeAtLevel(tree, pos, nextlevel);
 		}

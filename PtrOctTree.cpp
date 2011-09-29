@@ -328,6 +328,52 @@ void PtrOctTree::OctNode::read(istream& in)
 	}
 }
 
+unsigned PtrOctTree::OctNode::countInteriorNodesAtLevel(unsigned level, unsigned curlevel) const
+{
+	if(level == curlevel)
+	{
+		if(type == Children)
+			return 1;
+		else
+			return 0;
+	}
+	else if(type == Children)
+	{
+		unsigned ret = 0;
+		for(unsigned i = 0; i < 8; i++)
+		{
+			ret += children[i]->countInteriorNodesAtLevel(level,curlevel+1);
+		}
+		return ret;
+	}
+	return 0;
+}
+
+//return the bit pattern for this node, if MSV is set, having
+//children sets a bit, otherwise not
+unsigned PtrOctTree::OctNode::getBitPattern(bool MSV) const
+{
+	switch(type)
+	{
+	case Full:
+		return 255;
+	case Empty:
+		return 0;
+	case Children:
+	{
+		unsigned ret = 0;
+		for(unsigned i = 0; i < 8; i++)
+		{
+			if((children[i]->type == Full) || (children[i]->type == Children && MSV))
+				ret |= (1<<i);
+		}
+		return ret;
+	}
+	}
+	return 0;
+}
+
+
 //dump oct tree to a file in binary form
 void PtrOctTree::write(ostream& out) const
 {
@@ -346,3 +392,28 @@ void PtrOctTree::read(istream& in)
 	root->read(in);
 }
 
+//return bit pattern of node specified by octant coordinates
+unsigned PtrOctTree::getOctantPattern(const vector<unsigned>& octant, bool MSV) const
+{
+	//find correct node
+	OctNode *node = root;
+	for(unsigned i = 0, n = octant.size(); i < n; i++)
+	{
+		if(node->type == Children)
+			node = node->children[octant[i]];
+		else
+			return node->getBitPattern(MSV);
+	}
+	return node->getBitPattern(MSV);
+}
+
+unsigned PtrOctTree::countInteriorNodesAtLevel(unsigned level) const
+{
+	return root->countInteriorNodesAtLevel(level, 0);
+}
+
+float PtrOctTree::hausdorffDistance(const OctTree* Rhs) const
+{
+	abort();
+	return 0;
+}

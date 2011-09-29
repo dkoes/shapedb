@@ -1,6 +1,10 @@
 /*
  * OctTreeFactory.h
  *
+ * Factory for creating different types of oct trees.  A user class
+ * need not worry what kinds is generate, although the assumption is
+ * that different kinds will not be mixed.
+ *
  *  Created on: Sep 28, 2011
  *      Author: dkoes
  */
@@ -9,13 +13,18 @@
 #define OCTTREEFACTORY_H_
 
 #include "OctTree.h"
-#include "LinearOctTree.h"
+
 
 class OctTreeFactory
 {
 public:
-	OctTreeFactory();
-	virtual ~OctTreeFactory();
+	enum OctTreeType {Linear, Pointer,Array};
+private:
+	OctTreeType type;
+public:
+	OctTreeFactory(): type(Linear) {}
+	OctTreeFactory(OctTreeType t): type(t) {}
+
 
 	OctTree* newOctTree() const { return newOctTree(0,0); }
 	OctTree* newOctTree(float dim, float res) const {
@@ -23,11 +32,18 @@ public:
 		return newOctTree(dim, res, dummy);
 	}
 
-	OctTree* newOctTree(float dim, float res, const vector<MolSphere>& mol) const
+	OctTree* newOctTree(float dim, float res,
+			const vector<MolSphere>& mol) const;
+
+	void write(ostream& out) const
 	{
-		return new LinearOctTree(dim, res, mol);
+		out.write((char*)&type, sizeof(type));
 	}
 
+	void read(istream& in)
+	{
+		in.read((char*)&type, sizeof(type));
+	}
 };
 
 #endif /* OCTTREEFACTORY_H_ */

@@ -12,7 +12,7 @@
 
 /* Pointer based oct tree. Tree is represented by node pointers
  */
-class PtrOctTree
+class PtrOctTree: public OctTree
 {
 	float dimension; //sits within a cube of this dimension, power of 2
 	float resolution; //increase resolution down to this increment (power of 2)
@@ -69,6 +69,8 @@ class PtrOctTree
 		float volume(float dim) const; //recursive volume calculation
 		unsigned leaves() const; //recursive leafs cnt
 
+		unsigned countInteriorNodesAtLevel(unsigned level, unsigned curlevel) const;
+		unsigned getBitPattern(bool MSV) const;
 		void write(ostream& out) const;
 		void read(istream& out);
 
@@ -110,6 +112,11 @@ public:
 		}
 	}
 
+	virtual OctTree* clone() const
+	{
+		return new PtrOctTree(*this);
+	}
+
 	PtrOctTree& operator=(PtrOctTree rhs)
 	{
 		swap(*this, rhs); //rhs passed by value
@@ -139,13 +146,15 @@ public:
 	}
 
 	//mogrifying intersection
-	bool intersect(const PtrOctTree& rhs)
+	bool intersect(const OctTree* Rhs)
 	{
+		const PtrOctTree& rhs = dynamic_cast<const PtrOctTree&>(*Rhs);
 		return root->intersect(rhs.root);
 	}
 	//mogrifying union
-	bool unionWith(const PtrOctTree& rhs)
+	bool unionWith(const OctTree* Rhs)
 	{
+		const PtrOctTree& rhs = dynamic_cast<const PtrOctTree&>(*Rhs);
 		return root->unionWith(rhs.root);
 	}
 
@@ -164,12 +173,14 @@ public:
 	}
 
 	//volume calculations that don't require creating a tmp tree
-	float intersectVolume(const PtrOctTree& rhs) const
+	float intersectVolume(const OctTree* Rhs) const
 	{
+		const PtrOctTree& rhs = dynamic_cast<const PtrOctTree&>(*Rhs);
 		return root->intersectVolume(rhs.root, dimension);
 	}
-	float unionVolume(const PtrOctTree& rhs) const
+	float unionVolume(const OctTree* Rhs) const
 	{
+		const PtrOctTree& rhs = dynamic_cast<const PtrOctTree&>(*Rhs);
 		return root->unionVolume(rhs.root, dimension);
 	}
 
@@ -194,6 +205,10 @@ public:
 		root->deleteChildren();
 		root->type = Full;
 	}
+
+	unsigned getOctantPattern(const vector<unsigned>& octant, bool MSV) const;
+	unsigned countInteriorNodesAtLevel(unsigned level) const;
+	float hausdorffDistance(const OctTree* Rhs) const;
 
 	void write(ostream& out) const;
 	void read(istream& in);

@@ -196,7 +196,7 @@ public:
 	void write(ostream& out) const;
 	void read(istream& in);
 
-	unsigned getOctantPattern(const vector<unsigned>& coord) const;
+	unsigned getOctantPattern(const vector<unsigned>& coord, bool MSV) const;
 
 	unsigned countInteriorNodesAtLevel(unsigned level) const;
 

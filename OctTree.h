@@ -63,9 +63,8 @@ public:
 	virtual void write(ostream& out) const = 0;
 	virtual void read(istream& in) = 0;
 
-	virtual unsigned getOctantPattern(const vector<unsigned>& coord) const = 0;
+	virtual unsigned getOctantPattern(const vector<unsigned>& coord, bool MSV) const = 0;
 
-	virtual unsigned countInteriorNodesAtLevel(unsigned level) const = 0;
 
 	virtual float hausdorffDistance(const OctTree* B) const = 0;
 };

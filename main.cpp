@@ -49,6 +49,15 @@ cl::opt<CommandEnum>
 				clEnumVal(CreateSearch,"In memory database creation and search for testing"),
 				clEnumValEnd) );
 
+cl::opt<OctTreeFactory::OctTreeType>
+		OctType(
+				cl::desc("OctTree type to use:"),
+				cl::init(OctTreeFactory::Linear),
+				cl::values(clEnumValN(OctTreeFactory::Linear, "linear-octtree", "Use a space efficient leaf-only representation"),
+						clEnumValN(OctTreeFactory::Pointer, "ptr-octtree", "Use a full pointer based representation"),
+						clEnumValN(OctTreeFactory::Array, "arr-octtree", "Array storage of full oct tree"),
+				clEnumValEnd) );
+
 cl::opt<string> Input("in", cl::desc("Input file"));
 cl::opt<string> Output("out", cl::desc("Output file"));
 cl::opt<string> Database("db", cl::desc("Database file"));
@@ -136,7 +145,7 @@ int main(int argc, char *argv[])
 		}
 
 	    //create gss tree
-	    OctTreeFactory octGen;
+	    OctTreeFactory octGen(OctType);
 	    GSSTree gss(octGen, box, Resolution);
 	    gss.load(allmols);
 
