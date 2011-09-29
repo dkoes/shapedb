@@ -164,6 +164,7 @@ void ArrayOctTree::write(ostream& out) const
 {
 	out.write((char*) &dimension, sizeof(dimension));
 	out.write((char*) &resolution, sizeof(resolution));
+	out.write((char*) &root, sizeof(root));
 	unsigned sz = tree.size();
 	out.write((char*) &sz, sizeof(sz));
 	for (unsigned i = 0, n = tree.size(); i < n; i++)
@@ -176,6 +177,7 @@ void ArrayOctTree::read(istream& in)
 {
 	in.read((char*) &dimension, sizeof(dimension));
 	in.read((char*) &resolution, sizeof(resolution));
+	in.read((char*) &root, sizeof(root));
 	unsigned sz = 0;
 	in.read((char*) &sz, sizeof(sz));
 	tree.resize(sz);
@@ -392,7 +394,10 @@ float ArrayOctTree::ChildNode::unionVolume(
 {
 	if(rhs.isLeaf && isLeaf && rhs.isFull == isFull)
 	{
-		return dim*dim*dim;
+		if(isFull)
+			return dim*dim*dim;
+		else
+			return 0;
 	}
 	else if(isLeaf && isFull)
 	{

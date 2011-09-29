@@ -1190,6 +1190,7 @@ bool GSSTree::fitsInbetween(const OctTree *MIV, const OctTree *MSV, const OctTre
 	fitChecks++;
 	//TODO: more efficient
 	//the MSV must completely enclose min
+	//cout << MSV->volume() << " , " << min->volume() << "," << MSV->unionVolume(min) << "\n";
 	if(MSV->unionVolume(min) != MSV->volume())
 		return false;
 	//MIV must be completely enclosed by max
