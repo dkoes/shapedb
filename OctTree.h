@@ -67,6 +67,11 @@ public:
 
 
 	virtual float hausdorffDistance(const OctTree* B) const = 0;
+
+	virtual bool containedIn(const OctTree *larger) const
+	{
+		return intersectVolume(larger) == volume();
+	}
 };
 
 

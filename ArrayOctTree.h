@@ -26,20 +26,42 @@ class ArrayOctTree: public OctTree
 	struct OctNode;
 	struct ChildNode
 	{
-		bool isLeaf: 1;
-		bool isFull: 1; //only relevant if leaf
-		unsigned index: 30;
+		bool isLeaf :1;
+		bool isFull :1; //only relevant if leaf
+		unsigned index :30;
 
-		ChildNode(): isLeaf(true), isFull(false), index(0) {}
+		ChildNode() :
+			isLeaf(true), isFull(false), index(0)
+		{
+		}
 
-		ChildNode(bool leaf, bool full): isLeaf(leaf), isFull(full), index(0) {}
-		ChildNode(bool leaf, bool full, unsigned i): isLeaf(leaf), isFull(full), index(i) {}
+		ChildNode(bool leaf, bool full) :
+			isLeaf(leaf), isFull(full), index(0)
+		{
+		}
+		ChildNode(bool leaf, bool full, unsigned i) :
+			isLeaf(leaf), isFull(full), index(i)
+		{
+		}
 
-		ChildNode intersect(const vector<OctNode>& tree, const vector<OctNode>& rtree, const ChildNode& rhs, vector<OctNode>& newtree, bool& changed) const;
-		ChildNode unionWith(const vector<OctNode>& tree, const vector<OctNode>& rtree, const ChildNode& rhs, vector<OctNode>& newtree, bool& changed) const;
+		ChildNode intersect(const vector<OctNode>& tree,
+				const vector<OctNode>& rtree, const ChildNode& rhs,
+				vector<OctNode>& newtree, bool& changed) const;
+		ChildNode unionWith(const vector<OctNode>& tree,
+				const vector<OctNode>& rtree, const ChildNode& rhs,
+				vector<OctNode>& newtree, bool& changed) const;
 
-		float intersectVolume(const vector<OctNode>& tree, const vector<OctNode>& rtree, const ChildNode& rhs, float dim) const;
-		float unionVolume(const vector<OctNode>& tree, const vector<OctNode>& rtree, const ChildNode& rhs, float dim) const;
+		float
+				intersectVolume(const vector<OctNode>& tree,
+						const vector<OctNode>& rtree, const ChildNode& rhs,
+						float dim) const;
+		float
+				unionVolume(const vector<OctNode>& tree,
+						const vector<OctNode>& rtree, const ChildNode& rhs,
+						float dim) const;
+
+		bool containedIn(const vector<OctNode>& tree,
+				const vector<OctNode>& rtree, const ChildNode& rhs) const;
 
 		float volume(const vector<OctNode>& tree, float dim) const;
 		unsigned getBitPattern(const vector<OctNode>& tree, bool MSV) const;
@@ -51,7 +73,9 @@ class ArrayOctTree: public OctTree
 	{
 		ChildNode children[8];
 
-		OctNode() {}
+		OctNode()
+		{
+		}
 
 		OctNode(const ChildNode& init)
 		{
@@ -64,8 +88,12 @@ class ArrayOctTree: public OctTree
 	ChildNode create(const Cube& cube, const vector<MolSphere>& mol);
 
 public:
-	ArrayOctTree() {}
-	virtual ~ArrayOctTree() {}
+	ArrayOctTree()
+	{
+	}
+	virtual ~ArrayOctTree()
+	{
+	}
 
 	ArrayOctTree(const ArrayOctTree& rhs) :
 		dimension(rhs.dimension), resolution(rhs.resolution)
@@ -114,6 +142,8 @@ public:
 	virtual float intersectVolume(const OctTree * rhs) const;
 	virtual float unionVolume(const OctTree *rhs) const;
 
+	virtual bool containedIn(const OctTree *rhs) const;
+
 	//return total volume contained in octtree
 	virtual float volume() const;
 
@@ -126,7 +156,8 @@ public:
 	virtual void write(ostream& out) const;
 	virtual void read(istream& in);
 
-	virtual unsigned getOctantPattern(const vector<unsigned>& coord, bool MSV) const;
+	virtual unsigned
+			getOctantPattern(const vector<unsigned>& coord, bool MSV) const;
 
 	virtual float hausdorffDistance(const OctTree* B) const;
 };

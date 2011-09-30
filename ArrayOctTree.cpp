@@ -127,6 +127,12 @@ float ArrayOctTree::unionVolume(const OctTree *Rhs) const
 	return root.unionVolume(tree, rhs.tree, rhs.root, dimension);
 }
 
+bool ArrayOctTree::containedIn(const OctTree *Rhs) const
+{
+	const ArrayOctTree& rhs = dynamic_cast<const ArrayOctTree&> (*Rhs);
+	return root.containedIn(tree, rhs.tree, rhs.root);
+}
+
 //return total volume contained in octtree
 float ArrayOctTree::volume() const
 {
@@ -429,6 +435,45 @@ float ArrayOctTree::ChildNode::unionVolume(
 		return ret;
 	}
 }
+
+
+//return true if this is contained in rhs - short circuit eval
+bool ArrayOctTree::ChildNode::containedIn(
+		const vector<OctNode>& tree, const vector<OctNode>& rtree,
+		const ChildNode& rhs) const
+{
+	if(rhs.isLeaf && isLeaf && rhs.isFull == isFull)
+	{
+		return true;
+	}
+	else if(isLeaf && !isFull)
+	{
+		return true;
+	}
+	else if (rhs.isLeaf && !rhs.isFull)
+	{
+		return false; //somthing not in nothing (nothing handled above)
+	}
+	else if (rhs.isLeaf && rhs.isFull)
+	{
+		return true;
+	}
+	else if (isLeaf && isFull)
+	{
+		return false;
+	}
+	else //both have children
+	{
+		for (unsigned i = 0; i < 8; i++)
+		{
+			if(!tree[index].children[i].containedIn(tree, rtree,
+					rtree[rhs.index].children[i]))
+				return false;
+		}
+		return true;;
+	}
+}
+
 
 
 unsigned ArrayOctTree::ChildNode::getBitPattern(const vector<OctNode>& tree, bool MSV) const
