@@ -151,13 +151,13 @@ unsigned ArrayOctTree::leaves() const
 void ArrayOctTree::clear()
 {
 	tree.clear();
-	tree.push_back(OctNode());
+	root = ChildNode(true,false);
 }
 
 void ArrayOctTree::fill()
 {
 	tree.clear();
-	tree.push_back(OctNode(ChildNode(true, true)));
+	root = ChildNode(true,true);
 }
 
 void ArrayOctTree::write(ostream& out) const
@@ -337,7 +337,7 @@ ArrayOctTree::ChildNode ArrayOctTree::ChildNode::unionWith(
 		{
 			newtree.pop_back();
 			ret.isLeaf = true;
-			ret.isFull = false;
+			ret.isFull = true;
 			ret.index = 0;
 		}
 		return ret;
