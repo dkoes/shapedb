@@ -52,7 +52,7 @@ cl::opt<CommandEnum>
 cl::opt<OctTreeFactory::OctTreeType>
 		OctType(
 				cl::desc("OctTree type to use:"),
-				cl::init(OctTreeFactory::Linear),
+				cl::init(OctTreeFactory::Array),
 				cl::values(clEnumValN(OctTreeFactory::Linear, "linear-octtree", "Use a space efficient leaf-only representation"),
 						clEnumValN(OctTreeFactory::Pointer, "ptr-octtree", "Use a full pointer based representation"),
 						clEnumValN(OctTreeFactory::Array, "arr-octtree", "Array storage of full oct tree"),

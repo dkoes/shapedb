@@ -65,6 +65,10 @@ public:
 
 	virtual unsigned getOctantPattern(const vector<unsigned>& coord, bool MSV) const = 0;
 
+	virtual float volumeDistance(const OctTree * B) const
+	{
+		return 1 - intersectVolume(B)/unionVolume(B);
+	}
 
 	virtual float hausdorffDistance(const OctTree* B) const = 0;
 

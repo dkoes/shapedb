@@ -207,6 +207,16 @@ unsigned ArrayOctTree::getOctantPattern(const vector<unsigned>& coord, bool MSV)
 	return node.getBitPattern(tree,MSV);
 }
 
+float ArrayOctTree::volumeDistance(const OctTree * Rhs) const
+{
+	const ArrayOctTree& rhs = dynamic_cast<const ArrayOctTree&> (*Rhs);
+	float ival = 0, uval = 0;
+	root.intersectUnionVolume(tree, rhs.tree, rhs.root, dimension, ival, uval);
+
+	return 1 - ival/uval;
+}
+
+
 float ArrayOctTree::hausdorffDistance(const OctTree* B) const
 {
 	abort();
@@ -436,6 +446,48 @@ float ArrayOctTree::ChildNode::unionVolume(
 	}
 }
 
+//compute both the intersection and union volume at once
+void ArrayOctTree::ChildNode::intersectUnionVolume(
+		const vector<OctNode>& tree, const vector<OctNode>& rtree,
+		const ChildNode& rhs, float dim, float& intersectval, float& unionval) const
+{
+	if(rhs.isLeaf && isLeaf && rhs.isFull == isFull)
+	{
+		if(isFull)
+		{
+			intersectval += dim*dim*dim;
+			unionval += dim*dim*dim;
+		}
+	}
+	else if(isLeaf && isFull)
+	{
+		unionval += dim*dim*dim;
+		intersectval += rhs.volume(rtree, dim);
+	}
+	else if (rhs.isLeaf && rhs.isFull)
+	{
+		unionval += dim*dim*dim;
+		intersectval += volume(tree,dim);
+	}
+	else if (rhs.isLeaf && !rhs.isFull)
+	{
+		//vol of this tree
+		unionval += volume(tree, dim);
+	}
+	else if (isLeaf && !isFull)
+	{
+		// from rhs
+		unionval += rhs.volume(rtree, dim);
+	}
+	else //both have children
+	{
+		for (unsigned i = 0; i < 8; i++)
+		{
+			tree[index].children[i].intersectUnionVolume(tree, rtree,
+					rtree[rhs.index].children[i], dim/2, intersectval,unionval);
+		}
+	}
+}
 
 //return true if this is contained in rhs - short circuit eval
 bool ArrayOctTree::ChildNode::containedIn(
@@ -516,12 +568,15 @@ float ArrayOctTree::ChildNode::volume(const vector<OctNode>& tree, float dim) co
 	}
 	else
 	{
+		if(volumeCache > 0)
+			return volumeCache;
 		float ret = 0;
 		const OctNode& node = tree[index];
 		for (unsigned i = 0; i < 8; i++)
 		{
 			ret += node.children[i].volume(tree, dim/2);
 		}
+		volumeCache = ret;
 		return ret;
 	}
 }

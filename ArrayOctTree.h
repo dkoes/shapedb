@@ -29,18 +29,19 @@ class ArrayOctTree: public OctTree
 		bool isLeaf :1;
 		bool isFull :1; //only relevant if leaf
 		unsigned index :30;
+		mutable float volumeCache; //computed on demand
 
 		ChildNode() :
-			isLeaf(true), isFull(false), index(0)
+			isLeaf(true), isFull(false), index(0), volumeCache(-1)
 		{
 		}
 
 		ChildNode(bool leaf, bool full) :
-			isLeaf(leaf), isFull(full), index(0)
+			isLeaf(leaf), isFull(full), index(0), volumeCache(-1)
 		{
 		}
 		ChildNode(bool leaf, bool full, unsigned i) :
-			isLeaf(leaf), isFull(full), index(i)
+			isLeaf(leaf), isFull(full), index(i), volumeCache(-1)
 		{
 		}
 
@@ -51,14 +52,17 @@ class ArrayOctTree: public OctTree
 				const vector<OctNode>& rtree, const ChildNode& rhs,
 				vector<OctNode>& newtree, bool& changed) const;
 
+		void intersectUnionVolume(const vector<OctNode>& tree,
+				const vector<OctNode>& rtree, const ChildNode& rhs, float dim,
+				float& intersectval, float& unionval) const;
+
 		float
 				intersectVolume(const vector<OctNode>& tree,
 						const vector<OctNode>& rtree, const ChildNode& rhs,
 						float dim) const;
 		float
-				unionVolume(const vector<OctNode>& tree,
-						const vector<OctNode>& rtree, const ChildNode& rhs,
-						float dim) const;
+		unionVolume(const vector<OctNode>& tree, const vector<OctNode>& rtree,
+				const ChildNode& rhs, float dim) const;
 
 		bool containedIn(const vector<OctNode>& tree,
 				const vector<OctNode>& rtree, const ChildNode& rhs) const;
@@ -96,7 +100,7 @@ public:
 	}
 
 	ArrayOctTree(const ArrayOctTree& rhs) :
-		dimension(rhs.dimension), resolution(rhs.resolution)
+		dimension(rhs.dimension), resolution(rhs.resolution), tree(rhs.tree), root(rhs.root)
 	{
 
 	}
@@ -157,9 +161,11 @@ public:
 	virtual void read(istream& in);
 
 	virtual unsigned
-			getOctantPattern(const vector<unsigned>& coord, bool MSV) const;
+	getOctantPattern(const vector<unsigned>& coord, bool MSV) const;
 
 	virtual float hausdorffDistance(const OctTree* B) const;
+	virtual float volumeDistance(const OctTree * B) const;
+
 };
 
 #endif /* ARRAYOCTTREE_H_ */

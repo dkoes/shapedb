@@ -18,49 +18,66 @@
 
 using namespace std;
 
-cl::opt<bool> ScanCheck("scancheck",cl::desc("Perform a full scan to check results"),cl::Hidden);
-cl::opt<unsigned> KBestInsertion("kinsert",cl::desc("Evaluate k insertion points"),cl::value_desc("k"),cl::init(0));
-cl::opt<bool> KBestReshuffle("reshuffle", cl::desc("Reshuffle using k insertion points on split"), cl::init(false));
-cl::opt<unsigned> ReshuffleLimit("reshuffle-limit", cl::desc("Limit number of reshufflings"), cl::init(0));
-cl::opt<bool> InsertionLoad("insert-load",cl::desc("Load be simply inserting"), cl::init(false));
+cl::opt<bool> ScanCheck("scancheck",
+		cl::desc("Perform a full scan to check results"), cl::Hidden);
+cl::opt<unsigned> KBestInsertion("kinsert",
+		cl::desc("Evaluate k insertion points"), cl::value_desc("k"),
+		cl::init(0));
+cl::opt<bool> KBestReshuffle("reshuffle",
+		cl::desc("Reshuffle using k insertion points on split"),
+		cl::init(false));
+cl::opt<unsigned> ReshuffleLimit("reshuffle-limit",
+		cl::desc("Limit number of reshufflings"), cl::init(0));
+cl::opt<bool> InsertionLoad("insert-load",
+		cl::desc("Load be simply inserting"), cl::init(false));
 
-cl::opt<unsigned> LeafPack("leaf-pack", cl::desc("Cutoff to trigger leaf packing"), cl::init(256));
-cl::opt<unsigned> NodePack("node-pack", cl::desc("Cutoff to trigger leaf packing"), cl::init(0));
+cl::opt<unsigned> LeafPack("leaf-pack",
+		cl::desc("Cutoff to trigger leaf packing"), cl::init(256));
+cl::opt<unsigned> NodePack("node-pack",
+		cl::desc("Cutoff to trigger leaf packing"), cl::init(0));
 
-cl::opt<unsigned> LeafMerge("leaf-merge", cl::desc("Cutoff to merge small leaf clusters"), cl::init(4));
-cl::opt<unsigned> NodeMerge("node-merge", cl::desc("Cutoff to merge small node clusters"), cl::init(4));
+cl::opt<unsigned> LeafMerge("leaf-merge",
+		cl::desc("Cutoff to merge small leaf clusters"), cl::init(4));
+cl::opt<unsigned> NodeMerge("node-merge",
+		cl::desc("Cutoff to merge small node clusters"), cl::init(4));
 
-cl::opt<bool> HDist("hdist", cl::desc("Hausdorff distance as a splitting metric"), cl::init(false));
+cl::opt<bool> PackPartitions("pack-partitions", cl::desc("Group partitions for more even split"), cl::init(false));
+cl::opt<bool> HDist("hdist",
+		cl::desc("Hausdorff distance as a splitting metric"), cl::init(false));
 
 extern cl::opt<bool> Verbose;
 
 const unsigned GSSTree::MaxSplit = 8; //number of children in each node
 
-GSSTree::GSSNode::~GSSNode() { delete MSV; delete MIV; }
-
-
-void GSSTree::setBoundingBox(array<float,6>& box)
+GSSTree::GSSNode::~GSSNode()
 {
-	float dims[3] = {0,0,0};
-	for(unsigned i = 0; i < 3; i++)
+	delete MSV;
+	delete MIV;
+}
+
+void GSSTree::setBoundingBox(array<float, 6>& box)
+{
+	float dims[3] =
+	{ 0, 0, 0 };
+	for (unsigned i = 0; i < 3; i++)
 	{
-		min[i] = box[2*i];
-		dims[i] = box[2*i+1]-min[i];
+		min[i] = box[2 * i];
+		dims[i] = box[2 * i + 1] - min[i];
 	}
 
 	//to make things easier, cubify using the longest dimension
-	dim = max(dims[2],max(dims[0],dims[1]));
+	dim = max(dims[2], max(dims[0], dims[1]));
 	//round all dimensions up to a power of 2; use fp
-	dim = pow(2, ceil(log(dim)/log(2)));
-	if(dim < 1)
+	dim = pow(2, ceil(log(dim) / log(2)));
+	if (dim < 1)
 		dim = 1;
 
 	float div = dim;
 	maxlevel = 0;
-	while(div > maxres)
+	while (div > maxres)
 	{
 		maxlevel++;
-		div /=2;
+		div /= 2;
 	}
 }
 
@@ -71,9 +88,11 @@ void GSSTree::transformMol(const vector<MolSphere>& m, vector<MolSphere>& ret)
 	ret.clear();
 	ret.reserve(m.size());
 
-	for(unsigned i = 0, n = m.size(); i < n; i++)
+	for (unsigned i = 0, n = m.size(); i < n; i++)
 	{
-		ret.push_back(MolSphere(m[i].x-min[0], m[i].y-min[1], m[i].z-min[2],m[i].r));
+		ret.push_back(
+				MolSphere(m[i].x - min[0], m[i].y - min[1], m[i].z - min[2],
+						m[i].r));
 	}
 }
 
@@ -92,7 +111,7 @@ void GSSTree::add(const vector<MolSphere>& m)
 	GSSLeafNode *leaf = NULL;
 
 	vector<LeafDistPair> kbest;
-	if(KBestInsertion > 0)
+	if (KBestInsertion > 0)
 	{
 		root->findInsertionPoints(oct, kbest, KBestInsertion);
 
@@ -100,10 +119,10 @@ void GSSTree::add(const vector<MolSphere>& m)
 		//find the one that creates the smallest change in the MIV/MSV of the leaf
 		unsigned besti = 0;
 		float smallestChange = HUGE_VAL;
-		for(unsigned i = 0, n = kbest.size(); i < n; i++)
+		for (unsigned i = 0, n = kbest.size(); i < n; i++)
 		{
 			float change = kbest[i].leaf->combinedVolumeChange(oct, oct);
-			if(change < smallestChange)
+			if (change < smallestChange)
 			{
 				smallestChange = change;
 				besti = i;
@@ -112,7 +131,7 @@ void GSSTree::add(const vector<MolSphere>& m)
 		assert(isfinite(smallestChange));
 		leaf = kbest[besti].leaf;
 
-		if(!KBestReshuffle)
+		if (!KBestReshuffle)
 			kbest.clear();
 	}
 	else //single best
@@ -132,51 +151,59 @@ GSSTree::PartitionData::PartitionData()
 
 //compute shannon entropy of bit pattern distribution
 // entropy = - Sum(p_i * log(p_i))
-double GSSTree::Partitioner::shannonEntropy(unsigned *patternCnts, unsigned total)
+double GSSTree::Partitioner::shannonEntropy(unsigned *patternCnts,
+		unsigned total)
 {
 	double res = 0;
 	double tot = total;
-	for(unsigned i = 0; i < 256; i++)
+	for (unsigned i = 0; i < 256; i++)
 	{
-		double pi = patternCnts[i]/tot;
-		if(pi > 0)
+		double pi = patternCnts[i] / tot;
+		if (pi > 0)
 		{
-			res += pi*log(pi);
+			res += pi * log(pi);
 		}
 	}
 
 	return -res;
 }
 
-//enumerate all octants at this level
-//TODO: be smarter - some can be ignored
-void GSSTree::Partitioner::getOctants(unsigned level, bool splitMSV, vector< vector<unsigned> >& octants)
+//create additional octants at a higher level if need be
+void GSSTree::Partitioner::updateOctantsForLevel(unsigned level,
+		OctantCoords& octants, vector<bool>& done)
 {
 	//the number of octants grows exponentially with the level, for now
 	//do the brute force approach, but eventually replace with a fraction ptr-based octtree
 	//approach that traverse only the variable-presence octants
-	octants.clear();
-	octants.push_back( vector<unsigned>());
-	for(unsigned l = 0; l < level; l++)
+	if (octants.size() == 0)
 	{
-		vector< vector<unsigned> > newoctants;
+		octants.push_back(vector<unsigned> ());
+		done.clear();
+		done.resize(1, false);
+	}
+
+	if (level > octants[0].size())
+	{
+		vector<vector<unsigned> > newoctants;
 		newoctants.reserve(octants.size() * 8);
-		for(unsigned i = 0; i < 8; i++)
+		for (unsigned i = 0; i < 8; i++)
 		{
-			for(unsigned j = 0, n = octants.size(); j < n; j++)
+			for (unsigned j = 0, n = octants.size(); j < n; j++)
 			{
 				newoctants.push_back(octants[j]);
 				newoctants.back().push_back(i);
 			}
 		}
 		octants.swap(newoctants);
+		done.resize(octants.size(), false);
 	}
 }
 
 // find an octant at the specified level that is "good"
 // if splitMSV is true, look only at MSV patterns, otherwise MIV
 // put result in octantcoord
-bool GSSTree::Partitioner::findOctant(unsigned level, bool splitMSV, vector<unsigned>& octantcoord)
+bool GSSTree::Partitioner::findOctantAndSetUsed(unsigned level, bool splitMSV,
+		vector<unsigned>& octantcoord)
 {
 	//some ideas for "best" octant
 	//-largest variance in volume
@@ -184,23 +211,35 @@ bool GSSTree::Partitioner::findOctant(unsigned level, bool splitMSV, vector<unsi
 	//-shannon index of bit patterns  <----
 	//-other diversity indices of bit patterns
 
-	vector< vector<unsigned> > octants;
-	getOctants(level, splitMSV, octants);
+	OctantCoords& octants = MSVoctants;
+	vector<bool>& done = MSVdoneOct;
+	if (!splitMSV)
+	{
+		octants = MIVoctants;
+		done = MIVdoneOct;
+	}
+
+	updateOctantsForLevel(level, octants, done);
 
 	double bestval = 0;
 	unsigned besto = 0;
-	for(unsigned o = 0, no = octants.size(); o < no; o++)
+	for (unsigned o = 0, no = octants.size(); o < no; o++)
 	{
-		unsigned patternCnts[256] ={ 0, };
+		if (done[o])
+			continue;
+		unsigned patternCnts[256] =
+		{ 0, };
 		unsigned total = 0;
 		for (unsigned i = 0, n = tindex.size(); i < n; i++)
 		{
 			unsigned index = tindex[i];
 			unsigned which = 0;
 			if (splitMSV)
-				which = partdata->getMSV(index)->getOctantPattern(octants[o], true);
+				which = partdata->getMSV(index)->getOctantPattern(octants[o],
+						true);
 			else
-				which = partdata->getMIV(index)->getOctantPattern(octants[o], false);
+				which = partdata->getMIV(index)->getOctantPattern(octants[o],
+						false);
 			patternCnts[which]++;
 			total++;
 		}
@@ -208,41 +247,48 @@ bool GSSTree::Partitioner::findOctant(unsigned level, bool splitMSV, vector<unsi
 		//various metrics are possible, probably just evaluate
 		//shannon entropy and volume (faster?)
 		double entropy = shannonEntropy(patternCnts, total);
-		if(entropy > bestval)
+		if (entropy > bestval)
 		{
 			bestval = entropy;
 			besto = o;
 		}
 	}
 
-	if(bestval == 0)
+	if (bestval == 0)
 		return false; //all the same at this level
 
 	octantcoord = octants[besto];
+	done[besto] = true;
 	return true;
 }
 
 //create sub partitions based on the octant bit pattern at the specified coord
-void GSSTree::Partitioner::partitionOnOctant(const vector<unsigned>& octantcoord, bool splitMSV, vector<Partitioner>& parts)
+void GSSTree::Partitioner::partitionOnOctant(
+		const vector<unsigned>& octantcoord, bool splitMSV,
+		vector<Partitioner>& parts)
 {
 	int pos[256];
 	memset(pos, -1, sizeof(pos));
 
 	parts.clear();
 	parts.reserve(256);
-	for(unsigned i = 0, n = tindex.size(); i < n; i++)
+	for (unsigned i = 0, n = tindex.size(); i < n; i++)
 	{
 		unsigned index = tindex[i];
 		unsigned which = 0;
 		if (splitMSV)
-			which = partdata->getMSV(index)->getOctantPattern(octantcoord, true);
+			which
+					= partdata->getMSV(index)->getOctantPattern(octantcoord,
+							true);
 		else
-			which = partdata->getMIV(index)->getOctantPattern(octantcoord, false);
+			which = partdata->getMIV(index)->getOctantPattern(octantcoord,
+					false);
 
-		if(pos[which] < 0) //create new partition
+		if (pos[which] < 0) //create new partition
 		{
 			pos[which] = parts.size();
-			parts.push_back(Partitioner(partdata));
+			parts.push_back(Partitioner());
+			parts.back().inheritFrom(*this);
 		}
 
 		parts[pos[which]].addSingle(*this, i);
@@ -254,70 +300,110 @@ void GSSTree::Partitioner::partitionOnOctant(const vector<unsigned>& octantcoord
 void GSSTree::Partitioner::add(const Partitioner& from)
 {
 	assert(partdata == from.partdata);
-	for(unsigned i = 0, n = from.size(); i < n; i++)
+	for (unsigned i = 0, n = from.size(); i < n; i++)
 		tindex.push_back(from.tindex[i]);
 }
 
 //add a single bit of partition data from from, updating structures as necessary
-void GSSTree::Partitioner::addSingle(const Partitioner& from, unsigned fromindex)
+void GSSTree::Partitioner::addSingle(const Partitioner& from,
+		unsigned fromindex)
 {
-	tindex.push_back(from.tindex[fromindex]);
+	unsigned i = from.tindex[fromindex];
+	tindex.push_back(i);
+
+	if (MSV == NULL)
+		MSV = partdata->getMSV(i)->clone();
+	else
+		MSV->unionWith(partdata->getMSV(i));
+
+	if (MIV == NULL)
+		MIV = partdata->getMIV(i)->clone();
+	else
+		MIV->intersect(partdata->getMIV(i));
 }
+
+//put everything in rhs into this
+//assumes octants are the same
+void GSSTree::Partitioner::mergeWith(const Partitioner& rhs)
+{
+	assert(rhs.partdata == partdata);
+
+	for(unsigned i = 0, n = rhs.tindex.size(); i < n; i++)
+	{
+		addSingle(rhs, i);
+	}
+
+	assert(MSVdoneOct.size() == rhs.MSVdoneOct.size());
+	for(unsigned i = 0, n = MSVdoneOct.size(); i < n; i++)
+	{
+		MSVdoneOct[i] = MSVdoneOct[i] | rhs.MSVdoneOct[i];
+	}
+	assert(MIVdoneOct.size() == rhs.MIVdoneOct.size());
+	for(unsigned i = 0, n = MIVdoneOct.size(); i < n; i++)
+	{
+		MIVdoneOct[i] = MIVdoneOct[i] | rhs.MIVdoneOct[i];
+	}
+}
+
 
 //pack the partition into clusters such that no cluster has more than max members
 //presumably clusters should have no fewer than max/2 and there should be an
 //effort made to keep the clusters dense, yet informative
 //TODO: make efficient, evaluate clustering schemes
-void GSSTree::Partitioner::packClusters(unsigned max, vector<Partitioner>& clusters)
+void GSSTree::Partitioner::packClusters(unsigned max,
+		vector<Partitioner>& clusters)
 {
 	//compute pairwise distances between all members
 	unsigned N = tindex.size();
 	boost::multi_array<float, 2> distances(boost::extents[N][N]);
-	vector<vector<unsigned> > clusts; clusts.reserve(1+size() / max);
-	for(unsigned i = 0; i < N; i++)
+	vector<vector<unsigned> > clusts;
+	clusts.reserve(1 + size() / max);
+	for (unsigned i = 0; i < N; i++)
 	{
 		distances[i][i] = 0;
 		const OctTree *imiv = partdata->getMIV(tindex[i]);
 		const OctTree *imsv = partdata->getMSV(tindex[i]);
-		for(unsigned j = 0; j < i; j++)
+		for (unsigned j = 0; j < i; j++)
 		{
 			const OctTree *jmiv = partdata->getMIV(tindex[j]);
 			const OctTree *jmsv = partdata->getMSV(tindex[j]);
-			if(imiv == imsv && jmiv == jmsv) //leaf case
+			if (imiv == imsv && jmiv == jmsv) //leaf case
 				distances[i][j] = distances[j][i] = leafDist(imiv, jmiv);
 			else
-				distances[i][j] = distances[j][i] = splitDist(imiv, imsv, jmiv,jmsv);
+				distances[i][j] = distances[j][i] = splitDist(imiv, imsv, jmiv,
+						jmsv);
 		}
-		clusts.push_back(vector<unsigned>());
+		clusts.push_back(vector<unsigned> ());
 		clusts.back().push_back(i);
 	}
 
 	//iteratively merge all clusters until we run into size limit
-	while(clusts.size() > 1)
+	while (clusts.size() > 1)
 	{
 		//find two clusters with smallest complete linkage distance
 		//(minimize the maximum distance)
 		float mindist = HUGE_VAL;
 		unsigned besti = 0;
 		unsigned bestj = 0;
-		for(unsigned i = 0, n = clusts.size(); i < n; i++)
+		for (unsigned i = 0, n = clusts.size(); i < n; i++)
 		{
-			for(unsigned j = 0; j < i; j++)
+			for (unsigned j = 0; j < i; j++)
 			{
 				float maxdist = 0;
 				//find the max distance between i and j
-				for(unsigned I = 0, ni = clusts[i].size(); I < ni; I++)
+				for (unsigned I = 0, ni = clusts[i].size(); I < ni; I++)
 				{
-					for(unsigned J = 0, nj = clusts[j].size(); J < nj; J++)
+					for (unsigned J = 0, nj = clusts[j].size(); J < nj; J++)
 					{
 						float d = distances[clusts[i][I]][clusts[j][J]];
-						if(d > maxdist)
+						if (d > maxdist)
 						{
 							maxdist = d;
 						}
 					}
 				}
-				if(maxdist < mindist && clusts[i].size() + clusts[j].size() <= max)
+				if (maxdist < mindist && clusts[i].size() + clusts[j].size()
+						<= max)
 				{
 					mindist = maxdist;
 					besti = i;
@@ -326,47 +412,136 @@ void GSSTree::Partitioner::packClusters(unsigned max, vector<Partitioner>& clust
 			}
 		}
 
-		if(besti == bestj)
+		if (besti == bestj)
 			break; //couldn't merge any
 
 		//move besti and bestj to end of vector
-		unsigned last = clusts.size() -1;
-		if(bestj == last)
+		unsigned last = clusts.size() - 1;
+		if (bestj == last)
 		{
-			swap(clusts[besti], clusts[last-1]);
+			swap(clusts[besti], clusts[last - 1]);
 		}
 		else
 		{
-			swap(clusts[besti],clusts[last]);
-			swap(clusts[bestj],clusts[last-1]);
+			swap(clusts[besti], clusts[last]);
+			swap(clusts[bestj], clusts[last - 1]);
 		}
 
 		//insert into second to last
-		clusts[last-1].insert(clusts[last-1].end(), clusts[last].begin(), clusts[last].end());
+		clusts[last - 1].insert(clusts[last - 1].end(), clusts[last].begin(),
+				clusts[last].end());
 		clusts.pop_back(); //remove
 	}
 
-	if(Verbose) cout << "  pack " << tindex.size() << " " << clusts.size() << "\n";
+	if (Verbose)
+		cout << "  pack " << tindex.size() << " " << clusts.size() << "\n";
 
 	//now create partitions
 	clusters.clear();
 	clusters.reserve(clusts.size());
-	for(unsigned i = 0, n = clusts.size(); i < n; i++)
+	for (unsigned i = 0, n = clusts.size(); i < n; i++)
 	{
 		clusters.push_back(Partitioner(partdata));
-		for(unsigned j = 0, m = clusts[i].size(); j < m; j++)
+		for (unsigned j = 0, m = clusts[i].size(); j < m; j++)
 		{
 			clusters.back().addSingle(*this, clusts[i][j]);
 		}
 	}
 }
 
+//cluster a set of partitions, merging each cluster into a single partition
+//tries to produce a balanced set of clusters, where not cluster is
+//(much?) larger than the largest incoming partition
+void GSSTree::Partitioner::clusterPartitions(vector<Partitioner>& clusters)
+{
+	if (clusters.size() <= 1)
+		return;
+	unsigned max = 0;
+	//find the largest cluster
+	unsigned largestpos = 0;
+	for (unsigned i = 0, n = clusters.size(); i < n; i++)
+	{
+		if (clusters[i].size() > max)
+		{
+			max = clusters[i].size();
+			largestpos = i;
+		}
+	}
+	max = std::min(16U,max);
+
+	//compute pairwise distances between mergeable clusters
+	//(combined size <= max)
+	boost::multi_array<float, 2> distances(
+			boost::extents[clusters.size()][clusters.size()]);
+	for (unsigned i = 0, n = clusters.size(); i < n; i++)
+	{
+		distances[i][i] = HUGE_VAL;
+		for (unsigned j = 0; j < i; j++)
+		{
+			if (clusters[i].size() + clusters[j].size() >= max)
+				distances[i][j] = distances[j][i] = HUGE_VAL;
+			else
+			{
+				distances[i][j] = distances[j][i] = splitDist(
+						clusters[i].getMIV(), clusters[i].getMSV(),
+						clusters[j].getMIV(), clusters[j].getMSV());
+			}
+		}
+	}
+
+	while(clusters.size() > 1)
+	{
+		//find closest partitions
+		float min = HUGE_VAL;
+		int posi = -1, posj = -1;
+		for(unsigned i = 0, n = clusters.size(); i < n; i++)
+		{
+			for(unsigned j = 0; j < i; j++)
+			{
+				if(distances[i][j] < min)
+				{
+					min = distances[i][j];
+					posi = i;
+					posj = j;
+				}
+			}
+		}
+		//if none, done
+		if(posi < 0)
+			break;
+
+		//merge
+		clusters[posi].mergeWith(clusters[posj]);
+		clusters[posj].clear();
+		//mark posj as unmergeable
+		for(unsigned i = 0, n = clusters.size(); i < n; i++)
+		{
+			distances[posj][i] = distances[i][posj] = HUGE_VAL;
+		}
+		//recompute distances from merged cluster, old j is now unmergeable
+		for(unsigned i = 0, n = clusters.size(); i < n; i++)
+		{
+			if(!isfinite(distances[posi][i]))
+				; //stays unmergeable
+			else if (clusters[posi].size() + clusters[i].size() >= max)
+				distances[posi][i] = distances[i][posi] = HUGE_VAL;
+			else
+			{
+				distances[posi][i] = distances[i][posi] = splitDist(
+						clusters[i].getMIV(), clusters[i].getMSV(),
+						clusters[posi].getMIV(), clusters[posi].getMSV());
+			}
+		}
+	}
+}
+
 //create a leaf node from the contents of partitioner, does not check size
-GSSTree::GSSLeafNode* GSSTree::leafFromPartition(Partitioner& partitioner, LeafPartitionData& leafdata)
+GSSTree::GSSLeafNode* GSSTree::leafFromPartition(Partitioner& partitioner,
+		LeafPartitionData& leafdata)
 {
 	GSSLeafNode *newnode = new GSSLeafNode(octGen, dim, maxres);
 
-	for(unsigned i = 0, n = partitioner.size(); i < n; i++)
+	for (unsigned i = 0, n = partitioner.size(); i < n; i++)
 	{
 		newnode->trees.push_back(leafdata.getTree(partitioner.getDataIndex(i)));
 		newnode->data.push_back(leafdata.getData(partitioner.getDataIndex(i)));
@@ -377,13 +552,15 @@ GSSTree::GSSLeafNode* GSSTree::leafFromPartition(Partitioner& partitioner, LeafP
 }
 
 //create an internal node from the contents of partitioner, does not check size
-GSSTree::GSSInternalNode* GSSTree::nodeFromPartition(Partitioner& partitioner, NodePartitionData& nodedata)
+GSSTree::GSSInternalNode* GSSTree::nodeFromPartition(Partitioner& partitioner,
+		NodePartitionData& nodedata)
 {
 	GSSInternalNode *newnode = new GSSInternalNode(octGen, dim, maxres);
 
-	for(unsigned i = 0, n = partitioner.size(); i < n; i++)
+	for (unsigned i = 0, n = partitioner.size(); i < n; i++)
 	{
-		newnode->children.push_back(nodedata.getNode(partitioner.getDataIndex(i)));
+		newnode->children.push_back(
+				nodedata.getNode(partitioner.getDataIndex(i)));
 	}
 	newnode->selfUpdate(); //update MIV/MSV
 
@@ -393,37 +570,41 @@ GSSTree::GSSInternalNode* GSSTree::nodeFromPartition(Partitioner& partitioner, N
 /*
  * Take all the trees indexed by tindex, segregate them
  */
-void GSSTree::partitionLeaves(Partitioner& partitioner, LeafPartitionData& leafdata, unsigned level, bool splitMSV, vector<GSSNode*>& nodes)
+void GSSTree::partitionLeaves(Partitioner& partitioner,
+		LeafPartitionData& leafdata, unsigned level, bool splitMSV,
+		vector<GSSNode*>& nodes)
 {
-	if(partitioner.size() == 0)
+	if (partitioner.size() == 0)
 		return;
 
-	if(partitioner.size() <= MaxSplit)
+	if (partitioner.size() <= MaxSplit)
 	{
 		//create a node
 		nodes.push_back(leafFromPartition(partitioner, leafdata));
 		return;
 	}
 
-	if(Verbose) cout << "leaves " << partitioner.size() << " l" << level << " s" << splitMSV << "\n";
+	if (Verbose)
+		cout << "leaves " << partitioner.size() << " l" << level << " s"
+				<< splitMSV << "\n";
 	//identify octant to split on
 	vector<unsigned> octantcoord;
-	while(level <= maxlevel)
+	while (level <= maxlevel)
 	{
-		if(partitioner.findOctant(level, splitMSV, octantcoord))
+		if (partitioner.findOctantAndSetUsed(level, splitMSV, octantcoord))
 			break;
 		splitMSV = !splitMSV;
-		if(partitioner.findOctant(level, splitMSV, octantcoord))
+		if (partitioner.findOctantAndSetUsed(level, splitMSV, octantcoord))
 			break;
 		level++;
 	}
 
 	//check for cases where we should just agglomerate
-	if(level > maxlevel || partitioner.size() < LeafPack)
+	if (level > maxlevel || partitioner.size() < LeafPack)
 	{
-		vector< Partitioner > clusters;
+		vector<Partitioner> clusters;
 		partitioner.packClusters(MaxSplit, clusters);
-		for(unsigned i = 0, n = clusters.size(); i < n; i++)
+		for (unsigned i = 0, n = clusters.size(); i < n; i++)
 		{
 			nodes.push_back(leafFromPartition(clusters[i], leafdata));
 		}
@@ -434,16 +615,19 @@ void GSSTree::partitionLeaves(Partitioner& partitioner, LeafPartitionData& leafd
 		vector<Partitioner> parts;
 		partitioner.partitionOnOctant(octantcoord, splitMSV, parts);
 
+		if(PackPartitions)
+			Partitioner::clusterPartitions(parts);
+
 		//select which bins to recursively split and which to combine
 		//into a single group to be clustered into leaves
 		vector<unsigned> partitionMore;
 		Partitioner mergedPartition(&leafdata);
 
-		for(unsigned i = 0, n = parts.size(); i < n; i++)
+		for (unsigned i = 0, n = parts.size(); i < n; i++)
 		{
-			if(parts[i].size() == 0)
+			if (parts[i].size() == 0)
 				continue;
-			if(parts[i].size() < LeafMerge)
+			if (parts[i].size() < LeafMerge)
 			{
 				mergedPartition.add(parts[i]);
 			}
@@ -454,17 +638,18 @@ void GSSTree::partitionLeaves(Partitioner& partitioner, LeafPartitionData& leafd
 		}
 
 		//create leaves from small groups
-		vector< Partitioner > clusters;
+		vector<Partitioner> clusters;
 		mergedPartition.packClusters(MaxSplit, clusters);
-		for(unsigned i = 0, n = clusters.size(); i < n; i++)
+		for (unsigned i = 0, n = clusters.size(); i < n; i++)
 		{
 			nodes.push_back(leafFromPartition(clusters[i], leafdata));
 		}
 
 		//split on octants with large partitions
-		for(unsigned i = 0, n = partitionMore.size(); i < n; i++)
+		for (unsigned i = 0, n = partitionMore.size(); i < n; i++)
 		{
-			partitionLeaves(parts[partitionMore[i]],leafdata, level, splitMSV, nodes);
+			partitionLeaves(parts[partitionMore[i]], leafdata, level, splitMSV,
+					nodes);
 		}
 	}
 }
@@ -472,37 +657,41 @@ void GSSTree::partitionLeaves(Partitioner& partitioner, LeafPartitionData& leafd
 //partition nodes to build another level
 //very similar to partition leaves, but different data structures
 //also, opportunaty for different algorithmic choices
-void GSSTree::partitionNodes(Partitioner& partitioner, NodePartitionData& nodedata, unsigned level, bool splitMSV, vector<GSSNode*>& nodes)
+void GSSTree::partitionNodes(Partitioner& partitioner,
+		NodePartitionData& nodedata, unsigned level, bool splitMSV,
+		vector<GSSNode*>& nodes)
 {
-	if(partitioner.size() == 0)
+	if (partitioner.size() == 0)
 		return;
-	if(partitioner.size() <= MaxSplit)
+	if (partitioner.size() <= MaxSplit)
 	{
 		//create a node
 		nodes.push_back(nodeFromPartition(partitioner, nodedata));
 		return;
 	}
 
-	if(Verbose) cout << "nodes " << partitioner.size() << " l" << level << " s" << splitMSV << "\n";
+	if (Verbose)
+		cout << "nodes " << partitioner.size() << " l" << level << " s"
+				<< splitMSV << "\n";
 
 	//identify octant to split on
 	vector<unsigned> octantcoord;
-	while(level <= maxlevel)
+	while (level <= maxlevel)
 	{
-		if(partitioner.findOctant(level, splitMSV, octantcoord))
+		if (partitioner.findOctantAndSetUsed(level, splitMSV, octantcoord))
 			break;
 		splitMSV = !splitMSV;
-		if(partitioner.findOctant(level, splitMSV, octantcoord))
+		if (partitioner.findOctantAndSetUsed(level, splitMSV, octantcoord))
 			break;
 		level++;
 	}
 
 	//check for cases where we should just agglomerate
-	if(level > maxlevel || partitioner.size() < NodePack)
+	if (level > maxlevel || partitioner.size() < NodePack)
 	{
-		vector< Partitioner > clusters;
+		vector<Partitioner> clusters;
 		partitioner.packClusters(MaxSplit, clusters);
-		for(unsigned i = 0, n = clusters.size(); i < n; i++)
+		for (unsigned i = 0, n = clusters.size(); i < n; i++)
 		{
 			nodes.push_back(nodeFromPartition(clusters[i], nodedata));
 		}
@@ -513,16 +702,19 @@ void GSSTree::partitionNodes(Partitioner& partitioner, NodePartitionData& nodeda
 		vector<Partitioner> parts;
 		partitioner.partitionOnOctant(octantcoord, splitMSV, parts);
 
+		if(PackPartitions)
+			Partitioner::clusterPartitions(parts);
+
 		//select which bins to recursively split and which to combine
 		//into a single group to be clustered into leaves
 		vector<unsigned> partitionMore;
 		Partitioner mergedPartition(&nodedata);
 
-		for(unsigned i = 0, n = parts.size(); i < n; i++)
+		for (unsigned i = 0, n = parts.size(); i < n; i++)
 		{
-			if(parts[i].size() == 0)
+			if (parts[i].size() == 0)
 				continue;
-			if(parts[i].size() < NodeMerge)
+			if (parts[i].size() < NodeMerge)
 			{
 				mergedPartition.add(parts[i]);
 			}
@@ -533,21 +725,21 @@ void GSSTree::partitionNodes(Partitioner& partitioner, NodePartitionData& nodeda
 		}
 
 		//create leaves from small groups
-		vector< Partitioner > clusters;
+		vector<Partitioner> clusters;
 		mergedPartition.packClusters(MaxSplit, clusters);
-		for(unsigned i = 0, n = clusters.size(); i < n; i++)
+		for (unsigned i = 0, n = clusters.size(); i < n; i++)
 		{
 			nodes.push_back(nodeFromPartition(clusters[i], nodedata));
 		}
 
 		//split on octants with large partitions
-		for(unsigned i = 0, n = partitionMore.size(); i < n; i++)
+		for (unsigned i = 0, n = partitionMore.size(); i < n; i++)
 		{
-			partitionNodes(parts[partitionMore[i]],nodedata, level, splitMSV, nodes);
+			partitionNodes(parts[partitionMore[i]], nodedata, level, splitMSV,
+					nodes);
 		}
 	}
 }
-
 
 void GSSTree::load(const vector<vector<MolSphere> >& mols)
 {
@@ -569,7 +761,7 @@ void GSSTree::load(const vector<vector<MolSphere> >& mols)
 		vector<LeafData> data;
 		trees.reserve(mols.size());
 		data.reserve(mols.size());
-		for(unsigned i = 0, n = mols.size(); i < n; i++)
+		for (unsigned i = 0, n = mols.size(); i < n; i++)
 		{
 			vector<MolSphere> mol;
 			transformMol(mols[i], mol);
@@ -587,7 +779,7 @@ void GSSTree::load(const vector<vector<MolSphere> >& mols)
 		trees.clear(); //now stored in nodes
 		data.clear();
 
-		while(nodes.size() > 1)
+		while (nodes.size() > 1)
 		{
 			NodePartitionData nodedata(&nodes);
 			Partitioner nodepartition(&nodedata);
@@ -600,7 +792,6 @@ void GSSTree::load(const vector<vector<MolSphere> >& mols)
 		root = nodes[0];
 	}
 }
-
 
 static unsigned leavesChecked = 0;
 static unsigned fitChecks = 0;
@@ -617,10 +808,12 @@ void GSSTree::nn_search(const vector<MolSphere>& m, vector<MolSphere>& res)
 	Timer t;
 	root->findNearest(tree, dist, data);
 	double elapsed = t.elapsed();
-	if(Verbose) cout << "LeavesChecked " << leavesChecked << " / " << root->numLeaves() << "\tFitChecks " << fitChecks << " " << elapsed << "\n";
+	if (Verbose)
+		cout << "LeavesChecked " << leavesChecked << " / " << root->numLeaves()
+				<< "\tFitChecks " << fitChecks << " " << elapsed << "\n";
 	swap(res, data.spheres);
 
-	if(ScanCheck)
+	if (ScanCheck)
 	{
 		//check
 		t.restart();
@@ -629,8 +822,10 @@ void GSSTree::nn_search(const vector<MolSphere>& m, vector<MolSphere>& res)
 		dist = HUGE_VAL;
 		root->scanNearest(tree, dist, data);
 		elapsed = t.elapsed();
-		if(Verbose) cout << "LeavesScanned " << leavesChecked << " / " << root->numLeaves()
-				<< "\tFitChecks " << fitChecks << " " << elapsed << "\n";
+		if (Verbose)
+			cout << "LeavesScanned " << leavesChecked << " / "
+					<< root->numLeaves() << "\tFitChecks " << fitChecks << " "
+					<< elapsed << "\n";
 
 		if (data.spheres != res)
 		{
@@ -641,7 +836,8 @@ void GSSTree::nn_search(const vector<MolSphere>& m, vector<MolSphere>& res)
 	delete tree;
 }
 
-void GSSTree::tree_range_search(const OctTree* smallTree, const OctTree* bigTree, vector<vector<MolSphere>  >& res)
+void GSSTree::tree_range_search(const OctTree* smallTree,
+		const OctTree* bigTree, vector<vector<MolSphere> >& res)
 {
 	leavesChecked = 0;
 	fitChecks = 0;
@@ -650,15 +846,17 @@ void GSSTree::tree_range_search(const OctTree* smallTree, const OctTree* bigTree
 	vector<LeafData> data;
 	root->findTweeners(smallTree, bigTree, data);
 	double elapsed = t.elapsed();
-	if(Verbose) cout << "LeavesChecked "  << leavesChecked << " / " << root->numLeaves() << "\tFitChecks "
-			<< fitChecks << " "<< elapsed << "\t" << data.size() << "\n";
+	if (Verbose)
+		cout << "LeavesChecked " << leavesChecked << " / " << root->numLeaves()
+				<< "\tFitChecks " << fitChecks << " " << elapsed << "\t"
+				<< data.size() << "\n";
 
-	for(unsigned i = 0, n = data.size(); i < n; i++)
+	for (unsigned i = 0, n = data.size(); i < n; i++)
 	{
 		res.push_back(data[i].spheres);
 	}
 
-	if(ScanCheck)
+	if (ScanCheck)
 	{
 		//check
 		t.restart();
@@ -667,8 +865,10 @@ void GSSTree::tree_range_search(const OctTree* smallTree, const OctTree* bigTree
 		data.clear();
 		root->scanTweeners(smallTree, bigTree, data);
 		elapsed = t.elapsed();
-		if (Verbose) cout << "LeavesScanned " << leavesChecked << " / " << root->numLeaves()
-								<< "\tFitChecks " << fitChecks << " " << elapsed << "\t" << data.size() << "\n";
+		if (Verbose)
+			cout << "LeavesScanned " << leavesChecked << " / "
+					<< root->numLeaves() << "\tFitChecks " << fitChecks << " "
+					<< elapsed << "\t" << data.size() << "\n";
 
 		if (data.size() != res.size()) //lame but easy check
 		{
@@ -677,14 +877,15 @@ void GSSTree::tree_range_search(const OctTree* smallTree, const OctTree* bigTree
 	}
 }
 
-void GSSTree::dc_search(const vector<MolSphere>& little, const vector<MolSphere>& big, vector<vector<MolSphere> >& res)
+void GSSTree::dc_search(const vector<MolSphere>& little,
+		const vector<MolSphere>& big, vector<vector<MolSphere> >& res)
 {
 	vector<MolSphere> littleMol, bigMol;
 	transformMol(little, littleMol);
 	transformMol(big, bigMol);
 
-	OctTree *smallTree = octGen.newOctTree(dim,maxres, littleMol);
-	OctTree *bigTree = octGen.newOctTree(dim,maxres, bigMol);
+	OctTree *smallTree = octGen.newOctTree(dim, maxres, littleMol);
+	OctTree *bigTree = octGen.newOctTree(dim, maxres, bigMol);
 
 	tree_range_search(smallTree, bigTree, res);
 
@@ -692,14 +893,15 @@ void GSSTree::dc_search(const vector<MolSphere>& little, const vector<MolSphere>
 	delete bigTree;
 }
 
-void GSSTree::inex_search(const vector<MolSphere>& inc, const vector<MolSphere>& exc, vector<vector<MolSphere> >& res)
+void GSSTree::inex_search(const vector<MolSphere>& inc,
+		const vector<MolSphere>& exc, vector<vector<MolSphere> >& res)
 {
 	vector<MolSphere> littleMol, bigMol;
 	transformMol(inc, littleMol);
 	transformMol(exc, bigMol);
 
-	OctTree* smallTree = octGen.newOctTree(dim,maxres, littleMol);
-	OctTree* bigTree = octGen.newOctTree(dim,maxres, bigMol);
+	OctTree* smallTree = octGen.newOctTree(dim, maxres, littleMol);
+	OctTree* bigTree = octGen.newOctTree(dim, maxres, bigMol);
 	bigTree->invert();
 
 	tree_range_search(smallTree, bigTree, res);
@@ -708,28 +910,26 @@ void GSSTree::inex_search(const vector<MolSphere>& inc, const vector<MolSphere>&
 	delete bigTree;
 }
 
-
-
 //output leaf data
 void GSSTree::LeafData::write(ostream& out) const
 {
 	unsigned n = spheres.size();
-	out.write((char*)&n, sizeof(n));
-	for(unsigned i = 0; i < n; i++)
+	out.write((char*) &n, sizeof(n));
+	for (unsigned i = 0; i < n; i++)
 	{
-		out.write((char*)&spheres[i], sizeof(MolSphere));
+		out.write((char*) &spheres[i], sizeof(MolSphere));
 	}
 }
 
 //and input
-void GSSTree::LeafData::read(istream&  in)
+void GSSTree::LeafData::read(istream& in)
 {
 	unsigned n = 0;
-	in.read((char*)&n, sizeof(n));
+	in.read((char*) &n, sizeof(n));
 	spheres.resize(n);
-	for(unsigned i = 0; i < n; i++)
+	for (unsigned i = 0; i < n; i++)
 	{
-		in.read((char*)&spheres[i], sizeof(MolSphere));
+		in.read((char*) &spheres[i], sizeof(MolSphere));
 	}
 }
 
@@ -739,24 +939,25 @@ void GSSTree::GSSNode::write(ostream& out) const
 	streampos ret = out.tellp();
 
 	//write out kind of node
-	const GSSInternalNode* intnode = dynamic_cast<const GSSInternalNode*>(this);
+	const GSSInternalNode* intnode =
+			dynamic_cast<const GSSInternalNode*> (this);
 	bool isInternal = intnode != NULL;
 
-	out.write((char*)&isInternal, sizeof(isInternal));
-	out.write((char*)&res, sizeof(res));
-	out.write((char*)&which, sizeof(which));
+	out.write((char*) &isInternal, sizeof(isInternal));
+	out.write((char*) &res, sizeof(res));
+	out.write((char*) &which, sizeof(which));
 	//write out MIV/MSV
 	MIV->write(out);
 	MSV->write(out);
 }
 
-
-GSSTree::GSSNode* GSSTree::GSSNode::readCreate(const OctTreeFactory& octGen, istream& in, GSSInternalNode *parPtr)
+GSSTree::GSSNode* GSSTree::GSSNode::readCreate(const OctTreeFactory& octGen,
+		istream& in, GSSInternalNode *parPtr)
 {
 	bool isInternal = false;
-	in.read((char*)&isInternal, sizeof(isInternal));
+	in.read((char*) &isInternal, sizeof(isInternal));
 
-	if(isInternal)
+	if (isInternal)
 	{
 		GSSInternalNode *ret = new GSSInternalNode(octGen);
 		ret->read(octGen, in, parPtr);
@@ -774,8 +975,8 @@ GSSTree::GSSNode* GSSTree::GSSNode::readCreate(const OctTreeFactory& octGen, ist
 void GSSTree::GSSNode::read(istream& in, GSSInternalNode *parPtr)
 {
 	parent = parPtr;
-	in.read((char*)&res, sizeof(res));
-	in.read((char*)&which, sizeof(which));
+	in.read((char*) &res, sizeof(res));
+	in.read((char*) &which, sizeof(which));
 	MIV->read(in);
 	MSV->read(in);
 }
@@ -785,22 +986,23 @@ void GSSTree::GSSInternalNode::write(ostream& out) const
 	GSSNode::write(out);
 
 	unsigned n = children.size();
-	out.write((char*)&n, sizeof(n));
+	out.write((char*) &n, sizeof(n));
 
-	for(unsigned i = 0; i < n; i++)
+	for (unsigned i = 0; i < n; i++)
 	{
 		children[i]->write(out);
 	}
 }
 
-void GSSTree::GSSInternalNode::read(const OctTreeFactory& octGen, istream& in, GSSInternalNode *parPtr)
+void GSSTree::GSSInternalNode::read(const OctTreeFactory& octGen, istream& in,
+		GSSInternalNode *parPtr)
 {
 	GSSNode::read(in, parPtr);
 
 	unsigned n = 0;
-	in.read((char*)&n, sizeof(n));
+	in.read((char*) &n, sizeof(n));
 	children.resize(n, NULL);
-	for(unsigned i = 0; i < n; i++)
+	for (unsigned i = 0; i < n; i++)
 	{
 		children[i] = GSSNode::readCreate(octGen, in, this);
 	}
@@ -812,46 +1014,46 @@ void GSSTree::GSSLeafNode::write(ostream& out) const
 	GSSNode::write(out);
 
 	unsigned n = trees.size();
-	out.write((char*)&n, sizeof(n));
-	for(unsigned i = 0; i < n; i++)
+	out.write((char*) &n, sizeof(n));
+	for (unsigned i = 0; i < n; i++)
 	{
 		trees[i]->write(out);
 	}
 
-	for(unsigned i = 0; i < n; i++)
+	for (unsigned i = 0; i < n; i++)
 	{
 		data[i].write(out);
 	}
 }
 
-void GSSTree::GSSLeafNode::read(const OctTreeFactory& octGen, istream& in, GSSInternalNode *parPtr)
+void GSSTree::GSSLeafNode::read(const OctTreeFactory& octGen, istream& in,
+		GSSInternalNode *parPtr)
 {
 	GSSNode::read(in, parPtr);
 
 	unsigned n = 0;
-	in.read((char*)&n, sizeof(n));
+	in.read((char*) &n, sizeof(n));
 	trees.resize(n, NULL);
 	data.resize(n);
 
-	for(unsigned i = 0; i < n; i++)
+	for (unsigned i = 0; i < n; i++)
 	{
 		trees[i] = octGen.newOctTree();
 		trees[i]->read(in);
 	}
 
-	for(unsigned i = 0; i < n; i++)
+	for (unsigned i = 0; i < n; i++)
 	{
 		data[i].read(in);
 	}
 }
 
-
 //dump tree in binary to be read into memory later
 void GSSTree::write(ostream& out)
 {
-	out.write((char*)&maxres, sizeof(maxres));
-	out.write((char*)min, sizeof(min));
-	out.write((char*)&dim, sizeof(dim));
+	out.write((char*) &maxres, sizeof(maxres));
+	out.write((char*) min, sizeof(min));
+	out.write((char*) &dim, sizeof(dim));
 	octGen.write(out);
 	root->write(out);
 }
@@ -859,11 +1061,12 @@ void GSSTree::write(ostream& out)
 //read completely into memory
 void GSSTree::read(istream& in)
 {
-	in.read((char*)&maxres, sizeof(maxres));
-	in.read((char*)min, sizeof(min));
-	in.read((char*)&dim, sizeof(dim));
+	in.read((char*) &maxres, sizeof(maxres));
+	in.read((char*) min, sizeof(min));
+	in.read((char*) &dim, sizeof(dim));
 	octGen.read(in);
-	if(root) delete root;
+	if (root)
+		delete root;
 	root = GSSNode::readCreate(octGen, in, NULL);
 }
 
@@ -873,7 +1076,7 @@ void GSSTree::read(istream& in)
 float GSSTree::deltaFit(const GSSLeafNode *to, GSSLeafNode *from, unsigned t)
 {
 	//never remove the last tree from a node
-	if(from->trees.size() <= 1)
+	if (from->trees.size() <= 1)
 		return 0;
 
 	//compute MIV/MSV of from node without t
@@ -881,9 +1084,9 @@ float GSSTree::deltaFit(const GSSLeafNode *to, GSSLeafNode *from, unsigned t)
 	OctTree* nMSV = octGen.newOctTree(dim, maxres);
 	nMIV->fill();
 
-	for(unsigned i = 0, n = from->trees.size(); i < n; i++)
+	for (unsigned i = 0, n = from->trees.size(); i < n; i++)
 	{
-		if(i != t)
+		if (i != t)
 		{
 			nMIV->intersect(from->trees[i]);
 			nMSV->unionWith(from->trees[i]);
@@ -893,7 +1096,7 @@ float GSSTree::deltaFit(const GSSLeafNode *to, GSSLeafNode *from, unsigned t)
 	float fromMIV = nMIV->volume() - from->MIV->volume();
 	float fromMSV = from->MSV->volume() - nMSV->volume();
 
-	float fromCombined = fromMIV+fromMSV;
+	float fromCombined = fromMIV + fromMSV;
 	float toCombined = to->combinedVolumeChange(from->trees[t], from->trees[t]);
 
 	delete nMIV;
@@ -906,9 +1109,10 @@ float GSSTree::deltaFit(const GSSLeafNode *to, GSSLeafNode *from, unsigned t)
 //insert data into leaf node, if there isn't enough room, split
 //call update on parents if need-be
 //takes ownership of the tree memory
-void GSSTree::GSSLeafNode::insert(GSSTree& gTree, OctTree* tree, const LeafData& m, vector<LeafDistPair>& kbest)
+void GSSTree::GSSLeafNode::insert(GSSTree& gTree, OctTree* tree,
+		const LeafData& m, vector<LeafDistPair>& kbest)
 {
-	if(data.size() < MaxSplit)
+	if (data.size() < MaxSplit)
 	{
 		bool needUpdate = false;
 
@@ -921,7 +1125,7 @@ void GSSTree::GSSLeafNode::insert(GSSTree& gTree, OctTree* tree, const LeafData&
 		needUpdate |= MIV->intersect(tree);
 		needUpdate |= MSV->unionWith(tree);
 
-		if(needUpdate && parent != NULL)
+		if (needUpdate && parent != NULL)
 		{
 			parent->update(gTree, which, NULL);
 		}
@@ -937,42 +1141,45 @@ void GSSTree::GSSLeafNode::insert(GSSTree& gTree, OctTree* tree, const LeafData&
 		vector<unsigned> split1;
 		vector<unsigned> split2;
 		split(trees, trees, split1, split2);
-		GSSLeafNode *newnode = new GSSLeafNode(gTree.octGen, gTree.dim, gTree.maxres);
+		GSSLeafNode *newnode = new GSSLeafNode(gTree.octGen, gTree.dim,
+				gTree.maxres);
 
 		//put split2 in new node
 		newnode->MIV->fill();
 		newnode->data.resize(split2.size());
-		for(unsigned i = 0, n = split2.size(); i < n; i++)
+		for (unsigned i = 0, n = split2.size(); i < n; i++)
 		{
 			unsigned index = split2[i];
 			newnode->trees.push_back(trees[index]);
-			swap(newnode->data[i],data[index]);
+			swap(newnode->data[i], data[index]);
 
 			//update MIV/MSV
 			newnode->MSV->unionWith(trees[index]);
 			newnode->MIV->intersect(trees[index]);
 		}
 		//now mogirfy to split1
-		vector<OctTree*> tmptrees; tmptrees.reserve(MaxSplit);
+		vector<OctTree*> tmptrees;
+		tmptrees.reserve(MaxSplit);
 		vector<LeafData> tmpdata(split1.size());
 
 		MIV->fill();
 		MSV->clear();
-		for(unsigned i = 0, n = split1.size(); i < n; i++)
+		for (unsigned i = 0, n = split1.size(); i < n; i++)
 		{
 			unsigned index = split1[i];
 			tmptrees.push_back(trees[index]);
-			swap(tmpdata[i],data[index]);
+			swap(tmpdata[i], data[index]);
 
 			MIV->intersect(trees[index]);
 			MSV->unionWith(trees[index]);
 		}
 
-		swap(tmpdata,data);
-		swap(tmptrees,trees);
+		swap(tmpdata, data);
+		swap(tmptrees, trees);
 
-		if(parent != NULL) parent->update(gTree, which, newnode);
-		else if(newnode != NULL) //need new root
+		if (parent != NULL)
+			parent->update(gTree, which, newnode);
+		else if (newnode != NULL) //need new root
 		{
 			gTree.createRoot(this, newnode);
 		}
@@ -982,30 +1189,31 @@ void GSSTree::GSSLeafNode::insert(GSSTree& gTree, OctTree* tree, const LeafData&
 		//tree would be more specific to one of the split nodes and moving it
 		//if so - this is not cheap
 		int cnt = ReshuffleLimit;
-		if(kbest.size() > 0 && newnode != NULL)
+		if (kbest.size() > 0 && newnode != NULL)
 		{
-			for(unsigned i = 0, n = kbest.size(); i < n; i++)
+			for (unsigned i = 0, n = kbest.size(); i < n; i++)
 			{
-				if(cnt <= 0)
+				if (cnt <= 0)
 					break;
 				GSSLeafNode *altleaf = kbest[i].leaf;
-				if(altleaf == this)
+				if (altleaf == this)
 					continue;
 
 				//don't resplit, just stop if full
-				if(trees.size() >= MaxSplit && newnode->trees.size() >= MaxSplit)
+				if (trees.size() >= MaxSplit && newnode->trees.size()
+						>= MaxSplit)
 					break;
 
 				bool changed1 = false, changed2 = false;
-				for(int i = 0; i < (int)altleaf->trees.size(); i++)
+				for (int i = 0; i < (int) altleaf->trees.size(); i++)
 				{
 					float deltaFit1 = gTree.deltaFit(this, altleaf, i);
 					float deltaFit2 = gTree.deltaFit(newnode, altleaf, i);
 
 					//must be positive to be better fit
-					if(deltaFit1 > 0 || deltaFit2 > 0)
+					if (deltaFit1 > 0 || deltaFit2 > 0)
 					{
-						if(deltaFit1 > deltaFit2 && trees.size() < MaxSplit)
+						if (deltaFit1 > deltaFit2 && trees.size() < MaxSplit)
 						{
 							//move to this node
 							moveTreeFrom(altleaf, i);
@@ -1013,7 +1221,7 @@ void GSSTree::GSSLeafNode::insert(GSSTree& gTree, OctTree* tree, const LeafData&
 							i--; //has been deleted
 							cnt--;
 						}
-						else if(newnode->trees.size() < MaxSplit)
+						else if (newnode->trees.size() < MaxSplit)
 						{
 							//move to new node
 							newnode->moveTreeFrom(altleaf, i);
@@ -1024,9 +1232,9 @@ void GSSTree::GSSLeafNode::insert(GSSTree& gTree, OctTree* tree, const LeafData&
 					}
 				}
 
-				if(changed1 && parent != NULL) //update up the tree
+				if (changed1 && parent != NULL) //update up the tree
 					parent->fullUpdate();
-				if(changed2 && newnode->parent != NULL)
+				if (changed2 && newnode->parent != NULL)
 					newnode->parent->fullUpdate();
 
 			}
@@ -1047,7 +1255,7 @@ void GSSTree::GSSInternalNode::addChild(GSSNode *child)
 void GSSTree::GSSNode::fullUpdate()
 {
 	selfUpdate();
-	if(parent != NULL)
+	if (parent != NULL)
 		parent->fullUpdate();
 }
 
@@ -1058,7 +1266,7 @@ void GSSTree::GSSLeafNode::selfUpdate()
 	MIV->fill();
 	MSV->clear();
 
-	for(unsigned i = 0, n = trees.size(); i < n; i++)
+	for (unsigned i = 0, n = trees.size(); i < n; i++)
 	{
 		MIV->intersect(trees[i]);
 		MSV->unionWith(trees[i]);
@@ -1072,7 +1280,7 @@ void GSSTree::GSSInternalNode::selfUpdate()
 	MIV->fill();
 	MSV->clear();
 
-	for(unsigned i = 0, n = children.size(); i < n; i++)
+	for (unsigned i = 0, n = children.size(); i < n; i++)
 	{
 		MIV->intersect(children[i]->MIV);
 		MSV->unionWith(children[i]->MSV);
@@ -1080,7 +1288,8 @@ void GSSTree::GSSInternalNode::selfUpdate()
 }
 
 //recurse UP the tree updating MIV/MSV and splitting as necessary
-void GSSTree::GSSInternalNode::update(GSSTree& tree, unsigned whichChild, GSSNode *newnode)
+void GSSTree::GSSInternalNode::update(GSSTree& tree, unsigned whichChild,
+		GSSNode *newnode)
 {
 	//first update MIV/MSV
 	assert(whichChild < children.size());
@@ -1089,10 +1298,10 @@ void GSSTree::GSSInternalNode::update(GSSTree& tree, unsigned whichChild, GSSNod
 	needUpdate |= MIV->intersect(children[whichChild]->MIV);
 	needUpdate |= MSV->unionWith(children[whichChild]->MSV);
 
-	if(newnode != NULL)
+	if (newnode != NULL)
 	{
 		//add node to this level
-		if(children.size() < MaxSplit)
+		if (children.size() < MaxSplit)
 		{
 			//easy case
 			needUpdate |= MIV->intersect(newnode->MIV);
@@ -1110,7 +1319,7 @@ void GSSTree::GSSInternalNode::update(GSSTree& tree, unsigned whichChild, GSSNod
 			//add in new node briefly so it's part of the split
 			children.push_back(newnode);
 
-			for(unsigned i = 0, n = children.size(); i < n; i++)
+			for (unsigned i = 0, n = children.size(); i < n; i++)
 			{
 				MIVs.push_back(children[i]->MIV);
 				MSVs.push_back(children[i]->MSV);
@@ -1129,7 +1338,7 @@ void GSSTree::GSSInternalNode::update(GSSTree& tree, unsigned whichChild, GSSNod
 			//mogify this node to hold split1
 			MIV->fill();
 			MSV->clear();
-			for(unsigned i = 0, n = split1.size(); i < n; i++)
+			for (unsigned i = 0, n = split1.size(); i < n; i++)
 			{
 				GSSNode *child = oldchildren[split1[i]];
 				addChild(child);
@@ -1138,10 +1347,11 @@ void GSSTree::GSSInternalNode::update(GSSTree& tree, unsigned whichChild, GSSNod
 			}
 
 			//same thing for the new node and split2
-			GSSInternalNode *newinode = new GSSInternalNode(tree.octGen,tree.dim,tree.maxres);
+			GSSInternalNode *newinode = new GSSInternalNode(tree.octGen,
+					tree.dim, tree.maxres);
 			newinode->MIV->fill();
 			newinode->MSV->clear();
-			for(unsigned i = 0, n = split2.size(); i < n; i++)
+			for (unsigned i = 0, n = split2.size(); i < n; i++)
 			{
 				GSSNode *child = oldchildren[split2[i]];
 				newinode->addChild(child);
@@ -1152,11 +1362,11 @@ void GSSTree::GSSInternalNode::update(GSSTree& tree, unsigned whichChild, GSSNod
 		}
 	}
 
-	if(parent != NULL)
+	if (parent != NULL)
 	{
 		parent->update(tree, which, newnode);
 	}
-	else if(newnode != NULL && parent == NULL) //need new root
+	else if (newnode != NULL && parent == NULL) //need new root
 	{
 		tree.createRoot(this, newnode);
 	}
@@ -1168,7 +1378,7 @@ void GSSTree::GSSInternalNode::update(GSSTree& tree, unsigned whichChild, GSSNod
 void GSSTree::createRoot(GSSNode *left, GSSNode *right)
 {
 	assert(left == root);
-	GSSInternalNode* newroot = new GSSInternalNode(octGen,dim, maxres);
+	GSSInternalNode* newroot = new GSSInternalNode(octGen, dim, maxres);
 	//update trees
 	*newroot->MIV = *left->MIV;
 	newroot->MIV->intersect(right->MIV);
@@ -1183,17 +1393,17 @@ void GSSTree::createRoot(GSSNode *left, GSSNode *right)
 	root = newroot;
 }
 
-
 //return true if the object(s) represented by MIV/MSV might fit in between min and max
-bool GSSTree::fitsInbetween(const OctTree *MIV, const OctTree *MSV, const OctTree *min, const OctTree *max)
+bool GSSTree::fitsInbetween(const OctTree *MIV, const OctTree *MSV,
+		const OctTree *min, const OctTree *max)
 {
 	fitChecks++;
 	//TODO: more efficient
 	//the MSV must completely enclose min
-	if(!min->containedIn(MSV))
+	if (!min->containedIn(MSV))
 		return false;
 	//MIV must be completely enclosed by max
-	if(!MIV->containedIn(max))
+	if (!MIV->containedIn(max))
 		return false;
 
 	return true;
@@ -1202,52 +1412,52 @@ bool GSSTree::fitsInbetween(const OctTree *MIV, const OctTree *MSV, const OctTre
 //return a distance to a single leaf, should be compatible with search Dist
 float GSSTree::leafDist(const OctTree* obj, const OctTree *leaf)
 {
-	if(HDist)
+	if (HDist)
 	{
 		return max(obj->hausdorffDistance(leaf), leaf->hausdorffDistance(obj));
 	}
 	else
 	{
-		return 1 - obj->intersectVolume(leaf)/obj->unionVolume(leaf);
+		return obj->volumeDistance(leaf);
 	}
 }
 
 //return a "distance" between obj and MIV/MSV; the lower the distance
 //the higher the more likely a node should be searched
 //min and max should bookend the ultimate leaf distances
-float GSSTree::searchDist(const OctTree* obj, const OctTree *MIV, const OctTree *MSV, float& min, float& max)
+float GSSTree::searchDist(const OctTree* obj, const OctTree *MIV,
+		const OctTree *MSV, float& min, float& max)
 {
-	min = 1 - obj->intersectVolume(MSV)/obj->unionVolume(MIV);
-	max = 1 - obj->intersectVolume(MIV)/obj->unionVolume(MSV);
+	min = obj->volumeDistance(MIV);
+	max = obj->volumeDistance(MSV);
 
-	return min+max;
+	return min + max;
 }
-
 
 /*
  * return a "distance" between approximations
  * for now, just the sum of the volume different of the MIVs and of the MSVs
  */
-float GSSTree::splitDist(const OctTree* leftMIV, const OctTree* leftMSV, const OctTree* rightMIV, const OctTree* rightMSV)
+float GSSTree::splitDist(const OctTree* leftMIV, const OctTree* leftMSV,
+		const OctTree* rightMIV, const OctTree* rightMSV)
 {
-	if(HDist)
+	if (HDist)
 	{
-		float d1 = max(leftMIV->hausdorffDistance(rightMIV),rightMIV->hausdorffDistance(leftMIV));
-		float d2 = max(leftMSV->hausdorffDistance(rightMSV),rightMSV->hausdorffDistance(leftMSV));
+		float d1 = max(leftMIV->hausdorffDistance(rightMIV),
+				rightMIV->hausdorffDistance(leftMIV));
+		float d2 = max(leftMSV->hausdorffDistance(rightMSV),
+				rightMSV->hausdorffDistance(leftMSV));
 
-		return d1+d2;
+		return d1 + d2;
 	}
 	else
 	{
-		float mind = 1 - leftMIV->intersectVolume(rightMIV)
-				/ leftMIV->unionVolume(rightMIV);
-		float maxd = 1 - leftMSV->intersectVolume(rightMSV)
-				/ leftMSV->unionVolume(rightMSV);
+		float mind = leftMIV->volumeDistance(rightMIV);
+		float maxd = leftMSV->volumeDistance(rightMSV);
 
 		return mind + maxd;
 	}
 }
-
 
 /* Decide how to split a node.  For now, use the canonical quadratic split
  * where you find the two most "distant" nodes, and then greedily partition
@@ -1268,14 +1478,14 @@ void GSSTree::split(const vector<OctTree*>& MIV, const vector<OctTree*>& MSV,
 	s2.reserve(N);
 	float distances[N][N];
 
-	for(unsigned i = 0; i < N; i++)
+	for (unsigned i = 0; i < N; i++)
 	{
-		for(unsigned j = i+1; j < N; j++)
+		for (unsigned j = i + 1; j < N; j++)
 		{
-			float d = splitDist(MIV[i],MSV[i],MIV[j],MSV[j]);
+			float d = splitDist(MIV[i], MSV[i], MIV[j], MSV[j]);
 			distances[i][j] = d;
 			distances[j][i] = d;
-			if(d > dist)
+			if (d > dist)
 			{
 				dist = d;
 				besti = i;
@@ -1295,32 +1505,32 @@ void GSSTree::split(const vector<OctTree*>& MIV, const vector<OctTree*>& MSV,
 	OctTree *jMSV = MSV[bestj]->clone();
 	s2.push_back(bestj);
 
-	for(unsigned i = 0; i < N; i++)
+	for (unsigned i = 0; i < N; i++)
 	{
-		if(i != besti && i != bestj)
+		if (i != besti && i != bestj)
 		{
 			//choose based on distance to cumulative MIV/MSV
 			//unless we've already filled one split
-			if(s1.size() > N/2+1)
+			if (s1.size() > N / 2 + 1)
 			{
 				s2.push_back(i);
 			}
-			else if(s2.size() > N/2+1)
+			else if (s2.size() > N / 2 + 1)
 			{
 				s1.push_back(i);
 			}
 			else
 			{
-				float di = splitDist(iMIV,iMSV,MIV[i],MSV[i]);
-				float dj = splitDist(jMIV, jMSV, MIV[i],MSV[i]);
+				float di = splitDist(iMIV, iMSV, MIV[i], MSV[i]);
+				float dj = splitDist(jMIV, jMSV, MIV[i], MSV[i]);
 
-				if(di < dj)
+				if (di < dj)
 				{
 					s1.push_back(i);
 					iMIV->intersect(MIV[i]);
 					iMSV->unionWith(MSV[i]);
 				}
-				else if(dj < di)
+				else if (dj < di)
 				{
 					s2.push_back(i);
 					jMIV->intersect(MIV[i]);
@@ -1328,7 +1538,7 @@ void GSSTree::split(const vector<OctTree*>& MIV, const vector<OctTree*>& MSV,
 				}
 				else //equal, seems unlikely
 				{
-					if(s1.size() < s2.size())
+					if (s1.size() < s2.size())
 					{
 						s1.push_back(i);
 						iMIV->intersect(MIV[i]);
@@ -1346,7 +1556,6 @@ void GSSTree::split(const vector<OctTree*>& MIV, const vector<OctTree*>& MSV,
 		}
 	}
 
-
 	delete iMIV;
 	delete iMSV;
 	delete jMIV;
@@ -1354,31 +1563,32 @@ void GSSTree::split(const vector<OctTree*>& MIV, const vector<OctTree*>& MSV,
 }
 
 //how much will the current MIV and MSV change after merging in miv and msv?
-float GSSTree::GSSNode::combinedVolumeChange(const OctTree *miv, const OctTree *msv) const
+float GSSTree::GSSNode::combinedVolumeChange(const OctTree *miv,
+		const OctTree *msv) const
 {
 	float deltamiv = MIV->volume() - MIV->intersectVolume(miv);
 	float deltamsv = MSV->unionVolume(msv) - MSV->volume();
 	return deltamiv + deltamsv;
 }
 
-
 //examine every object in the leaf and see if it has a better distance than distance,
 //if so, store data
-void GSSTree::GSSLeafNode::scanNearest(const OctTree* tree, float& distance, LeafData& d)
+void GSSTree::GSSLeafNode::scanNearest(const OctTree* tree, float& distance,
+		LeafData& d)
 {
 	findNearest(tree, distance, d); //this is just the same
 }
 
-
 //find the object with the best distance in this node, if it's better than
 //the passed distance, update
-void GSSTree::GSSLeafNode::findNearest(const OctTree* tree, float& distance, LeafData& d)
+void GSSTree::GSSLeafNode::findNearest(const OctTree* tree, float& distance,
+		LeafData& d)
 {
 	leavesChecked++;
-	for(unsigned i = 0, n = trees.size(); i < n; i++)
+	for (unsigned i = 0, n = trees.size(); i < n; i++)
 	{
 		float dist = leafDist(tree, trees[i]);
-		if(dist < distance)
+		if (dist < distance)
 		{
 			distance = dist;
 			d = data[i];
@@ -1387,27 +1597,29 @@ void GSSTree::GSSLeafNode::findNearest(const OctTree* tree, float& distance, Lea
 }
 
 //identify all objects that are exactly in between min and max
-void GSSTree::GSSLeafNode::scanTweeners(const OctTree* min, const OctTree* max, vector<LeafData>& res)
+void GSSTree::GSSLeafNode::scanTweeners(const OctTree* min, const OctTree* max,
+		vector<LeafData>& res)
 {
 	findTweeners(min, max, res);
 }
 
 static unsigned foundLeafCnt = 0;
 //identify all objects that are exactly in between min and max
-void GSSTree::GSSLeafNode::findTweeners(const OctTree* min, const OctTree* max, vector<LeafData>& res)
+void GSSTree::GSSLeafNode::findTweeners(const OctTree* min, const OctTree* max,
+		vector<LeafData>& res)
 {
 	leavesChecked++;
 	bool found = false;
-	for(unsigned i = 0, n = trees.size(); i < n; i++)
+	for (unsigned i = 0, n = trees.size(); i < n; i++)
 	{
-		if(fitsInbetween(trees[i], trees[i],min,max))
+		if (fitsInbetween(trees[i], trees[i], min, max))
 		{
 			found = true;
 			res.push_back(data[i]);
 		}
 	}
 
-	if(0 && found)
+	if (0 && found)
 	{
 		//output stuff
 		cout << "FOUNDLEAF " << foundLeafCnt << "\n";
@@ -1415,13 +1627,15 @@ void GSSTree::GSSLeafNode::findTweeners(const OctTree* min, const OctTree* max, 
 		name << "LEAF" << foundLeafCnt << ".xyz";
 		ofstream out(name.str().c_str());
 
-		for(unsigned i = 0, n = trees.size(); i < n; i++)
+		for (unsigned i = 0, n = trees.size(); i < n; i++)
 		{
-			bool good = fitsInbetween(trees[i], trees[i],min,max);
-			cout << i << " " << good << " " << splitDist(trees[i], trees[i], min, max) << " |";
-			for(unsigned j = 0; j < n; j++)
+			bool good = fitsInbetween(trees[i], trees[i], min, max);
+			cout << i << " " << good << " " << splitDist(trees[i], trees[i],
+					min, max) << " |";
+			for (unsigned j = 0; j < n; j++)
 			{
-				cout << " " << splitDist(trees[j],trees[j],trees[i],trees[i]);
+				cout << " "
+						<< splitDist(trees[j], trees[j], trees[i], trees[i]);
 			}
 			cout << "\n";
 
@@ -1430,8 +1644,9 @@ void GSSTree::GSSLeafNode::findTweeners(const OctTree* min, const OctTree* max, 
 			out << "\nLEAF" << foundLeafCnt << " " << i << "\n";
 			for (unsigned j = 0, m = data[i].spheres.size(); j < m; j++)
 			{
-				out << "C " << data[i].spheres[j].x << " " << data[i].spheres[j].y << " "
-						<< data[i].spheres[j].z << "\n";
+				out << "C " << data[i].spheres[j].x << " "
+						<< data[i].spheres[j].y << " " << data[i].spheres[j].z
+						<< "\n";
 			}
 		}
 		cout << "----\n";
@@ -1440,11 +1655,11 @@ void GSSTree::GSSLeafNode::findTweeners(const OctTree* min, const OctTree* max, 
 	}
 }
 
-
 //if this leaf is a more appropriate place for tree, return self
-void GSSTree::GSSLeafNode::findInsertionPoint(const OctTree* tree, float& distance, GSSLeafNode*& leaf)
+void GSSTree::GSSLeafNode::findInsertionPoint(const OctTree* tree,
+		float& distance, GSSLeafNode*& leaf)
 {
-	if(trees.size() == 0)
+	if (trees.size() == 0)
 	{
 		distance = 0;
 		leaf = this;
@@ -1453,7 +1668,7 @@ void GSSTree::GSSLeafNode::findInsertionPoint(const OctTree* tree, float& distan
 	{
 		float min, max;
 		float dist = searchDist(tree, MIV, MSV, min, max);
-		if(dist < distance)
+		if (dist < distance)
 		{
 			distance = dist;
 			leaf = this;
@@ -1462,20 +1677,21 @@ void GSSTree::GSSLeafNode::findInsertionPoint(const OctTree* tree, float& distan
 }
 
 //add this leaf if it's distance is better and truncate kbest if necessary
-void GSSTree::GSSLeafNode::findInsertionPoints(const OctTree* tree, vector<LeafDistPair>& kbest, unsigned k)
+void GSSTree::GSSLeafNode::findInsertionPoints(const OctTree* tree,
+		vector<LeafDistPair>& kbest, unsigned k)
 {
 	float dist = 0;
-	if(trees.size() > 0)
+	if (trees.size() > 0)
 	{
 		float min, max;
 		dist = searchDist(tree, MIV, MSV, min, max);
 	}
 
-	if(kbest.size() == 0 || kbest.back().distance > dist)
+	if (kbest.size() == 0 || kbest.back().distance > dist)
 	{
 		LeafDistPair pair(this, dist);
 		kbest.insert(lower_bound(kbest.begin(), kbest.end(), pair), pair);
-		if(kbest.size() > k) //truncate
+		if (kbest.size() > k) //truncate
 			kbest.resize(k);
 	}
 
@@ -1487,7 +1703,7 @@ void GSSTree::GSSLeafNode::moveTreeFrom(GSSLeafNode* from, unsigned t)
 {
 	assert(t < from->trees.size());
 
-	swap(from->trees[t],from->trees.back());
+	swap(from->trees[t], from->trees.back());
 	swap(from->data[t], from->data.back());
 
 	trees.push_back(from->trees.back());
@@ -1503,16 +1719,19 @@ void GSSTree::GSSLeafNode::moveTreeFrom(GSSLeafNode* from, unsigned t)
 	MSV->unionWith(trees.back());
 }
 
-
-
 struct ScoreIndex
 {
 	unsigned index;
 	float score;
 	float min;
 
-	ScoreIndex() {}
-	ScoreIndex(unsigned i, float s, float m): index(i), score(s), min(m) {}
+	ScoreIndex()
+	{
+	}
+	ScoreIndex(unsigned i, float s, float m) :
+		index(i), score(s), min(m)
+	{
+	}
 
 	bool operator<(const ScoreIndex& si) const
 	{
@@ -1520,12 +1739,12 @@ struct ScoreIndex
 	}
 };
 
-
 //identify all objects that are exactly in between min and max
 //brute force scan for debugging
-void GSSTree::GSSInternalNode::scanTweeners(const OctTree* min, const OctTree* max, vector<LeafData>& res)
+void GSSTree::GSSInternalNode::scanTweeners(const OctTree* min,
+		const OctTree* max, vector<LeafData>& res)
 {
-	for(unsigned i = 0, n = children.size(); i < n; i++)
+	for (unsigned i = 0, n = children.size(); i < n; i++)
 	{
 		children[i]->scanTweeners(min, max, res);
 	}
@@ -1533,11 +1752,12 @@ void GSSTree::GSSInternalNode::scanTweeners(const OctTree* min, const OctTree* m
 
 //identify all objects that are exactly in between min and max
 //filter out children that can't possibly match
-void GSSTree::GSSInternalNode::findTweeners(const OctTree* min, const OctTree* max, vector<LeafData>& res)
+void GSSTree::GSSInternalNode::findTweeners(const OctTree* min,
+		const OctTree* max, vector<LeafData>& res)
 {
-	for(unsigned i = 0, n = children.size(); i < n; i++)
+	for (unsigned i = 0, n = children.size(); i < n; i++)
 	{
-		if(fitsInbetween(children[i]->MIV, children[i]->MSV, min, max))
+		if (fitsInbetween(children[i]->MIV, children[i]->MSV, min, max))
 		{
 			children[i]->findTweeners(min, max, res);
 		}
@@ -1545,36 +1765,39 @@ void GSSTree::GSSInternalNode::findTweeners(const OctTree* min, const OctTree* m
 }
 
 //scan - ignore any bounding on the search
-void GSSTree::GSSInternalNode::scanNearest(const OctTree* tree, float& distance, LeafData& data)
+void GSSTree::GSSInternalNode::scanNearest(const OctTree* tree,
+		float& distance, LeafData& data)
 {
-	for(unsigned i = 0, n = children.size(); i < n; i++)
+	for (unsigned i = 0, n = children.size(); i < n; i++)
 	{
 		children[i]->scanNearest(tree, distance, data);
 	}
 }
 
 //explore children to find closest value
-void GSSTree::GSSInternalNode::findNearest(const OctTree* tree, float& distance, LeafData& data)
+void GSSTree::GSSInternalNode::findNearest(const OctTree* tree,
+		float& distance, LeafData& data)
 {
 	vector<ScoreIndex> SIs;
 	SIs.reserve(children.size());
 
-	for(unsigned i = 0, n = children.size(); i < n; i++)
+	for (unsigned i = 0, n = children.size(); i < n; i++)
 	{
 		float min = 0, max = 0;
-		float score = searchDist(tree, children[i]->MIV, children[i]->MSV, min, max);
-		if(min < distance) //there's hope
+		float score = searchDist(tree, children[i]->MIV, children[i]->MSV, min,
+				max);
+		if (min < distance) //there's hope
 		{
-			SIs.push_back(ScoreIndex(i,score,min));
+			SIs.push_back(ScoreIndex(i, score, min));
 		}
 	}
 
 	//explore in priority order
 	sort(SIs.begin(), SIs.end());
 
-	for(unsigned i = 0, n = SIs.size(); i < n; i++)
+	for (unsigned i = 0, n = SIs.size(); i < n; i++)
 	{
-		if(SIs[i].min < distance)
+		if (SIs[i].min < distance)
 		{
 			children[SIs[i].index]->findNearest(tree, distance, data);
 		}
@@ -1582,33 +1805,35 @@ void GSSTree::GSSInternalNode::findNearest(const OctTree* tree, float& distance,
 }
 
 //look for a good place for the data indexed by tree
-void GSSTree::GSSInternalNode::findInsertionPoint(const OctTree* tree, float& distance, GSSLeafNode*& leaf)
+void GSSTree::GSSInternalNode::findInsertionPoint(const OctTree* tree,
+		float& distance, GSSLeafNode*& leaf)
 {
 	float min, max;
 	float dist = searchDist(tree, MIV, MSV, min, max);
-	if(dist < distance)
+	if (dist < distance)
 	{
 		//if this tree might contain something better, look at all children -> really should sort this
-		for(unsigned i = 0, n = children.size(); i < n; i++)
+		for (unsigned i = 0, n = children.size(); i < n; i++)
 		{
 			children[i]->findInsertionPoint(tree, distance, leaf);
 		}
 	}
 }
 
-void GSSTree::GSSInternalNode::findInsertionPoints(const OctTree* tree, vector<LeafDistPair>& kbest, unsigned k)
+void GSSTree::GSSInternalNode::findInsertionPoints(const OctTree* tree,
+		vector<LeafDistPair>& kbest, unsigned k)
 {
 	float min, max;
 	float dist = searchDist(tree, MIV, MSV, min, max);
 	float bestdist = HUGE_VAL;
-	if(kbest.size() == k && k > 0)
+	if (kbest.size() == k && k > 0)
 	{
 		bestdist = kbest.back().distance;
 	}
-	if(dist < bestdist)
+	if (dist < bestdist)
 	{
 		//if this tree might contain something better, look at all children -> really should sort this
-		for(unsigned i = 0, n = children.size(); i < n; i++)
+		for (unsigned i = 0, n = children.size(); i < n; i++)
 		{
 			children[i]->findInsertionPoints(tree, kbest, k);
 		}
@@ -1620,31 +1845,33 @@ void GSSTree::GSSInternalNode::findInsertionPoints(const OctTree* tree, vector<L
 unsigned GSSTree::GSSInternalNode::getStats(Stats& leaves, Stats& nodes) const
 {
 	unsigned sz = children.size();
-	if(sz > nodes.max)
+	if (sz > nodes.max)
 		nodes.max = sz;
-	if(sz < nodes.min)
+	if (sz < nodes.min)
 		nodes.min = sz;
 	nodes.total += sz;
 	nodes.cnt++;
-	if(sz == 1) nodes.singletonCnt++;
+	if (sz == 1)
+		nodes.singletonCnt++;
 	unsigned ret = 0;
-	for(unsigned i = 0, n = children.size(); i < n; i++)
+	for (unsigned i = 0, n = children.size(); i < n; i++)
 	{
-		ret = max(ret,children[i]->getStats(leaves,nodes));
+		ret = max(ret, children[i]->getStats(leaves, nodes));
 	}
-	return ret+1;
+	return ret + 1;
 }
 
 unsigned GSSTree::GSSLeafNode::getStats(Stats& leaves, Stats& nodes) const
 {
 	unsigned sz = trees.size();
-	if(sz > leaves.max)
+	if (sz > leaves.max)
 		leaves.max = sz;
-	if(sz < leaves.min)
+	if (sz < leaves.min)
 		leaves.min = sz;
 	leaves.total += sz;
 	leaves.cnt++;
-	if(sz == 1) leaves.singletonCnt++;
+	if (sz == 1)
+		leaves.singletonCnt++;
 	return 0;
 }
 
@@ -1652,13 +1879,15 @@ unsigned GSSTree::GSSLeafNode::getStats(Stats& leaves, Stats& nodes) const
 void GSSTree::printStats() const
 {
 	Stats leaves, nodes;
-	unsigned depth = root->getStats(leaves,nodes);
+	unsigned depth = root->getStats(leaves, nodes);
 
-	printf("%dDepth %fAve | Leaves (%d): %fAve %dMin %dMax %dSingle| Nodes (%d): %fAve %dMin %dMax %dSingle\n",
-			depth,(leaves.total+nodes.total)/(double)(leaves.cnt+nodes.cnt),
-			leaves.cnt, leaves.total/(double)leaves.cnt, leaves.min, leaves.max, leaves.singletonCnt,
-			nodes.cnt, nodes.total/(double)nodes.cnt, nodes.min, nodes.max, nodes.singletonCnt);
+	printf(
+			"%dDepth %fAve | Leaves (%d): %fAve %dMin %dMax %dSingle| Nodes (%d): %fAve %dMin %dMax %dSingle\n",
+			depth,
+			(leaves.total + nodes.total) / (double) (leaves.cnt + nodes.cnt),
+			leaves.cnt, leaves.total / (double) leaves.cnt, leaves.min,
+			leaves.max, leaves.singletonCnt, nodes.cnt,
+			nodes.total / (double) nodes.cnt, nodes.min, nodes.max,
+			nodes.singletonCnt);
 }
-
-
 
