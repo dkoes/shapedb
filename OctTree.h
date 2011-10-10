@@ -76,6 +76,35 @@ public:
 	{
 		return intersectVolume(larger) == volume();
 	}
+
+	virtual float percentOverlapVolume(const OctTree *thisMSV, const OctTree *rightMIV, const OctTree *rightMSV) const
+	{
+		OctTree *tmp1 = clone();
+		tmp1->unionWith(rightMIV);
+		tmp1->invert();
+
+		OctTree *tmp2 = thisMSV->clone();
+		tmp2->intersect(rightMSV);
+
+		tmp1->intersect(tmp2); //overlap
+
+		OctTree *tmp3 = clone();
+		tmp3->intersect(rightMIV);
+		tmp3->invert();
+
+		OctTree *tmp4 = thisMSV->clone();
+		tmp4->unionWith(rightMSV);
+		tmp4->intersect(tmp3); //anylap
+
+		float ret = tmp1->volume()/tmp4->volume();
+		delete tmp1;
+		delete tmp2;
+		delete tmp3;
+		delete tmp4;
+
+		return ret;
+
+	}
 };
 
 

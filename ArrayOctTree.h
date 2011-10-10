@@ -71,6 +71,12 @@ class ArrayOctTree: public OctTree
 		unsigned getBitPattern(const vector<OctNode>& tree, bool MSV) const;
 
 		ChildNode copyTo(const vector<OctNode>& from, vector<OctNode>& to) const;
+#if 0
+		void overlapVolume(const vector<OctNode>& tree,const vector<OctNode>& msvtree,
+				const vector<OctNode>&  rmivtree,const vector<OctNode>&  rmsvtree,
+				const ChildNode& msvroot,const ChildNode& rmivroot,const ChildNode& rmsvroot, float dimension,
+				float& oval, float& aval) const;
+#endif
 	};
 
 	struct OctNode
@@ -165,6 +171,8 @@ public:
 
 	virtual float hausdorffDistance(const OctTree* B) const;
 	virtual float volumeDistance(const OctTree * B) const;
+
+	//virtual float percentOverlapVolume(const OctTree *thisMSV, const OctTree *rightMIV, const OctTree *rightMSV);
 
 };
 

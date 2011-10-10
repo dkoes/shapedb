@@ -1428,8 +1428,8 @@ float GSSTree::leafDist(const OctTree* obj, const OctTree *leaf)
 float GSSTree::searchDist(const OctTree* obj, const OctTree *MIV,
 		const OctTree *MSV, float& min, float& max)
 {
-	min = obj->volumeDistance(MIV);
-	max = obj->volumeDistance(MSV);
+	min = 1 - obj->intersectVolume(MSV)/obj->unionVolume(MIV); //percent of shape already covered
+	max = 1 - obj->intersectVolume(MIV)/obj->unionVolume(MSV); //difference if MIV/MSV after merge
 
 	return min + max;
 }
@@ -1452,10 +1452,7 @@ float GSSTree::splitDist(const OctTree* leftMIV, const OctTree* leftMSV,
 	}
 	else
 	{
-		float mind = leftMIV->volumeDistance(rightMIV);
-		float maxd = leftMSV->volumeDistance(rightMSV);
-
-		return mind + maxd;
+		return leftMIV->volumeDistance(rightMIV) + leftMSV->volumeDistance(rightMSV);
 	}
 }
 

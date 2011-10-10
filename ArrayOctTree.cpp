@@ -216,6 +216,22 @@ float ArrayOctTree::volumeDistance(const OctTree * Rhs) const
 	return 1 - ival/uval;
 }
 
+#if 0
+//this is an MIV, find the percentage of the merged MIV/MSV that is already common
+//to the current MIV/MSV pairs
+float ArrayOctTree::percentOverlapVolume(const OctTree *thisMSV, const OctTree *rightMIV, const OctTree *rightMSV)
+{
+	const ArrayOctTree& msv = dynamic_cast<const ArrayOctTree&> (*thisMSV);
+	const ArrayOctTree& rmiv = dynamic_cast<const ArrayOctTree&> (*rightMIV);
+	const ArrayOctTree& rmsv = dynamic_cast<const ArrayOctTree&> (*rightMSV);
+
+	float oval = 0, aval = 0;
+	root.overlapVolume(tree,msv.tree,rmiv.tree,rmsv.tree,msv.root,rmiv.root,rmsv.root, dimension, oval, aval);
+
+	return 1 - oval/aval;
+}
+#endif
+
 
 float ArrayOctTree::hausdorffDistance(const OctTree* B) const
 {
@@ -445,6 +461,20 @@ float ArrayOctTree::ChildNode::unionVolume(
 		return ret;
 	}
 }
+
+#if 0
+//compute shared overlap (oval) between MIV/MSV pairs and the any overlap
+//oval = ~(MIV1 | MIV2) & (MSV1 & MSV2)
+//aval = ~(MIV1 & MIV2) & (MSV1 | MSV2)
+//this is miv1
+void overlapVolume(const vector<OctNode>& miv1,const vector<OctNode>& msv1,
+			const vector<OctNode>&  miv2,const vector<OctNode>&  msv2,
+			const ChildNode& msvroot,const ChildNode& rmivroot,const ChildNode& rmsvroot, float dimension,
+			float& oval, float& aval) const
+{
+
+}
+#endif
 
 //compute both the intersection and union volume at once
 void ArrayOctTree::ChildNode::intersectUnionVolume(
