@@ -161,26 +161,30 @@ class GSSTree
 		OctTree *MIV;
 		OctTree *MSV;
 
+		unsigned maxlevel;
+		unsigned level;
+		bool splitMSV;
+
 		void updateOctantsForLevel(unsigned level, OctantCoords& octants, vector<bool>& done);
 		void mergeWith(const Partitioner& rhs);
 
 	public:
 
 		Partitioner() :
-			partdata(NULL), MIV(NULL), MSV(NULL)
+			partdata(NULL), MIV(NULL), MSV(NULL), maxlevel(0), level(0), splitMSV(true)
 		{
 		}
 
 		//initialize initial partition
-		Partitioner(const PartitionData *part) :
-			partdata(part), MIV(NULL), MSV(NULL)
+		Partitioner(const PartitionData *part, unsigned maxl) :
+			partdata(part), MIV(NULL), MSV(NULL), maxlevel(maxl), level(0), splitMSV(true)
 		{
 
 		}
 
 		Partitioner(const Partitioner& rhs): tindex(rhs.tindex), partdata(rhs.partdata),
 				MSVoctants(rhs.MSVoctants), MIVoctants(rhs.MIVoctants), MSVdoneOct(rhs.MSVdoneOct),
-				MIVdoneOct(rhs.MIVdoneOct), MIV(NULL), MSV(NULL)
+				MIVdoneOct(rhs.MIVdoneOct), MIV(NULL), MSV(NULL), maxlevel(rhs.maxlevel),level(rhs.level), splitMSV(rhs.splitMSV)
 		{
 			if(rhs.MIV)
 				MIV = rhs.MIV->clone();
@@ -209,6 +213,10 @@ class GSSTree
 
 			swap(first.MIV,second.MIV);
 			swap(first.MSV,second.MSV);
+			swap(first.level, second.level);
+			swap(first.splitMSV, second.splitMSV);
+
+			swap(first.maxlevel,second.maxlevel);
 		}
 
 
@@ -232,6 +240,10 @@ class GSSTree
 			MSVdoneOct = parent.MSVdoneOct;
 			MIVdoneOct = parent.MIVdoneOct;
 			tindex.reserve(parent.tindex.size());
+
+			level = parent.level;
+			splitMSV = parent.splitMSV;
+			maxlevel = parent.maxlevel;
 		}
 
 		void initFromData()
@@ -266,12 +278,20 @@ class GSSTree
 		void add(const Partitioner& from);
 		void addSingle(const Partitioner& from, unsigned fromindex);
 		void packClusters(unsigned max, vector<Partitioner>& clusters);
+		void kClusters(unsigned k, vector<Partitioner>& clusters);
 		double shannonEntropy(unsigned *patternCnts, unsigned total);
 
 		const OctTree* getMSV() const { return MSV; }
 		const OctTree* getMIV() const { return MIV; }
 
 		static void clusterPartitions(vector<Partitioner>& clusters);
+
+		void topDownOctantPartition(vector<Partitioner>& parts);
+		void topDownKSamplePartition(vector<Partitioner>& parts);
+
+		bool unableToPartition() const;
+
+		void getCenter(const OctTree *& MIV, const OctTree *& MSV) const;
 
 	};
 
@@ -539,11 +559,11 @@ class GSSTree
 	GSSLeafNode* leafFromPartition(Partitioner& partitioner,
 			LeafPartitionData& leafdata);
 	void partitionLeaves(Partitioner& partitioner, LeafPartitionData& leafdata,
-			unsigned level, bool splitMSV, vector<GSSNode*>& nodes);
+			vector<GSSNode*>& nodes);
 	GSSInternalNode* nodeFromPartition(Partitioner& partitioner,
 			NodePartitionData& nodedata);
 	void partitionNodes(Partitioner& partitioner, NodePartitionData& nodedata,
-			unsigned level, bool splitMSV, vector<GSSNode*>& nodes);
+			vector<GSSNode*>& nodes);
 
 public:
 

@@ -44,10 +44,38 @@ cl::opt<unsigned> NodeMerge("node-merge",
 cl::opt<bool> PackPartitions("pack-partitions", cl::desc("Group partitions for more even split"), cl::init(false));
 cl::opt<bool> HDist("hdist",
 		cl::desc("Hausdorff distance as a splitting metric"), cl::init(false));
+cl::opt<bool> ODist("odist",
+		cl::desc("Overlap volume distance as a splitting metric"), cl::init(false));
 
 extern cl::opt<bool> Verbose;
 
+enum TopDownEnum
+{
+	OctantSplit, KSampleSplit
+};
+
+cl::opt<TopDownEnum>		TopDownSplit(
+				cl::desc("Top down splitting method:"),
+				cl::values(clEnumValN(OctantSplit, "octant-split", "Split based on informative octants"),
+				clEnumValN(KSampleSplit, "ksample-split", "Spit using centers of random sample"),
+				clEnumValEnd),cl::init(OctantSplit) );
+
+enum CenterFindEnum
+{
+	AveCenter,MinMaxCenter
+};
+
+cl::opt<CenterFindEnum>		CenterFind(
+				cl::desc("Cluster center finding method:"),
+				cl::values(clEnumValN(AveCenter, "ave-center", "Center defined by best average"),
+				clEnumValN(MinMaxCenter, "minmax-center", "Center defined by minmax distance"),
+				clEnumValEnd) ,cl::init(AveCenter));
+
+
 const unsigned GSSTree::MaxSplit = 8; //number of children in each node
+
+cl::opt<unsigned> KCenters("kcenters", cl::desc("number of centers for ksample-split"), cl::init(8));
+cl::opt<unsigned> KSampleMult("ksamplex", cl::desc("multiplictive factor for ksampling"),cl::init(10));
 
 GSSTree::GSSNode::~GSSNode()
 {
@@ -357,7 +385,7 @@ void GSSTree::Partitioner::packClusters(unsigned max,
 	unsigned N = tindex.size();
 	boost::multi_array<float, 2> distances(boost::extents[N][N]);
 	vector<vector<unsigned> > clusts;
-	clusts.reserve(1 + size() / max);
+	clusts.reserve(1 + N);
 	for (unsigned i = 0; i < N; i++)
 	{
 		distances[i][i] = 0;
@@ -441,7 +469,106 @@ void GSSTree::Partitioner::packClusters(unsigned max,
 	clusters.reserve(clusts.size());
 	for (unsigned i = 0, n = clusts.size(); i < n; i++)
 	{
-		clusters.push_back(Partitioner(partdata));
+		clusters.push_back(Partitioner(partdata, maxlevel));
+		for (unsigned j = 0, m = clusts[i].size(); j < m; j++)
+		{
+			clusters.back().addSingle(*this, clusts[i][j]);
+		}
+	}
+}
+
+//use aglomerative clusters (complete linkage) to create k clusters of variable size
+void GSSTree::Partitioner::kClusters(unsigned k,
+		vector<Partitioner>& clusters)
+{
+	//compute pairwise distances between all members
+	unsigned N = tindex.size();
+	boost::multi_array<float, 2> distances(boost::extents[N][N]);
+	vector<vector<unsigned> > clusts;
+	clusts.reserve(1 + size());
+	for (unsigned i = 0; i < N; i++)
+	{
+		distances[i][i] = 0;
+		const OctTree *imiv = partdata->getMIV(tindex[i]);
+		const OctTree *imsv = partdata->getMSV(tindex[i]);
+		for (unsigned j = 0; j < i; j++)
+		{
+			const OctTree *jmiv = partdata->getMIV(tindex[j]);
+			const OctTree *jmsv = partdata->getMSV(tindex[j]);
+			if (imiv == imsv && jmiv == jmsv) //leaf case
+				distances[i][j] = distances[j][i] = leafDist(imiv, jmiv);
+			else
+				distances[i][j] = distances[j][i] = splitDist(imiv, imsv, jmiv,
+						jmsv);
+		}
+		clusts.push_back(vector<unsigned> ());
+		clusts.back().push_back(i);
+	}
+
+	//iteratively merge all clusters until we run into size limit
+	while (clusts.size() > k)
+	{
+		//find two clusters with smallest complete linkage distance
+		//(minimize the maximum distance)
+		float mindist = HUGE_VAL;
+		unsigned besti = 0;
+		unsigned bestj = 0;
+		for (unsigned i = 0, n = clusts.size(); i < n; i++)
+		{
+			for (unsigned j = 0; j < i; j++)
+			{
+				float maxdist = 0;
+				//find the max distance between i and j
+				for (unsigned I = 0, ni = clusts[i].size(); I < ni; I++)
+				{
+					for (unsigned J = 0, nj = clusts[j].size(); J < nj; J++)
+					{
+						float d = distances[clusts[i][I]][clusts[j][J]];
+						if (d > maxdist)
+						{
+							maxdist = d;
+						}
+					}
+				}
+				if (maxdist < mindist)
+				{
+					mindist = maxdist;
+					besti = i;
+					bestj = j;
+				}
+			}
+		}
+
+		if (besti == bestj)
+			break; //couldn't merge any
+
+		//move besti and bestj to end of vector
+		unsigned last = clusts.size() - 1;
+		if (bestj == last)
+		{
+			swap(clusts[besti], clusts[last - 1]);
+		}
+		else
+		{
+			swap(clusts[besti], clusts[last]);
+			swap(clusts[bestj], clusts[last - 1]);
+		}
+
+		//insert into second to last
+		clusts[last - 1].insert(clusts[last - 1].end(), clusts[last].begin(),
+				clusts[last].end());
+		clusts.pop_back(); //remove
+	}
+
+	if (Verbose)
+		cout << "  pack " << tindex.size() << " " << clusts.size() << "\n";
+
+	//now create partitions
+	clusters.clear();
+	clusters.reserve(clusts.size());
+	for (unsigned i = 0, n = clusts.size(); i < n; i++)
+	{
+		clusters.push_back(Partitioner(partdata, maxlevel));
 		for (unsigned j = 0, m = clusts[i].size(); j < m; j++)
 		{
 			clusters.back().addSingle(*this, clusts[i][j]);
@@ -567,12 +694,215 @@ GSSTree::GSSInternalNode* GSSTree::nodeFromPartition(Partitioner& partitioner,
 	return newnode;
 }
 
+//shouldnt top down partition, fall back to bottom up
+bool GSSTree::Partitioner::unableToPartition() const
+{
+	if(level > maxlevel)
+		return true;
+	if(TopDownSplit == KSampleSplit)
+	{
+		if(size() < KCenters * KSampleMult)
+			return true;
+	}
+
+	return false;
+}
+
+//find the value that is most central in this partition
+//this is assumed to be a small partition since we calculate all n^2 distances
+void GSSTree::Partitioner::getCenter(const OctTree *& MIV, const OctTree *& MSV) const
+{
+	unsigned N = tindex.size();
+	boost::multi_array<float, 2> distances(boost::extents[N][N]);
+
+	//compute distances
+	for (unsigned i = 0; i < N; i++)
+	{
+		distances[i][i] = 0;
+		const OctTree *imiv = partdata->getMIV(tindex[i]);
+		const OctTree *imsv = partdata->getMSV(tindex[i]);
+		for (unsigned j = 0; j < i; j++)
+		{
+			const OctTree *jmiv = partdata->getMIV(tindex[j]);
+			const OctTree *jmsv = partdata->getMSV(tindex[j]);
+			distances[i][j] = distances[j][i] = splitDist(imiv, imsv, jmiv,
+						jmsv);
+		}
+	}
+
+	//what is most central?  the row with the lowest average?
+	//or the minimum maximum value?
+	float bestave = HUGE_VAL;
+	unsigned bestavei = 0;
+	float minmaxval = HUGE_VAL;
+	unsigned minmaxi = 0;
+	for (unsigned i = 0; i < N; i++)
+	{
+		float ave = 0;
+		float max = 0;
+		for(unsigned j = 0; j < N; j++)
+		{
+			ave += distances[i][j];
+			if(distances[i][j] > max)
+				max = distances[i][j];
+		}
+		ave /= N;
+
+		if(ave < bestave)
+		{
+			bestave = ave;
+			bestavei = i;
+		}
+		if(max < minmaxval)
+		{
+			minmaxval = max;
+			minmaxi = i;
+		}
+	}
+
+	unsigned best;
+	if(CenterFind == AveCenter)
+		best = bestavei;
+	else
+		best = minmaxi;
+
+	MIV = partdata->getMIV(tindex[best]);
+	MSV = partdata->getMSV(tindex[best]);
+}
+
+//performs a top down partition, select a random sample, clusters it to
+//get k clusters, and then uses the cluster centers to partition the whole data set
+void GSSTree::Partitioner::topDownKSamplePartition(vector<Partitioner>& parts)
+{
+	//grab k*mult samples
+	unsigned nsamples = KCenters*KSampleMult;
+	assert(nsamples > 0);
+	//assume reasonable input distribution, just slice out instead of random
+	unsigned inc = size()/nsamples;
+	if(inc == 0) inc = 1;
+
+	Partitioner samples;
+	samples.inheritFrom(*this);
+	for(unsigned i = 0, n = size(); i < n; i += inc)
+	{
+		samples.addSingle(*this, i);
+	}
+
+	vector<Partitioner> clusters;
+	samples.kClusters(KCenters, clusters);
+
+	vector<const OctTree*> MSVcenters; MSVcenters.reserve(KCenters);
+	vector<const OctTree*> MIVcenters; MIVcenters.reserve(KCenters);
+
+	parts.resize(clusters.size());
+	for(unsigned i = 0, n = clusters.size(); i < n; i++)
+	{
+		MSVcenters.push_back(NULL);
+		MIVcenters.push_back(NULL);
+
+		clusters[i].getCenter(MIVcenters.back(), MSVcenters.back());
+		parts[i].inheritFrom(*this);
+	}
+
+	unsigned numclusters = clusters.size();
+	//now add each data iterm to the cluster whose center it is closest to
+	for (unsigned i = 0, n = tindex.size(); i < n; i++)
+	{
+		unsigned index = tindex[i];
+
+		//TODO: use triangle inequality to make this more efficient
+		float mindist = HUGE_VAL;
+		unsigned best = 0;
+		for(unsigned j = 0; j < numclusters; j++)
+		{
+			float d = splitDist(MIVcenters[j],MSVcenters[j], partdata->getMIV(index), partdata->getMSV(index));
+			if(d < mindist)
+			{
+				mindist = d;
+				best = j;
+			}
+		}
+
+		parts[best].addSingle(*this, i);
+	}
+
+	if(Verbose)
+	{
+		cout << "KSample (" << size() << ") ";
+		for(unsigned i = 0, n = parts.size(); i < n; i++)
+		{
+			cout << " " << parts[i].size();
+		}
+		cout << "\n";
+	}
+}
+
+//performs a top down partition, this must be efficient O(n) and will
+//create sub partitions for further partitioning while generating any
+//small clusters that arise
+void GSSTree::Partitioner::topDownOctantPartition(vector<Partitioner>& subparts)
+{
+	//identify octant to split on
+	vector<unsigned> octantcoord;
+	while (level <= maxlevel)
+	{
+		if (findOctantAndSetUsed(level, splitMSV, octantcoord))
+			break;
+		splitMSV = !splitMSV;
+		if (findOctantAndSetUsed(level, splitMSV, octantcoord))
+			break;
+		level++;
+	}
+
+	//first partition based on the occupancy pattern of the specified octant
+	vector<Partitioner> parts;
+	partitionOnOctant(octantcoord, splitMSV, parts);
+
+	if(PackPartitions)
+		Partitioner::clusterPartitions(parts);
+
+	//select which bins to recursively split and which to combine
+	//into a single group to be clustered into leaves
+	vector<unsigned> partitionMore;
+	Partitioner mergedPartition(partdata, maxlevel);
+
+	for (unsigned i = 0, n = parts.size(); i < n; i++)
+	{
+		if (parts[i].size() == 0)
+			continue;
+		if (parts[i].size() < LeafMerge)
+		{
+			mergedPartition.add(parts[i]);
+			parts[i].clear();
+		}
+	}
+
+	//create small partitions from small groups
+	vector<Partitioner> clusters;
+	mergedPartition.packClusters(MaxSplit, clusters);
+
+	//now fill out subparts with all the partitions
+	subparts.clear(); subparts.reserve(parts.size() + clusters.size());
+	for (unsigned i = 0, n = parts.size(); i < n; i++)
+	{
+		if(parts[i].size() > 0)
+		{
+			subparts.push_back(Partitioner());
+			swap(subparts.back(),parts[i]);
+		}
+	}
+	for (unsigned i = 0, n = clusters.size(); i < n; i++)
+	{
+		subparts.push_back(Partitioner());
+		swap(subparts.back(),clusters[i]);
+	}
+}
+
 /*
  * Take all the trees indexed by tindex, segregate them
  */
 void GSSTree::partitionLeaves(Partitioner& partitioner,
-		LeafPartitionData& leafdata, unsigned level, bool splitMSV,
-		vector<GSSNode*>& nodes)
+		LeafPartitionData& leafdata, vector<GSSNode*>& nodes)
 {
 	if (partitioner.size() == 0)
 		return;
@@ -584,23 +914,9 @@ void GSSTree::partitionLeaves(Partitioner& partitioner,
 		return;
 	}
 
-	if (Verbose)
-		cout << "leaves " << partitioner.size() << " l" << level << " s"
-				<< splitMSV << "\n";
-	//identify octant to split on
-	vector<unsigned> octantcoord;
-	while (level <= maxlevel)
-	{
-		if (partitioner.findOctantAndSetUsed(level, splitMSV, octantcoord))
-			break;
-		splitMSV = !splitMSV;
-		if (partitioner.findOctantAndSetUsed(level, splitMSV, octantcoord))
-			break;
-		level++;
-	}
 
 	//check for cases where we should just agglomerate
-	if (level > maxlevel || partitioner.size() < LeafPack)
+	if (partitioner.size() < LeafPack || partitioner.unableToPartition())
 	{
 		vector<Partitioner> clusters;
 		partitioner.packClusters(MaxSplit, clusters);
@@ -611,45 +927,16 @@ void GSSTree::partitionLeaves(Partitioner& partitioner,
 	}
 	else
 	{
-		//first partition based on the occupancy pattern of the specified octant
+		//top down partition
 		vector<Partitioner> parts;
-		partitioner.partitionOnOctant(octantcoord, splitMSV, parts);
-
-		if(PackPartitions)
-			Partitioner::clusterPartitions(parts);
-
-		//select which bins to recursively split and which to combine
-		//into a single group to be clustered into leaves
-		vector<unsigned> partitionMore;
-		Partitioner mergedPartition(&leafdata);
-
+		if(TopDownSplit == OctantSplit)
+			partitioner.topDownOctantPartition(parts);
+		else
+			partitioner.topDownKSamplePartition(parts);
+		//split on octants with large partitions
 		for (unsigned i = 0, n = parts.size(); i < n; i++)
 		{
-			if (parts[i].size() == 0)
-				continue;
-			if (parts[i].size() < LeafMerge)
-			{
-				mergedPartition.add(parts[i]);
-			}
-			else
-			{
-				partitionMore.push_back(i);
-			}
-		}
-
-		//create leaves from small groups
-		vector<Partitioner> clusters;
-		mergedPartition.packClusters(MaxSplit, clusters);
-		for (unsigned i = 0, n = clusters.size(); i < n; i++)
-		{
-			nodes.push_back(leafFromPartition(clusters[i], leafdata));
-		}
-
-		//split on octants with large partitions
-		for (unsigned i = 0, n = partitionMore.size(); i < n; i++)
-		{
-			partitionLeaves(parts[partitionMore[i]], leafdata, level, splitMSV,
-					nodes);
+			partitionLeaves(parts[i], leafdata, nodes);
 		}
 	}
 }
@@ -658,8 +945,7 @@ void GSSTree::partitionLeaves(Partitioner& partitioner,
 //very similar to partition leaves, but different data structures
 //also, opportunaty for different algorithmic choices
 void GSSTree::partitionNodes(Partitioner& partitioner,
-		NodePartitionData& nodedata, unsigned level, bool splitMSV,
-		vector<GSSNode*>& nodes)
+		NodePartitionData& nodedata, vector<GSSNode*>& nodes)
 {
 	if (partitioner.size() == 0)
 		return;
@@ -670,24 +956,9 @@ void GSSTree::partitionNodes(Partitioner& partitioner,
 		return;
 	}
 
-	if (Verbose)
-		cout << "nodes " << partitioner.size() << " l" << level << " s"
-				<< splitMSV << "\n";
-
-	//identify octant to split on
-	vector<unsigned> octantcoord;
-	while (level <= maxlevel)
-	{
-		if (partitioner.findOctantAndSetUsed(level, splitMSV, octantcoord))
-			break;
-		splitMSV = !splitMSV;
-		if (partitioner.findOctantAndSetUsed(level, splitMSV, octantcoord))
-			break;
-		level++;
-	}
 
 	//check for cases where we should just agglomerate
-	if (level > maxlevel || partitioner.size() < NodePack)
+	if (partitioner.size() < NodePack || partitioner.unableToPartition())
 	{
 		vector<Partitioner> clusters;
 		partitioner.packClusters(MaxSplit, clusters);
@@ -698,45 +969,15 @@ void GSSTree::partitionNodes(Partitioner& partitioner,
 	}
 	else
 	{
-		//first partition based on the occupancy pattern of the specified octant
+		//top down partition
 		vector<Partitioner> parts;
-		partitioner.partitionOnOctant(octantcoord, splitMSV, parts);
-
-		if(PackPartitions)
-			Partitioner::clusterPartitions(parts);
-
-		//select which bins to recursively split and which to combine
-		//into a single group to be clustered into leaves
-		vector<unsigned> partitionMore;
-		Partitioner mergedPartition(&nodedata);
-
+		if(TopDownSplit == OctantSplit)
+			partitioner.topDownOctantPartition(parts);
+		else
+			partitioner.topDownKSamplePartition(parts);		//split on octants with large partitions
 		for (unsigned i = 0, n = parts.size(); i < n; i++)
 		{
-			if (parts[i].size() == 0)
-				continue;
-			if (parts[i].size() < NodeMerge)
-			{
-				mergedPartition.add(parts[i]);
-			}
-			else
-			{
-				partitionMore.push_back(i);
-			}
-		}
-
-		//create leaves from small groups
-		vector<Partitioner> clusters;
-		mergedPartition.packClusters(MaxSplit, clusters);
-		for (unsigned i = 0, n = clusters.size(); i < n; i++)
-		{
-			nodes.push_back(nodeFromPartition(clusters[i], nodedata));
-		}
-
-		//split on octants with large partitions
-		for (unsigned i = 0, n = partitionMore.size(); i < n; i++)
-		{
-			partitionNodes(parts[partitionMore[i]], nodedata, level, splitMSV,
-					nodes);
+			partitionNodes(parts[i], nodedata, nodes);
 		}
 	}
 }
@@ -771,21 +1012,21 @@ void GSSTree::load(const vector<vector<MolSphere> >& mols)
 		}
 
 		LeafPartitionData leafdata(&trees, &data);
-		Partitioner leafpartition(&leafdata);
+		Partitioner leafpartition(&leafdata, maxlevel);
 		leafpartition.initFromData();
 		vector<GSSNode*> nodes;
 		vector<unsigned> octant;
-		partitionLeaves(leafpartition, leafdata, 0, true, nodes);
+		partitionLeaves(leafpartition, leafdata, nodes);
 		trees.clear(); //now stored in nodes
 		data.clear();
 
 		while (nodes.size() > 1)
 		{
 			NodePartitionData nodedata(&nodes);
-			Partitioner nodepartition(&nodedata);
+			Partitioner nodepartition(&nodedata, maxlevel);
 			nodepartition.initFromData();
 			vector<GSSNode*> nextlevel;
-			partitionNodes(nodepartition, nodedata, 0, true, nextlevel);
+			partitionNodes(nodepartition, nodedata, nextlevel);
 			swap(nextlevel, nodes);
 		}
 		assert(nodes.size() == 1);
@@ -1441,6 +1682,12 @@ float GSSTree::searchDist(const OctTree* obj, const OctTree *MIV,
 float GSSTree::splitDist(const OctTree* leftMIV, const OctTree* leftMSV,
 		const OctTree* rightMIV, const OctTree* rightMSV)
 {
+	//handle leaves differently
+	if(leftMIV == leftMSV && rightMIV == rightMSV)
+	{
+		return leafDist(leftMIV, rightMIV);
+	}
+
 	if (HDist)
 	{
 		float d1 = max(leftMIV->hausdorffDistance(rightMIV),
@@ -1449,6 +1696,12 @@ float GSSTree::splitDist(const OctTree* leftMIV, const OctTree* leftMSV,
 				rightMSV->hausdorffDistance(leftMSV));
 
 		return d1 + d2;
+	}
+	else if(ODist)
+	{
+		if(leftMIV->volume() == leftMSV->volume() || rightMIV->volume() == rightMSV->volume())
+			return leftMIV->volumeDistance(rightMIV) + leftMSV->volumeDistance(rightMSV);
+		return leftMIV->inbetweenVolumeDiff(leftMSV, rightMIV, rightMSV);
 	}
 	else
 	{

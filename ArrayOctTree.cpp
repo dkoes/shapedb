@@ -71,10 +71,12 @@ ArrayOctTree::ChildNode ArrayOctTree::create(const Cube& cube,
 //invert filled and unfilled
 void ArrayOctTree::invert()
 {
+	root.volumeCache = 0;
 	for (unsigned i = 0, n = tree.size(); i < n; i++)
 	{
 		for (unsigned j = 0; j < 8; j++)
 		{
+			tree[i].children[j].volumeCache = 0;
 			if (tree[i].children[j].isLeaf)
 				tree[i].children[j].isFull = !tree[i].children[j].isFull;
 		}
@@ -264,6 +266,7 @@ ArrayOctTree::ChildNode ArrayOctTree::ChildNode::intersect(
 		const vector<OctNode>& tree, const vector<OctNode>& rtree,
 		const ChildNode& rhs, vector<OctNode>& newtree, bool& changed) const
 {
+	volumeCache = 0;
 	if(rhs.isLeaf && isLeaf && rhs.isFull == isFull)
 	{
 		return ChildNode(isLeaf, isFull);
@@ -322,6 +325,7 @@ ArrayOctTree::ChildNode ArrayOctTree::ChildNode::unionWith(
 		const vector<OctNode>& tree, const vector<OctNode>& rtree,
 		const ChildNode& rhs, vector<OctNode>& newtree, bool& changed) const
 {
+	volumeCache = 0;
 	if(rhs.isLeaf && isLeaf && rhs.isFull == isFull)
 	{
 		return ChildNode(isLeaf, isFull);

@@ -105,6 +105,40 @@ public:
 		return ret;
 
 	}
+
+	//this is the volume difference ratio between the volumes inbetween MIV/MSVs
+	// (~MIV1 & MSV1) voldiff (~MIV2 & MSV2)
+	virtual float inbetweenVolumeDiff(const OctTree *thisMSV, const OctTree *rightMIV, const OctTree *rightMSV) const
+	{
+		OctTree *tmp1 = clone();
+
+		if(tmp1->volume() == thisMSV->volume()) //identical
+		{
+		 //treat as empty MIV
+		}
+		else
+		{
+			tmp1->invert();
+			tmp1->intersect(thisMSV);
+		}
+
+		OctTree *tmp2 = rightMIV->clone();
+		if(tmp2->volume() == rightMSV->volume())
+		{
+
+		}
+		else
+		{
+			tmp2->invert();
+			tmp2->intersect(rightMSV);
+		}
+
+		float ret = tmp1->volumeDistance(tmp2);
+		delete tmp1;
+		delete tmp2;
+
+		return ret;
+	}
 };
 
 
