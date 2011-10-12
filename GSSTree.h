@@ -168,6 +168,101 @@ class GSSTree
 		void updateOctantsForLevel(unsigned level, OctantCoords& octants, vector<bool>& done);
 		void mergeWith(const Partitioner& rhs);
 
+		struct Cluster
+		{
+			vector<unsigned> indices; //into tindex
+			OctTree *MIV;
+			OctTree *MSV;
+
+			Cluster(): MIV(NULL), MSV(NULL) {}
+
+			Cluster(unsigned i, const OctTree *miv, const OctTree *msv)
+			{
+				indices.push_back(i);
+				MIV = miv->clone();
+				MSV = msv->clone();
+			}
+
+			Cluster(const Cluster& rhs): MIV(NULL), MSV(NULL)
+			{
+				indices = rhs.indices;
+				if(rhs.MIV) MIV = rhs.MIV->clone();
+				if(rhs.MSV) MSV = rhs.MSV->clone();
+			}
+
+			void set(unsigned i, const OctTree *miv, const OctTree *msv)
+			{
+				clear();
+				indices.push_back(i);
+				MIV = miv->clone();
+				MSV = msv->clone();
+			}
+			//invalidates a and b
+			void mergeInto(Cluster& a, Cluster& b)
+			{
+				indices.reserve(a.indices.size() + b.indices.size());
+				copy(a.indices.begin(), a.indices.end(), inserter(indices, indices.end()));
+				copy(b.indices.begin(), b.indices.end(), inserter(indices, indices.end()));
+
+				MIV = a.MIV;
+				a.MIV = NULL;
+				MIV->intersect(b.MIV);
+
+				MSV = a.MSV;
+				a.MSV = NULL;
+				MSV->unionWith(b.MSV);
+
+				a.clear();
+				b.clear();
+			}
+
+			void addInto(Cluster& a)
+			{
+				copy(a.indices.begin(), a.indices.end(), inserter(indices, indices.end()));
+				MIV->intersect(a.MIV);
+				MSV->unionWith(a.MSV);
+
+				a.clear();
+			}
+
+			//invalidates a
+			void moveInto(Cluster& a)
+			{
+				swap(indices,a.indices);
+				MIV = a.MIV;
+				MSV = a.MSV;
+				a.MIV = NULL;
+				a.MSV = NULL;
+
+				a.clear();
+			}
+			~Cluster()
+			{
+				if(MIV) delete MIV;
+				if(MSV) delete MSV;
+			}
+
+			void clear()
+			{
+				if(MIV) delete MIV;
+				if(MSV) delete MSV;
+				MIV = NULL;
+				MSV = NULL;
+				indices.clear();
+			}
+			bool isValid() const { return MIV != NULL && MSV != NULL; }
+			unsigned size() const { return indices.size(); }
+
+			unsigned operator[](unsigned i) const
+			{
+				return indices[i];
+			}
+		};
+
+		float combineClusters(float threshold, vector<Cluster>& clusters);
+		void packClustersCompleteLink(unsigned max, vector<Partitioner>& clusters);
+		void mergeClusters(vector<Partitioner>& clusters);
+
 	public:
 
 		Partitioner() :
@@ -277,8 +372,9 @@ class GSSTree
 				bool splitMSV, vector<Partitioner>& parts);
 		void add(const Partitioner& from);
 		void addSingle(const Partitioner& from, unsigned fromindex);
-		void packClusters(unsigned max, vector<Partitioner>& clusters);
 		void kClusters(unsigned k, vector<Partitioner>& clusters);
+		void packClusters(vector<Partitioner>& clusters);
+
 		double shannonEntropy(unsigned *patternCnts, unsigned total);
 
 		const OctTree* getMSV() const { return MSV; }

@@ -129,6 +129,12 @@ float ArrayOctTree::unionVolume(const OctTree *Rhs) const
 	return root.unionVolume(tree, rhs.tree, rhs.root, dimension);
 }
 
+float ArrayOctTree::subtractVolume(const OctTree *Rhs) const
+{
+	const ArrayOctTree& rhs = dynamic_cast<const ArrayOctTree&> (*Rhs);
+	return root.subtractVolume(tree, rhs.tree, rhs.root, dimension);
+}
+
 bool ArrayOctTree::containedIn(const OctTree *Rhs) const
 {
 	const ArrayOctTree& rhs = dynamic_cast<const ArrayOctTree&> (*Rhs);
@@ -209,7 +215,7 @@ unsigned ArrayOctTree::getOctantPattern(const vector<unsigned>& coord, bool MSV)
 	return node.getBitPattern(tree,MSV);
 }
 
-float ArrayOctTree::volumeDistance(const OctTree * Rhs) const
+float ArrayOctTree::relativeVolumeDistance(const OctTree * Rhs) const
 {
 	const ArrayOctTree& rhs = dynamic_cast<const ArrayOctTree&> (*Rhs);
 	float ival = 0, uval = 0;
@@ -218,22 +224,14 @@ float ArrayOctTree::volumeDistance(const OctTree * Rhs) const
 	return 1 - ival/uval;
 }
 
-#if 0
-//this is an MIV, find the percentage of the merged MIV/MSV that is already common
-//to the current MIV/MSV pairs
-float ArrayOctTree::percentOverlapVolume(const OctTree *thisMSV, const OctTree *rightMIV, const OctTree *rightMSV)
+float ArrayOctTree::absoluteVolumeDistance(const OctTree * Rhs) const
 {
-	const ArrayOctTree& msv = dynamic_cast<const ArrayOctTree&> (*thisMSV);
-	const ArrayOctTree& rmiv = dynamic_cast<const ArrayOctTree&> (*rightMIV);
-	const ArrayOctTree& rmsv = dynamic_cast<const ArrayOctTree&> (*rightMSV);
+	const ArrayOctTree& rhs = dynamic_cast<const ArrayOctTree&> (*Rhs);
+	float ival = 0, uval = 0;
+	root.intersectUnionVolume(tree, rhs.tree, rhs.root, dimension, ival, uval);
 
-	float oval = 0, aval = 0;
-	root.overlapVolume(tree,msv.tree,rmiv.tree,rmsv.tree,msv.root,rmiv.root,rmsv.root, dimension, oval, aval);
-
-	return 1 - oval/aval;
+	return uval - ival;
 }
-#endif
-
 
 float ArrayOctTree::hausdorffDistance(const OctTree* B) const
 {
@@ -560,6 +558,41 @@ bool ArrayOctTree::ChildNode::containedIn(
 	}
 }
 
+//return volume of big - this, assumes this is contained in big
+float ArrayOctTree::ChildNode::subtractVolume(const vector<OctNode>& tree,
+		const vector<OctNode>& bigtree, const ChildNode& bigrhs, float dim) const
+{
+	if(bigrhs.isLeaf && isLeaf && bigrhs.isFull == isFull)
+	{
+		return 0;
+	}
+	else if(isLeaf && !isFull)
+	{
+		return bigrhs.volume(bigtree, dim);
+	}
+	else if (bigrhs.isLeaf && !bigrhs.isFull)
+	{
+		return 0; //shouldn't happen
+	}
+	else if (bigrhs.isLeaf && bigrhs.isFull)
+	{
+		return bigrhs.volume(bigtree, dim) - volume(tree, dim);
+	}
+	else if (isLeaf && isFull)
+	{
+		return 0;
+	}
+	else //both have children
+	{
+		float sum = 0;
+		for (unsigned i = 0; i < 8; i++)
+		{
+			sum += tree[index].children[i].subtractVolume(tree, bigtree,
+					bigtree[bigrhs.index].children[i], dim/2);
+		}
+		return sum;
+	}
+}
 
 
 unsigned ArrayOctTree::ChildNode::getBitPattern(const vector<OctNode>& tree, bool MSV) const

@@ -50,6 +50,15 @@ public:
 	//volume calculations that don't require creating a tmp tree
 	virtual float intersectVolume(const OctTree * rhs) const = 0;
 	virtual float unionVolume(const OctTree *rhs) const = 0;
+	virtual float subtractVolume(const OctTree *rhs) const
+	{
+		OctTree *tmp = clone();
+		tmp->invert();
+		tmp->intersect(rhs);
+		float ret = tmp->volume();
+		delete tmp;
+		return ret;
+	}
 
 	//return total volume contained in octtree
 	virtual float volume() const = 0;
@@ -65,9 +74,14 @@ public:
 
 	virtual unsigned getOctantPattern(const vector<unsigned>& coord, bool MSV) const = 0;
 
-	virtual float volumeDistance(const OctTree * B) const
+	virtual float relativeVolumeDistance(const OctTree * B) const
 	{
 		return 1 - intersectVolume(B)/unionVolume(B);
+	}
+
+	virtual float absoluteVolumeDistance(const OctTree * B) const
+	{
+		return unionVolume(B)-intersectVolume(B);
 	}
 
 	virtual float hausdorffDistance(const OctTree* B) const = 0;
@@ -96,7 +110,11 @@ public:
 		tmp4->unionWith(rightMSV);
 		tmp4->intersect(tmp3); //anylap
 
-		float ret = tmp1->volume()/tmp4->volume();
+		float ret;
+		if(tmp4->volume() == 0)
+			ret = 0;
+		else
+			ret = 1-tmp1->volume()/tmp4->volume();
 		delete tmp1;
 		delete tmp2;
 		delete tmp3;
@@ -106,34 +124,22 @@ public:
 
 	}
 
-	//this is the volume difference ratio between the volumes inbetween MIV/MSVs
-	// (~MIV1 & MSV1) voldiff (~MIV2 & MSV2)
-	virtual float inbetweenVolumeDiff(const OctTree *thisMSV, const OctTree *rightMIV, const OctTree *rightMSV) const
+
+	//see how much the volume inbetween MIV and MSV will increase
+	virtual float inbetweenVolume(const OctTree *thisMSV, const OctTree *rightMIV, const OctTree *rightMSV) const
 	{
 		OctTree *tmp1 = clone();
+		tmp1->intersect(rightMIV); //new miv
 
-		if(tmp1->volume() == thisMSV->volume()) //identical
-		{
-		 //treat as empty MIV
-		}
-		else
-		{
-			tmp1->invert();
-			tmp1->intersect(thisMSV);
-		}
+		OctTree *tmp2 = thisMSV->clone();
+		tmp2->unionWith(rightMSV); //new msv
 
-		OctTree *tmp2 = rightMIV->clone();
-		if(tmp2->volume() == rightMSV->volume())
-		{
+		float newvol = tmp1->subtractVolume(tmp2);
+		float old1 = subtractVolume(thisMSV);
+		float old2 = rightMIV->subtractVolume(rightMSV);
 
-		}
-		else
-		{
-			tmp2->invert();
-			tmp2->intersect(rightMSV);
-		}
-
-		float ret = tmp1->volumeDistance(tmp2);
+		float ret = 1-(old1+old2)/(2*newvol);
+		ret = (newvol-old1) + (newvol-old2);
 		delete tmp1;
 		delete tmp2;
 

@@ -67,6 +67,9 @@ class ArrayOctTree: public OctTree
 		bool containedIn(const vector<OctNode>& tree,
 				const vector<OctNode>& rtree, const ChildNode& rhs) const;
 
+		float subtractVolume(const vector<OctNode>& tree,
+				const vector<OctNode>& bigtree, const ChildNode& bigrhs, float dim) const;
+
 		float volume(const vector<OctNode>& tree, float dim) const;
 		unsigned getBitPattern(const vector<OctNode>& tree, bool MSV) const;
 
@@ -151,6 +154,7 @@ public:
 	//volume calculations that don't require creating a tmp tree
 	virtual float intersectVolume(const OctTree * rhs) const;
 	virtual float unionVolume(const OctTree *rhs) const;
+	virtual float subtractVolume(const OctTree *rhs) const;
 
 	virtual bool containedIn(const OctTree *rhs) const;
 
@@ -170,9 +174,9 @@ public:
 	getOctantPattern(const vector<unsigned>& coord, bool MSV) const;
 
 	virtual float hausdorffDistance(const OctTree* B) const;
-	virtual float volumeDistance(const OctTree * B) const;
+	virtual float relativeVolumeDistance(const OctTree * B) const;
+	virtual float absoluteVolumeDistance(const OctTree * B) const;
 
-	//virtual float percentOverlapVolume(const OctTree *thisMSV, const OctTree *rightMIV, const OctTree *rightMSV);
 
 };
 

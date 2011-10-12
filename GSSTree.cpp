@@ -34,7 +34,7 @@ cl::opt<bool> InsertionLoad("insert-load",
 cl::opt<unsigned> LeafPack("leaf-pack",
 		cl::desc("Cutoff to trigger leaf packing"), cl::init(256));
 cl::opt<unsigned> NodePack("node-pack",
-		cl::desc("Cutoff to trigger leaf packing"), cl::init(0));
+		cl::desc("Cutoff to trigger leaf packing"), cl::init(256));
 
 cl::opt<unsigned> LeafMerge("leaf-merge",
 		cl::desc("Cutoff to merge small leaf clusters"), cl::init(4));
@@ -42,10 +42,22 @@ cl::opt<unsigned> NodeMerge("node-merge",
 		cl::desc("Cutoff to merge small node clusters"), cl::init(4));
 
 cl::opt<bool> PackPartitions("pack-partitions", cl::desc("Group partitions for more even split"), cl::init(false));
-cl::opt<bool> HDist("hdist",
-		cl::desc("Hausdorff distance as a splitting metric"), cl::init(false));
-cl::opt<bool> ODist("odist",
-		cl::desc("Overlap volume distance as a splitting metric"), cl::init(false));
+cl::opt<bool> AdaptivePacking("adaptive-pack", cl::desc("Dynamically set packing amount"), cl::init(false));
+
+enum MetricEnum
+{
+	AverageRelVolume, AverageAbsVolume, AverageHausdorff, SeparationVolume,SharedOverlap
+};
+
+cl::opt<MetricEnum>		SplitMetric(
+				cl::desc("Metric for splitting:"),
+				cl::values(clEnumValN(AverageRelVolume, "averV-metric", "Relative volume difference. Take average of MIV/MSV."),
+						clEnumValN(AverageAbsVolume, "aveaV-metric", "Absolute volume difference. Take average of MIV/MSV."),
+				clEnumValN(AverageHausdorff, "aveH-metric", "Hausdorff. Take average of MIV/MSV"),
+				clEnumValN(SeparationVolume, "sepV-metric", "Volume in between resulting MIV/MSV"),
+				clEnumValN(SharedOverlap, "shared-overlap-metric", "Vol difference between inbetween shape"),
+				clEnumValEnd),cl::init(AverageRelVolume) );
+
 
 extern cl::opt<bool> Verbose;
 
@@ -58,7 +70,7 @@ cl::opt<TopDownEnum>		TopDownSplit(
 				cl::desc("Top down splitting method:"),
 				cl::values(clEnumValN(OctantSplit, "octant-split", "Split based on informative octants"),
 				clEnumValN(KSampleSplit, "ksample-split", "Spit using centers of random sample"),
-				clEnumValEnd),cl::init(OctantSplit) );
+				clEnumValEnd),cl::init(KSampleSplit) );
 
 enum CenterFindEnum
 {
@@ -70,6 +82,17 @@ cl::opt<CenterFindEnum>		CenterFind(
 				cl::values(clEnumValN(AveCenter, "ave-center", "Center defined by best average"),
 				clEnumValN(MinMaxCenter, "minmax-center", "Center defined by minmax distance"),
 				clEnumValEnd) ,cl::init(AveCenter));
+
+enum PackingEnum
+{
+	CompleteLink, FullMerge
+};
+
+cl::opt<PackingEnum>		PackingAlgorithm(
+				cl::desc("Cluster packing method:"),
+				cl::values(clEnumValN(CompleteLink, "complete-link", "Greedy complete link"),
+				clEnumValN(FullMerge, "full-merge", "merge clusters based on cluster distances"),
+				clEnumValEnd) ,cl::init(CompleteLink));
 
 
 const unsigned GSSTree::MaxSplit = 8; //number of children in each node
@@ -373,12 +396,175 @@ void GSSTree::Partitioner::mergeWith(const Partitioner& rhs)
 	}
 }
 
+//distances between i and j
+struct IntraClusterDist
+{
+	unsigned i;
+	unsigned j;
+	float dist;
+
+	IntraClusterDist(): i(0), j(0), dist(HUGE_VAL) {}
+
+	IntraClusterDist(unsigned I, unsigned J, float d): i(I), j(J), dist(d) {}
+
+	bool operator<(const IntraClusterDist& rhs) const
+	{
+		return dist < rhs.dist;
+	}
+};
+
+void GSSTree::Partitioner::packClusters(vector<Partitioner>& clusters)
+{
+	switch(PackingAlgorithm)
+	{
+	case CompleteLink:
+		packClustersCompleteLink(MaxSplit, clusters);
+		break;
+	case FullMerge:
+		mergeClusters(clusters);
+		break;
+	}
+}
+
+
+//each cluster has one or more indices into tindex as well as the MSV/MIV for the cluster
+//greedily assign the shortest distances to be merged
+//return the longest distances merged
+float GSSTree::Partitioner::combineClusters(float threshold, vector<GSSTree::Partitioner::Cluster >& clusters)
+{
+	unsigned N = clusters.size();
+	if(N == 1)
+		return 0;
+
+
+	vector<IntraClusterDist> distances; distances.reserve(N*N / 2);
+	unsigned maxclust = 0;
+	double total = 0;
+	unsigned cnt = 0;
+	for (unsigned i = 0; i < N; i++)
+	{
+		const OctTree *imiv = clusters[i].MIV;
+		const OctTree *imsv = clusters[i].MSV;
+		for (unsigned j = 0; j < i; j++)
+		{
+			const OctTree *jmiv = clusters[j].MIV;
+			const OctTree *jmsv = clusters[j].MSV;
+
+			float dist = splitDist(imiv,imsv,jmiv,jmsv);
+
+			distances.push_back(IntraClusterDist(i,j,dist));
+			total += dist;
+			cnt++;
+		}
+	}
+	sort(distances.begin(), distances.end());
+
+
+	vector<Cluster> newclusters; newclusters.reserve(N/2);
+	unsigned merged = 0;
+	vector<float> mergedists;
+	for(unsigned d = 0, maxdists = distances.size(); d < maxdists; d++)
+	{
+		if(distances[d].dist > threshold)
+			break;
+		//merge if not already merged
+		unsigned i = distances[d].i;
+		unsigned j = distances[d].j;
+		if (clusters[i].isValid() && clusters[j].isValid()
+				&& clusters[i].size() + clusters[j].size() < MaxSplit)
+		{
+			newclusters.push_back(Cluster());
+			newclusters.back().mergeInto(clusters[i], clusters[j]);
+			mergedists.push_back(distances[d].dist);
+			merged += 2;
+			if (newclusters.back().size() > maxclust)
+				maxclust = newclusters.back().size();
+		}
+
+		if(merged >= N-1)
+			break;
+	}
+
+	if(merged != N) //find the loner(s), keep it as a singleton
+	{
+		for (unsigned i = 0; i < N; i++)
+		{
+			if(clusters[i].isValid())
+			{
+				newclusters.push_back(Cluster());
+				newclusters.back().moveInto(clusters[i]);
+			}
+		}
+	}
+
+	swap(newclusters,clusters);
+
+	if(mergedists.size() == 0)
+		return -1;
+	//otherwise, return the median value to use as a new threshold
+	return mergedists[mergedists.size()/2];
+}
+
+//do a full merge, comparing cluster distances using MIV/MSV
+void GSSTree::Partitioner::mergeClusters(vector<Partitioner>& clusters)
+{
+	//create clusters
+	if(tindex.size() == 0)
+		return;
+	vector<Cluster> clusts; clusts.resize(tindex.size());
+	for(unsigned i = 0, n = tindex.size(); i < n; i++)
+	{
+		unsigned index = tindex[i];
+		clusts[i].set(i, partdata->getMIV(index), partdata->getMSV(index));
+	}
+
+	float threshold = combineClusters(HUGE_VAL, clusts);
+
+	if(clusts.size() > 1 && clusts.back().size() == 1)
+	{
+		//push the lone singleton into some other cluster
+		double minval = HUGE_VAL;
+		unsigned best = 0;
+		const OctTree *smiv = clusts.back().MIV;
+		const OctTree *smsv = clusts.back().MSV;
+		for(unsigned i = 0, n = clusts.size() - 1; i < n; i++)
+		{
+			const OctTree *imiv = clusts[i].MIV;
+			const OctTree *imsv = clusts[i].MSV;
+			float dist = splitDist(imiv,imsv,smiv,smsv);
+			if(dist < minval)
+			{
+				minval = dist;
+				best = i;
+			}
+		}
+
+		clusts[best].addInto(clusts.back());
+		clusts.pop_back();
+	}
+
+	//only merge past 2 if better than the worst pair when adaptively packing
+	while(combineClusters(threshold, clusts) >= 0)
+		;
+
+	//now create partitions
+	clusters.clear();
+	clusters.reserve(clusts.size());
+	for (unsigned i = 0, n = clusts.size(); i < n; i++)
+	{
+		clusters.push_back(Partitioner(partdata, maxlevel));
+		for (unsigned j = 0, m = clusts[i].size(); j < m; j++)
+		{
+			clusters.back().addSingle(*this, clusts[i][j]);
+		}
+	}
+}
 
 //pack the partition into clusters such that no cluster has more than max members
 //presumably clusters should have no fewer than max/2 and there should be an
 //effort made to keep the clusters dense, yet informative
 //TODO: make efficient, evaluate clustering schemes
-void GSSTree::Partitioner::packClusters(unsigned max,
+void GSSTree::Partitioner::packClustersCompleteLink(unsigned max,
 		vector<Partitioner>& clusters)
 {
 	//compute pairwise distances between all members
@@ -386,21 +572,25 @@ void GSSTree::Partitioner::packClusters(unsigned max,
 	boost::multi_array<float, 2> distances(boost::extents[N][N]);
 	vector<vector<unsigned> > clusts;
 	clusts.reserve(1 + N);
+	float maxmin = 0;
 	for (unsigned i = 0; i < N; i++)
 	{
 		distances[i][i] = 0;
+		float min = HUGE_VAL;
 		const OctTree *imiv = partdata->getMIV(tindex[i]);
 		const OctTree *imsv = partdata->getMSV(tindex[i]);
 		for (unsigned j = 0; j < i; j++)
 		{
 			const OctTree *jmiv = partdata->getMIV(tindex[j]);
 			const OctTree *jmsv = partdata->getMSV(tindex[j]);
-			if (imiv == imsv && jmiv == jmsv) //leaf case
-				distances[i][j] = distances[j][i] = leafDist(imiv, jmiv);
-			else
-				distances[i][j] = distances[j][i] = splitDist(imiv, imsv, jmiv,
+			distances[i][j] = distances[j][i] = splitDist(imiv, imsv, jmiv,
 						jmsv);
+
+			if(distances[i][j] < min)
+				min = distances[i][j];
 		}
+		if(min > maxmin)
+			maxmin = min;
 		clusts.push_back(vector<unsigned> ());
 		clusts.back().push_back(i);
 	}
@@ -430,12 +620,18 @@ void GSSTree::Partitioner::packClusters(unsigned max,
 						}
 					}
 				}
-				if (maxdist < mindist && clusts[i].size() + clusts[j].size()
-						<= max)
+				if (maxdist < mindist)
 				{
-					mindist = maxdist;
-					besti = i;
-					bestj = j;
+					if( clusts[i].size() + clusts[j].size() <= max)
+					{
+							mindist = maxdist;
+							besti = i;
+							bestj = j;
+					}
+					else if(AdaptivePacking && max > 2)
+					{
+						max--;
+					}
 				}
 			}
 		}
@@ -701,7 +897,7 @@ bool GSSTree::Partitioner::unableToPartition() const
 		return true;
 	if(TopDownSplit == KSampleSplit)
 	{
-		if(size() < KCenters * KSampleMult)
+		if(size() < KCenters)
 			return true;
 	}
 
@@ -826,6 +1022,34 @@ void GSSTree::Partitioner::topDownKSamplePartition(vector<Partitioner>& parts)
 		parts[best].addSingle(*this, i);
 	}
 
+	//identify any singletons and add them to an alternative cluster
+	if (parts.size() > 1)
+	{
+		for (unsigned i = 0, n = parts.size(); i < n; i++)
+		{
+			if (parts[i].size() == 1)
+			{
+				unsigned index = parts[i].tindex.front();
+				float mindist = HUGE_VAL;
+				unsigned best = 0;
+				for (unsigned j = 0; j < numclusters; j++)
+				{
+					if (j == i)
+						continue;
+					float d = splitDist(MIVcenters[j],MSVcenters[j], partdata->getMIV(index), partdata->getMSV(index));
+					if(d < mindist)
+					{
+						mindist = d;
+						best = j;
+					}
+				}
+
+				parts[best].addSingle(parts[i], 0);
+				parts[i].clear();
+			}
+		}
+	}
+
 	if(Verbose)
 	{
 		cout << "KSample (" << size() << ") ";
@@ -879,7 +1103,7 @@ void GSSTree::Partitioner::topDownOctantPartition(vector<Partitioner>& subparts)
 
 	//create small partitions from small groups
 	vector<Partitioner> clusters;
-	mergedPartition.packClusters(MaxSplit, clusters);
+	mergedPartition.packClusters(clusters);
 
 	//now fill out subparts with all the partitions
 	subparts.clear(); subparts.reserve(parts.size() + clusters.size());
@@ -919,7 +1143,7 @@ void GSSTree::partitionLeaves(Partitioner& partitioner,
 	if (partitioner.size() < LeafPack || partitioner.unableToPartition())
 	{
 		vector<Partitioner> clusters;
-		partitioner.packClusters(MaxSplit, clusters);
+		partitioner.packClusters(clusters);
 		for (unsigned i = 0, n = clusters.size(); i < n; i++)
 		{
 			nodes.push_back(leafFromPartition(clusters[i], leafdata));
@@ -961,7 +1185,7 @@ void GSSTree::partitionNodes(Partitioner& partitioner,
 	if (partitioner.size() < NodePack || partitioner.unableToPartition())
 	{
 		vector<Partitioner> clusters;
-		partitioner.packClusters(MaxSplit, clusters);
+		partitioner.packClusters(clusters);
 		for (unsigned i = 0, n = clusters.size(); i < n; i++)
 		{
 			nodes.push_back(nodeFromPartition(clusters[i], nodedata));
@@ -1653,14 +1877,21 @@ bool GSSTree::fitsInbetween(const OctTree *MIV, const OctTree *MSV,
 //return a distance to a single leaf, should be compatible with search Dist
 float GSSTree::leafDist(const OctTree* obj, const OctTree *leaf)
 {
-	if (HDist)
+	switch(SplitMetric)
 	{
+	case AverageRelVolume:
+	case SeparationVolume:
+	case SharedOverlap:
+		return obj->relativeVolumeDistance(leaf);
+	case AverageAbsVolume:
+		return obj->absoluteVolumeDistance(leaf);
+		break;
+	case AverageHausdorff:
 		return max(obj->hausdorffDistance(leaf), leaf->hausdorffDistance(obj));
+
+		break;
 	}
-	else
-	{
-		return obj->volumeDistance(leaf);
-	}
+	abort();
 }
 
 //return a "distance" between obj and MIV/MSV; the lower the distance
@@ -1688,25 +1919,27 @@ float GSSTree::splitDist(const OctTree* leftMIV, const OctTree* leftMSV,
 		return leafDist(leftMIV, rightMIV);
 	}
 
-	if (HDist)
+	switch(SplitMetric)
 	{
+	case AverageRelVolume:
+		return leftMIV->relativeVolumeDistance(rightMIV) + leftMSV->relativeVolumeDistance(rightMSV);
+	case AverageAbsVolume:
+		return leftMIV->absoluteVolumeDistance(rightMIV) + leftMSV->absoluteVolumeDistance(rightMSV);
+	case SeparationVolume:
+		return leftMIV->inbetweenVolume(leftMSV, rightMIV, rightMSV);
+		break;
+	case SharedOverlap:
+		return leftMIV->percentOverlapVolume(leftMSV, rightMIV, rightMSV);
+	case AverageHausdorff:
 		float d1 = max(leftMIV->hausdorffDistance(rightMIV),
-				rightMIV->hausdorffDistance(leftMIV));
-		float d2 = max(leftMSV->hausdorffDistance(rightMSV),
-				rightMSV->hausdorffDistance(leftMSV));
+						rightMIV->hausdorffDistance(leftMIV));
+				float d2 = max(leftMSV->hausdorffDistance(rightMSV),
+						rightMSV->hausdorffDistance(leftMSV));
 
-		return d1 + d2;
+				return d1 + d2;
+		break;
 	}
-	else if(ODist)
-	{
-		if(leftMIV->volume() == leftMSV->volume() || rightMIV->volume() == rightMSV->volume())
-			return leftMIV->volumeDistance(rightMIV) + leftMSV->volumeDistance(rightMSV);
-		return leftMIV->inbetweenVolumeDiff(leftMSV, rightMIV, rightMSV);
-	}
-	else
-	{
-		return leftMIV->volumeDistance(rightMIV) + leftMSV->volumeDistance(rightMSV);
-	}
+	abort();
 }
 
 /* Decide how to split a node.  For now, use the canonical quadratic split
