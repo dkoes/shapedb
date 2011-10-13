@@ -24,6 +24,7 @@
 #include "MolSphere.h"
 #include "OctTree.h"
 #include "OctTreeFactory.h"
+#include <boost/multi_array.hpp>
 
 using namespace boost;
 using namespace std;
@@ -190,6 +191,16 @@ class GSSTree
 				if(rhs.MSV) MSV = rhs.MSV->clone();
 			}
 
+
+			friend void swap(Cluster& first, Cluster& second)
+			{
+				// enable ADL (not necessary in our case, but good practice)
+				using std::swap;
+				swap(first.indices, second.indices);
+				swap(first.MIV, second.MIV);
+				swap(first.MSV, second.MSV);
+			}
+
 			void set(unsigned i, const OctTree *miv, const OctTree *msv)
 			{
 				clear();
@@ -257,11 +268,14 @@ class GSSTree
 			{
 				return indices[i];
 			}
+
+			float distance(const Cluster& rhs, const Partitioner& part, const boost::multi_array<float, 2>& = boost::multi_array<float, 2>() ) const;
+
 		};
 
-		float combineClusters(float threshold, vector<Cluster>& clusters);
-		void packClustersCompleteLink(unsigned max, vector<Partitioner>& clusters);
-		void mergeClusters(vector<Partitioner>& clusters);
+		void moveClusterInto(const Partitioner& from, Cluster& c);
+		bool fullMergeClusters(vector<Cluster>& clusters);
+		void iterativeMergeClusters(vector<Cluster>& clusters);
 
 	public:
 

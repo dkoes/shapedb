@@ -13,8 +13,9 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <boost/multi_array.hpp>
+#include <queue>
 #include "CommandLine2/CommandLine.h"
+
 
 using namespace std;
 
@@ -43,13 +44,14 @@ cl::opt<unsigned> NodeMerge("node-merge",
 
 cl::opt<bool> PackPartitions("pack-partitions", cl::desc("Group partitions for more even split"), cl::init(false));
 cl::opt<bool> AdaptivePacking("adaptive-pack", cl::desc("Dynamically set packing amount"), cl::init(false));
+cl::opt<bool> RemoveSingletons("remove-singles", cl::desc("Remove singleton nodes"), cl::init(true));
 
-enum MetricEnum
+enum SplitMetricEnum
 {
 	AverageRelVolume, AverageAbsVolume, AverageHausdorff, SeparationVolume,SharedOverlap
 };
 
-cl::opt<MetricEnum>		SplitMetric(
+cl::opt<SplitMetricEnum>		SplitMetric(
 				cl::desc("Metric for splitting:"),
 				cl::values(clEnumValN(AverageRelVolume, "averV-metric", "Relative volume difference. Take average of MIV/MSV."),
 						clEnumValN(AverageAbsVolume, "aveaV-metric", "Absolute volume difference. Take average of MIV/MSV."),
@@ -57,6 +59,19 @@ cl::opt<MetricEnum>		SplitMetric(
 				clEnumValN(SeparationVolume, "sepV-metric", "Volume in between resulting MIV/MSV"),
 				clEnumValN(SharedOverlap, "shared-overlap-metric", "Vol difference between inbetween shape"),
 				clEnumValEnd),cl::init(AverageRelVolume) );
+
+enum ClusterMetricEnum
+{
+	SplitDist, CompleteLink, SingleLink
+};
+
+cl::opt<ClusterMetricEnum>		ClusterMetric(
+				cl::desc("Metric for cluster packing distance:"),
+				cl::values(clEnumValN(SplitDist, "split-cmetric", "Use splitting metric between MIV/MSV representations of clusters"),
+						clEnumValN(CompleteLink, "complete-cmetric", "Use complete linkage value between cluster members"),
+						clEnumValN(SingleLink, "single-cmetric", "Use single linkage value between cluster members"),
+				clEnumValEnd),cl::init(SplitDist) );
+
 
 
 extern cl::opt<bool> Verbose;
@@ -85,14 +100,14 @@ cl::opt<CenterFindEnum>		CenterFind(
 
 enum PackingEnum
 {
-	CompleteLink, FullMerge
+	IterativeMerge, FullMerge
 };
 
 cl::opt<PackingEnum>		PackingAlgorithm(
 				cl::desc("Cluster packing method:"),
-				cl::values(clEnumValN(CompleteLink, "complete-link", "Greedy complete link"),
-				clEnumValN(FullMerge, "full-merge", "merge clusters based on cluster distances"),
-				clEnumValEnd) ,cl::init(CompleteLink));
+				cl::values(clEnumValN(IterativeMerge, "itr-merge", "Greedy iterative merging"),
+				clEnumValN(FullMerge, "full-merge", "Merge everything simultaneously"),
+				clEnumValEnd) ,cl::init(FullMerge));
 
 
 const unsigned GSSTree::MaxSplit = 8; //number of children in each node
@@ -373,6 +388,24 @@ void GSSTree::Partitioner::addSingle(const Partitioner& from,
 		MIV->intersect(partdata->getMIV(i));
 }
 
+void GSSTree::Partitioner::moveClusterInto(const Partitioner& from, GSSTree::Partitioner::Cluster& c)
+{
+	tindex.clear();
+	for(unsigned i = 0, n = c.indices.size(); i < n; i++)
+	{
+		tindex.push_back(from.tindex[c.indices[i]]);
+	}
+
+	if(MSV) delete MSV;
+	if(MIV) delete MIV;
+
+	MIV = c.MIV;
+	MSV = c.MSV;
+	c.MIV = NULL;
+	c.MSV = NULL;
+	c.clear();
+}
+
 //put everything in rhs into this
 //assumes octants are the same
 void GSSTree::Partitioner::mergeWith(const Partitioner& rhs)
@@ -396,6 +429,75 @@ void GSSTree::Partitioner::mergeWith(const Partitioner& rhs)
 	}
 }
 
+
+float GSSTree::Partitioner::Cluster::distance(const GSSTree::Partitioner::Cluster& rhs, const GSSTree::Partitioner& part,const boost::multi_array<float, 2>& Dcache) const
+{
+	switch(ClusterMetric)
+	{
+	case SplitDist:
+		return splitDist(MIV,MSV, rhs.MIV, rhs.MSV);
+	case CompleteLink:
+	{
+		//this is the maximum of the minimum distances between cluster members
+		float max = 0;
+		for(unsigned i = 0, ni = indices.size(); i < ni; i++)
+		{
+			float min = HUGE_VAL;
+			for(unsigned j = 0, nj = rhs.indices.size(); j < nj; j++)
+			{
+				float dist = 0;
+				if(Dcache.size() > 0) //usecache
+				{
+					dist = Dcache[indices[i]][rhs.indices[j]];
+				}
+				else //have tor ecompute
+				{
+					unsigned l = part.tindex[indices[i]];
+					unsigned r = part.tindex[rhs.indices[j]];
+
+					dist = splitDist(part.partdata->getMIV(l), part.partdata->getMSV(l),
+						part.partdata->getMIV(r), part.partdata->getMSV(r));
+				}
+
+				if(dist < min)
+					min = dist;
+			}
+			if(min > max)
+				max = min;
+		}
+		return max;
+	}
+	case SingleLink:
+	{
+		//the minimum distance overall
+		float min = HUGE_VAL;
+		for(unsigned i = 0, ni = indices.size(); i < ni; i++)
+		{
+			for(unsigned j = 0, nj = rhs.indices.size(); j < nj; j++)
+			{
+				float dist = 0;
+				if(Dcache.size() > 0) //usecache
+				{
+					dist = Dcache[indices[i]][rhs.indices[j]];
+				}
+				else //have tor ecompute
+				{
+					unsigned l = part.tindex[indices[i]];
+					unsigned r = part.tindex[rhs.indices[j]];
+					dist = splitDist(part.partdata->getMIV(l), part.partdata->getMSV(l),
+						part.partdata->getMIV(r), part.partdata->getMSV(r));
+				}
+
+				if(dist < min)
+					min = dist;
+			}
+		}
+		return min;
+	}
+	}
+	return 0;
+}
+
 //distances between i and j
 struct IntraClusterDist
 {
@@ -413,70 +515,212 @@ struct IntraClusterDist
 	}
 };
 
+typedef bool (*ICDComp)(const IntraClusterDist& lhs, const IntraClusterDist& rhs);
+static bool reverseDist(const IntraClusterDist& lhs, const IntraClusterDist& rhs)
+{
+	return lhs.dist > rhs.dist;
+}
+
+//split this partition into clusters that are within maxsplit size; turn these into
+//smaller partitions
 void GSSTree::Partitioner::packClusters(vector<Partitioner>& clusters)
 {
+	if(tindex.size() == 0)
+		return;
+	vector<Cluster> clusts; clusts.resize(tindex.size());
+	for(unsigned i = 0, n = tindex.size(); i < n; i++)
+	{
+		unsigned index = tindex[i];
+		clusts[i].set(i, partdata->getMIV(index), partdata->getMSV(index));
+	}
+
 	switch(PackingAlgorithm)
 	{
-	case CompleteLink:
-		packClustersCompleteLink(MaxSplit, clusters);
-		break;
 	case FullMerge:
-		mergeClusters(clusters);
+		{
+			//combine everything as much as possible
+			while(fullMergeClusters(clusts))
+				;
+		}
 		break;
+	case IterativeMerge:
+		iterativeMergeClusters(clusts);
+		break;
+	}
+
+	//now create partitions
+	clusters.clear();
+	clusters.reserve(clusts.size());
+	for (unsigned i = 0, n = clusts.size(); i < n; i++)
+	{
+		clusters.push_back(Partitioner(partdata, maxlevel));
+		clusters.back().moveClusterInto(*this, clusts[i]);
 	}
 }
 
+//a priority q for distances, roll our own to support more efficient
+//removal of clusters and re-use of distances array
+class DistancePQ
+{
+	vector<IntraClusterDist>& Q;
+
+public:
+	DistancePQ(vector<IntraClusterDist>& q): Q(q)
+	{
+		make_heap(Q.begin(), Q.end(), reverseDist);
+	}
+
+	bool empty() const { return Q.size() == 0; }
+
+	const IntraClusterDist& top() const { return Q[0]; }
+
+	void push(const IntraClusterDist& c)
+	{
+		Q.push_back(c);
+		push_heap(Q.begin(), Q.end(), reverseDist);
+	}
+
+	void pop()
+	{
+		pop_heap(Q.begin(), Q.end(), reverseDist);
+		Q.pop_back();
+	}
+
+	//remove all references to clusters i and j; this is linear
+	void removeIJ(unsigned i, unsigned j)
+	{
+		unsigned c = 0;
+		unsigned end = Q.size();
+		while(c < end)
+		{
+			if(Q[c].i != i && Q[c].i != j && Q[c].j != i && Q[c].j != j)
+			{
+				c++;
+			}
+			else
+			{
+				end--;
+				swap(Q[c],Q[end]);
+			}
+		}
+
+		Q.erase(Q.begin()+end, Q.end());
+		make_heap(Q.begin(), Q.end(), reverseDist);
+	}
+
+};
+
+//this will greedly merge clusters, unlike full merge, it does not try to merge
+//everything at once, but greedily builds close clusters
+//ensures that all clusters have at least two elements
+void GSSTree::Partitioner::iterativeMergeClusters(vector<GSSTree::Partitioner::Cluster>& clusters)
+{
+	unsigned N = clusters.size();
+	clusters.reserve(N*2);
+
+	//compute all intra cluster distances
+	vector<IntraClusterDist> distances; distances.reserve(N*N / 2);
+	boost::multi_array<float, 2> darray(boost::extents[N][N]);
+
+	for (unsigned i = 0; i < N; i++)
+	{
+		darray[i][i] = 0;
+		for (unsigned j = 0; j < i; j++)
+		{
+			float dist = clusters[i].distance(clusters[j], *this);
+			darray[i][j] = darray[j][i] = dist;
+			distances.push_back(IntraClusterDist(i,j,dist));
+		}
+	}
+
+	DistancePQ pQ(distances); //manipulates a reference of distances
+
+	unsigned max = MaxSplit;
+	while(!pQ.empty())
+	{
+		//get the smallest distance
+		unsigned i = pQ.top().i;
+		unsigned j = pQ.top().j;
+		pQ.pop();
+
+		if(clusters[i].isValid() && clusters[j].isValid())
+		{
+			if(clusters[i].size() + clusters[j].size() <= max)
+			{
+				unsigned c = clusters.size();
+				//merge, create a new cluster
+				clusters.push_back(Cluster());
+				clusters.back().mergeInto(clusters[i], clusters[j]);
+
+				pQ.removeIJ(i, j);
+				//now compute the distance between this cluster and all remaining clusters
+				//and add to priority Q
+				for(unsigned d = 0; d < c; d++)
+				{
+					if(clusters[d].isValid())
+					{
+						float dist = clusters[d].distance(clusters.back(), *this, darray);
+						pQ.push(IntraClusterDist(c,d,dist));
+					}
+				}
+			}
+			else if(AdaptivePacking && max > 2)
+			{
+				max--;
+			}
+		}
+	}
+
+	//remove empty clusters
+	vector<Cluster> newclusters; newclusters.reserve(clusters.size());
+	for(unsigned i = 0, n = clusters.size(); i < n; i++)
+	{
+		if(clusters[i].isValid())
+		{
+			newclusters.push_back(Cluster());
+			newclusters.back().moveInto(clusters[i]);
+		}
+	}
+
+	swap(clusters,newclusters);
+}
 
 //each cluster has one or more indices into tindex as well as the MSV/MIV for the cluster
-//greedily assign the shortest distances to be merged
-//return the longest distances merged
-float GSSTree::Partitioner::combineClusters(float threshold, vector<GSSTree::Partitioner::Cluster >& clusters)
+//merge everything once, return true if did any merges
+bool GSSTree::Partitioner::fullMergeClusters(vector<GSSTree::Partitioner::Cluster >& clusters)
 {
 	unsigned N = clusters.size();
 	if(N == 1)
 		return 0;
 
-
 	vector<IntraClusterDist> distances; distances.reserve(N*N / 2);
 	unsigned maxclust = 0;
-	double total = 0;
-	unsigned cnt = 0;
+
 	for (unsigned i = 0; i < N; i++)
 	{
-		const OctTree *imiv = clusters[i].MIV;
-		const OctTree *imsv = clusters[i].MSV;
 		for (unsigned j = 0; j < i; j++)
 		{
-			const OctTree *jmiv = clusters[j].MIV;
-			const OctTree *jmsv = clusters[j].MSV;
-
-			float dist = splitDist(imiv,imsv,jmiv,jmsv);
-
+			float dist = clusters[i].distance(clusters[j], *this);
 			distances.push_back(IntraClusterDist(i,j,dist));
-			total += dist;
-			cnt++;
 		}
 	}
 	sort(distances.begin(), distances.end());
 
-
 	vector<Cluster> newclusters; newclusters.reserve(N/2);
 	unsigned merged = 0;
-	vector<float> mergedists;
+	bool didmerge = false;
 	for(unsigned d = 0, maxdists = distances.size(); d < maxdists; d++)
 	{
-		if(distances[d].dist > threshold)
-			break;
 		//merge if not already merged
 		unsigned i = distances[d].i;
 		unsigned j = distances[d].j;
 		if (clusters[i].isValid() && clusters[j].isValid()
-				&& clusters[i].size() + clusters[j].size() < MaxSplit)
+				&& clusters[i].size() + clusters[j].size() <= MaxSplit)
 		{
 			newclusters.push_back(Cluster());
 			newclusters.back().mergeInto(clusters[i], clusters[j]);
-			mergedists.push_back(distances[d].dist);
 			merged += 2;
+			didmerge = true;
 			if (newclusters.back().size() > maxclust)
 				maxclust = newclusters.back().size();
 		}
@@ -499,39 +743,15 @@ float GSSTree::Partitioner::combineClusters(float threshold, vector<GSSTree::Par
 
 	swap(newclusters,clusters);
 
-	if(mergedists.size() == 0)
-		return -1;
-	//otherwise, return the median value to use as a new threshold
-	return mergedists[mergedists.size()/2];
-}
-
-//do a full merge, comparing cluster distances using MIV/MSV
-void GSSTree::Partitioner::mergeClusters(vector<Partitioner>& clusters)
-{
-	//create clusters
-	if(tindex.size() == 0)
-		return;
-	vector<Cluster> clusts; clusts.resize(tindex.size());
-	for(unsigned i = 0, n = tindex.size(); i < n; i++)
-	{
-		unsigned index = tindex[i];
-		clusts[i].set(i, partdata->getMIV(index), partdata->getMSV(index));
-	}
-
-	float threshold = combineClusters(HUGE_VAL, clusts);
-
-	if(clusts.size() > 1 && clusts.back().size() == 1)
+	//this method may leave a singleton at then end, merge it
+	if(!didmerge && newclusters.size() > 1 && newclusters.back().size() == 1)
 	{
 		//push the lone singleton into some other cluster
 		double minval = HUGE_VAL;
 		unsigned best = 0;
-		const OctTree *smiv = clusts.back().MIV;
-		const OctTree *smsv = clusts.back().MSV;
-		for(unsigned i = 0, n = clusts.size() - 1; i < n; i++)
+		for(unsigned i = 0, n = newclusters.size() - 1; i < n; i++)
 		{
-			const OctTree *imiv = clusts[i].MIV;
-			const OctTree *imsv = clusts[i].MSV;
-			float dist = splitDist(imiv,imsv,smiv,smsv);
+			float dist = newclusters.back().distance(newclusters[i], *this);
 			if(dist < minval)
 			{
 				minval = dist;
@@ -539,138 +759,11 @@ void GSSTree::Partitioner::mergeClusters(vector<Partitioner>& clusters)
 			}
 		}
 
-		clusts[best].addInto(clusts.back());
-		clusts.pop_back();
+		newclusters[best].addInto(newclusters.back());
+		newclusters.pop_back();
 	}
 
-	//only merge past 2 if better than the worst pair when adaptively packing
-	while(combineClusters(threshold, clusts) >= 0)
-		;
-
-	//now create partitions
-	clusters.clear();
-	clusters.reserve(clusts.size());
-	for (unsigned i = 0, n = clusts.size(); i < n; i++)
-	{
-		clusters.push_back(Partitioner(partdata, maxlevel));
-		for (unsigned j = 0, m = clusts[i].size(); j < m; j++)
-		{
-			clusters.back().addSingle(*this, clusts[i][j]);
-		}
-	}
-}
-
-//pack the partition into clusters such that no cluster has more than max members
-//presumably clusters should have no fewer than max/2 and there should be an
-//effort made to keep the clusters dense, yet informative
-//TODO: make efficient, evaluate clustering schemes
-void GSSTree::Partitioner::packClustersCompleteLink(unsigned max,
-		vector<Partitioner>& clusters)
-{
-	//compute pairwise distances between all members
-	unsigned N = tindex.size();
-	boost::multi_array<float, 2> distances(boost::extents[N][N]);
-	vector<vector<unsigned> > clusts;
-	clusts.reserve(1 + N);
-	float maxmin = 0;
-	for (unsigned i = 0; i < N; i++)
-	{
-		distances[i][i] = 0;
-		float min = HUGE_VAL;
-		const OctTree *imiv = partdata->getMIV(tindex[i]);
-		const OctTree *imsv = partdata->getMSV(tindex[i]);
-		for (unsigned j = 0; j < i; j++)
-		{
-			const OctTree *jmiv = partdata->getMIV(tindex[j]);
-			const OctTree *jmsv = partdata->getMSV(tindex[j]);
-			distances[i][j] = distances[j][i] = splitDist(imiv, imsv, jmiv,
-						jmsv);
-
-			if(distances[i][j] < min)
-				min = distances[i][j];
-		}
-		if(min > maxmin)
-			maxmin = min;
-		clusts.push_back(vector<unsigned> ());
-		clusts.back().push_back(i);
-	}
-
-	//iteratively merge all clusters until we run into size limit
-	while (clusts.size() > 1)
-	{
-		//find two clusters with smallest complete linkage distance
-		//(minimize the maximum distance)
-		float mindist = HUGE_VAL;
-		unsigned besti = 0;
-		unsigned bestj = 0;
-		for (unsigned i = 0, n = clusts.size(); i < n; i++)
-		{
-			for (unsigned j = 0; j < i; j++)
-			{
-				float maxdist = 0;
-				//find the max distance between i and j
-				for (unsigned I = 0, ni = clusts[i].size(); I < ni; I++)
-				{
-					for (unsigned J = 0, nj = clusts[j].size(); J < nj; J++)
-					{
-						float d = distances[clusts[i][I]][clusts[j][J]];
-						if (d > maxdist)
-						{
-							maxdist = d;
-						}
-					}
-				}
-				if (maxdist < mindist)
-				{
-					if( clusts[i].size() + clusts[j].size() <= max)
-					{
-							mindist = maxdist;
-							besti = i;
-							bestj = j;
-					}
-					else if(AdaptivePacking && max > 2)
-					{
-						max--;
-					}
-				}
-			}
-		}
-
-		if (besti == bestj)
-			break; //couldn't merge any
-
-		//move besti and bestj to end of vector
-		unsigned last = clusts.size() - 1;
-		if (bestj == last)
-		{
-			swap(clusts[besti], clusts[last - 1]);
-		}
-		else
-		{
-			swap(clusts[besti], clusts[last]);
-			swap(clusts[bestj], clusts[last - 1]);
-		}
-
-		//insert into second to last
-		clusts[last - 1].insert(clusts[last - 1].end(), clusts[last].begin(),
-				clusts[last].end());
-		clusts.pop_back(); //remove
-	}
-
-	if (Verbose)
-		cout << "  pack " << tindex.size() << " " << clusts.size() << "\n";
-
-	//now create partitions
-	clusters.clear();
-	clusters.reserve(clusts.size());
-	for (unsigned i = 0, n = clusts.size(); i < n; i++)
-	{
-		clusters.push_back(Partitioner(partdata, maxlevel));
-		for (unsigned j = 0, m = clusts[i].size(); j < m; j++)
-		{
-			clusters.back().addSingle(*this, clusts[i][j]);
-		}
-	}
+	return didmerge;
 }
 
 //use aglomerative clusters (complete linkage) to create k clusters of variable size
@@ -1034,7 +1127,7 @@ void GSSTree::Partitioner::topDownKSamplePartition(vector<Partitioner>& parts)
 				unsigned best = 0;
 				for (unsigned j = 0; j < numclusters; j++)
 				{
-					if (j == i)
+					if (j == i || parts[j].size() == 0)
 						continue;
 					float d = splitDist(MIVcenters[j],MSVcenters[j], partdata->getMIV(index), partdata->getMSV(index));
 					if(d < mindist)
