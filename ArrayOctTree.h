@@ -18,11 +18,6 @@ class ArrayOctTree: public OctTree
 	float dimension; //sits within a cube of this dimension, power of 2
 	float resolution; //increase resolution down to this increment (power of 2)
 
-	enum OctType
-	{
-		Empty, Full, Interior
-	};
-
 	struct OctNode;
 	struct ChildNode
 	{
@@ -74,12 +69,6 @@ class ArrayOctTree: public OctTree
 		unsigned getBitPattern(const vector<OctNode>& tree, bool MSV) const;
 
 		ChildNode copyTo(const vector<OctNode>& from, vector<OctNode>& to) const;
-#if 0
-		void overlapVolume(const vector<OctNode>& tree,const vector<OctNode>& msvtree,
-				const vector<OctNode>&  rmivtree,const vector<OctNode>&  rmsvtree,
-				const ChildNode& msvroot,const ChildNode& rmivroot,const ChildNode& rmsvroot, float dimension,
-				float& oval, float& aval) const;
-#endif
 	};
 
 	struct OctNode
