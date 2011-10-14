@@ -87,14 +87,7 @@ class MappableOctTree
 
 	MappableOctTree(const MappableOctTree& rhs);
 
-	static MappableOctTree* create_r(float dim, float res, const Cube& cube,
-			const vector<MolSphere>& mol);
-
 public:
-
-	template <class Object>
-	static MappableOctTree* create(float dim, float res, const Object& obj);
-	static MappableOctTree* create(const ArrayOctTree& src);
 
 	MappableOctTree* clone() const;
 
@@ -125,6 +118,15 @@ public:
 	float relativeVolumeDistance(const OctTree * B) const;
 	float absoluteVolumeDistance(const OctTree * B) const;
 
+private:
+	template <class Object>
+	static MappableOctTree* create_r(float dim, float res, const Cube& cube,
+			const vector<MolSphere>& mol);
+
+public:
+
+	template <class Object>
+	static MappableOctTree* create(float dim, float res, const Object& obj);
 };
 
 #endif /* MAPPABLEOCTTREE_H_ */
