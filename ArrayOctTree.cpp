@@ -19,7 +19,7 @@ ArrayOctTree::ChildNode ArrayOctTree::create(const Cube& cube,
 	pruned.reserve(mol.size());
 	for (unsigned i = 0, n = mol.size(); i < n; i++)
 	{
-		if (cube.intersectsSphere(mol[i]))
+		if (mol[i].intersectsCube(cube))
 		{
 			pruned.push_back(mol[i]);
 		}

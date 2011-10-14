@@ -11,7 +11,7 @@
 
 #include <cmath>
 #include <cfloat>
-
+#include <algorithm>
 using namespace std;
 
 /* A cube. Functions for consistently dividing into octants */
@@ -87,32 +87,6 @@ public:
 			abort();
 		}
 		return res;
-	}
-
-	//thank you stack overflow for not making me think..
-	bool intersectsSphere(const MolSphere& sphere) const
-	{
-		float dist = sphere.r * sphere.r;
-		float x2 = x + dim;
-		float y2 = y + dim;
-		float z2 = z + dim;
-
-		if (sphere.x < x)
-			dist -= squared(sphere.x - x);
-		else if (sphere.x > x2)
-			dist -= squared(sphere.x - x2);
-
-		if (sphere.y < y)
-			dist -= squared(sphere.y - y);
-		else if (sphere.y > y2)
-			dist -= squared(sphere.y - y2);
-
-		if (sphere.z < z)
-			dist -= squared(sphere.z - z);
-		else if (sphere.z > z2)
-			dist -= squared(sphere.z - z2);
-
-		return dist > 0;
 	}
 
 	//shortest distance from this cube to rhs

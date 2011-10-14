@@ -19,52 +19,45 @@ struct MChildNode
 	bool isLeaf :1;
 	bool isFull :1; //only relevant if leaf
 	unsigned index :30;
-	mutable float volumeCache; //computed on demand
+	float vol;
 
 	MChildNode() :
-		isLeaf(true), isFull(false), index(0), volumeCache(-1)
+		isLeaf(true), isFull(false), index(0), vol(-1)
 	{
 	}
 
 	MChildNode(bool leaf, bool full) :
-		isLeaf(leaf), isFull(full), index(0), volumeCache(-1)
+		isLeaf(leaf), isFull(full), index(0), vol(-1)
 	{
 	}
 	MChildNode(bool leaf, bool full, unsigned i) :
-		isLeaf(leaf), isFull(full), index(i), volumeCache(-1)
+		isLeaf(leaf), isFull(full), index(i), vol(-1)
 	{
 	}
 
-	MChildNode intersect(const vector<MOctNode>& tree,
-			const vector<MOctNode>& rtree, const MChildNode& rhs,
-			vector<MOctNode>& newtree, bool& changed) const;
-	MChildNode unionWith(const vector<MOctNode>& tree,
-			const vector<MOctNode>& rtree, const MChildNode& rhs,
-			vector<MOctNode>& newtree, bool& changed) const;
 
-	void intersectUnionVolume(const vector<MOctNode>& tree,
-			const vector<MOctNode>& rtree, const MChildNode& rhs, float dim,
+
+	void intersectUnionVolume(const MOctNode* tree,
+			const MOctNode* rtree, const MChildNode& rhs, float dim,
 			float& intersectval, float& unionval) const;
 
 	float
-	intersectVolume(const vector<MOctNode>& tree, const vector<MOctNode>& rtree,
+	intersectVolume(const MOctNode* tree, const MOctNode* rtree,
 			const MChildNode& rhs, float dim) const;
 	float
-	unionVolume(const vector<MOctNode>& tree, const vector<MOctNode>& rtree,
+	unionVolume(const MOctNode* tree, const MOctNode* rtree,
 			const MChildNode& rhs, float dim) const;
 
-	bool containedIn(const vector<MOctNode>& tree, const vector<MOctNode>& rtree,
+	bool containedIn(const MOctNode* tree, const MOctNode* rtree,
 			const MChildNode& rhs) const;
 
 	float
-			subtractVolume(const vector<MOctNode>& tree,
-					const vector<MOctNode>& bigtree, const MChildNode& bigrhs,
+			subtractVolume(const MOctNode* tree,
+					const MOctNode* bigtree, const MChildNode& bigrhs,
 					float dim) const;
 
-	float volume(const vector<MOctNode>& tree, float dim) const;
-	unsigned getBitPattern(const vector<MOctNode>& tree, bool MSV) const;
+	float volume() const { return vol; }
 
-	MChildNode copyTo(const vector<MOctNode>& from, vector<MOctNode>& to) const;
 };
 
 struct MOctNode
@@ -99,7 +92,8 @@ class MappableOctTree
 
 public:
 
-	static MappableOctTree* create(float dim, float res, const vector<MolSphere>& mol);
+	template <class Object>
+	static MappableOctTree* create(float dim, float res, const Object& obj);
 	static MappableOctTree* create(const ArrayOctTree& src);
 
 	MappableOctTree* clone() const;

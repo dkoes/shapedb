@@ -33,11 +33,65 @@
 #ifndef GSSTREECREATOR_H_
 #define GSSTREECREATOR_H_
 
-class GSSTreeCreator
+#include <boost/interprocess/file_mapping.hpp>
+#include <boost/interprocess/mapped_region.hpp>
+#include <boost/filesystem.hpp>
+#include <iostream>
+#include <fstream>
+
+#include "GSSTreeStructures.h"
+
+using namespace boost;
+using namespace std;
+using namespace boost::interprocess;
+
+#include "Molecule.h"
+typedef Molecule Object;
+
+//store infor for files that are being created and will be memory mapped
+struct WorkFile
+{
+	//none of these has a real copy constructor
+	ofstream *file;
+	mapped_region *map;
+	file_mapping *mapping;
+
+	WorkFile(): file(NULL), map(NULL), mapping(NULL) {}
+	WorkFile(const char *name);
+	~WorkFile();
+
+	void switchToMap();
+	void set(const char *name);
+	void clear();
+};
+
+//a wrapper that can view single tree leaves the same as internal nodes
+class DataViewer
 {
 public:
-	GSSTreeCreator();
-	virtual ~GSSTreeCreator();
+	DataViewer();
+	//these are file ind
+	virtual const MappableOctTree* getMSV(file_index i) const = 0;
+	virtual const MappableOctTree* getMIV(file_index i) const = 0;
+};
+
+class GSSTreeCreator
+{
+	WorkFile objects;
+	WorkFile leaves;
+
+	vector<WorkFile> nodes;
+
+	filesystem::path dbpath;
+
+	static void createNextLevel(DataViewer& data, const vector<file_index>& indices,
+			ostream& out, vector<file_index>& nextindices);
+
+public:
+	GSSTreeCreator() {}
+	~GSSTreeCreator() {}
+
+	bool create(filesystem::path dir, Object::iterator itr, float dim, float res);
 };
 
 #endif /* GSSTREECREATOR_H_ */

@@ -44,7 +44,6 @@ cl::opt<unsigned> NodeMerge("node-merge",
 
 cl::opt<bool> PackPartitions("pack-partitions", cl::desc("Group partitions for more even split"), cl::init(false));
 cl::opt<bool> AdaptivePacking("adaptive-pack", cl::desc("Dynamically set packing amount"), cl::init(false));
-cl::opt<bool> RemoveSingletons("remove-singles", cl::desc("Remove singleton nodes"), cl::init(true));
 
 enum SplitMetricEnum
 {
@@ -691,7 +690,7 @@ bool GSSTree::Partitioner::fullMergeClusters(vector<GSSTree::Partitioner::Cluste
 {
 	unsigned N = clusters.size();
 	if(N == 1)
-		return 0;
+		return false;
 
 	vector<IntraClusterDist> distances; distances.reserve(N*N / 2);
 	unsigned maxclust = 0;
@@ -729,7 +728,7 @@ bool GSSTree::Partitioner::fullMergeClusters(vector<GSSTree::Partitioner::Cluste
 			break;
 	}
 
-	if(merged != N) //find the loner(s), keep it as a singleton
+	if(merged != N) //find the loner(s), keep it as a singleton (may also be too big)
 	{
 		for (unsigned i = 0; i < N; i++)
 		{
@@ -741,7 +740,6 @@ bool GSSTree::Partitioner::fullMergeClusters(vector<GSSTree::Partitioner::Cluste
 		}
 	}
 
-	swap(newclusters,clusters);
 
 	//this method may leave a singleton at then end, merge it
 	if(!didmerge && newclusters.size() > 1 && newclusters.back().size() == 1)
@@ -762,6 +760,8 @@ bool GSSTree::Partitioner::fullMergeClusters(vector<GSSTree::Partitioner::Cluste
 		newclusters[best].addInto(newclusters.back());
 		newclusters.pop_back();
 	}
+
+	swap(newclusters,clusters);
 
 	return didmerge;
 }
