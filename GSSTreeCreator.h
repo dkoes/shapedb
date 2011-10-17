@@ -38,6 +38,7 @@
 #include <boost/filesystem.hpp>
 #include <iostream>
 #include <fstream>
+#include <vector>
 
 #include "GSSTreeStructures.h"
 
@@ -68,27 +69,94 @@ struct WorkFile
 //a wrapper that can view single tree leaves the same as internal nodes
 class DataViewer
 {
+	const char *ptr;
 public:
-	DataViewer();
+	DataViewer(void *data): ptr((const char*)data) {}
+	virtual ~DataViewer() {}
 	//these are file ind
 	virtual const MappableOctTree* getMSV(file_index i) const = 0;
 	virtual const MappableOctTree* getMIV(file_index i) const = 0;
+	virtual bool isTree() const  = 0;
+
+	const void* getAddress(file_index i) const { return ptr+i; }
+};
+
+
+//abstract class for a top down partitioner, is expected to run in linear time
+//can maintain state as the partitions are refined
+class TopDownPartitioner
+{
+protected:
+	const DataViewer *data;
+	vector<file_index> indices;
+public:
+	TopDownPartitioner() {}
+	virtual ~TopDownPartitioner() {}
+	virtual TopDownPartitioner* create(const DataViewer* dv, const vector<file_index>& indices) const = 0;
+	virtual void partition(vector<TopDownPartitioner*>& parts) = 0;
+
+	virtual unsigned size() const { return indices.size(); }
+	virtual const DataViewer * getData() const { return data; }
+	virtual void extractIndicies(vector<file_index>& ind) { swap(ind, indices); }
+};
+
+//abstract class for a bottom up packer, can run in quadratic time
+class Packer
+{
+public:
+	struct Cluster
+	{
+		vector<file_index> indices;
+		MappableOctTree *MIV;
+		MappableOctTree *MSV;
+	};
+
+	Packer() {}
+	virtual ~Packer() {}
+	virtual void pack(const DataViewer* dv, const vector<file_index>& indices, vector<Cluster>& clusters) const;
+};
+
+//class for creating levels, follows the CM-tree bulk loading algorithm,
+//but can be overridden to implement any arbitrary algorithm
+class GSSLevelCreator
+{
+protected:
+	const TopDownPartitioner *partitioner;
+	const Packer *packer;
+
+	//configuration settings
+	unsigned nodePack;
+	unsigned leafPack;
+
+
+	//class vars used by nextlevelR
+	unsigned packingSize;
+	ostream *out;
+	vector<file_index> *nextindices;
+	virtual void createNextLevelR(TopDownPartitioner *P);
+public:
+	GSSLevelCreator(const TopDownPartitioner * part, const Packer *pack, unsigned np, unsigned lp):
+		partitioner(part), packer(pack), nodePack(np), leafPack(lp) {}
+
+	virtual ~GSSLevelCreator() {}
+
+	virtual void createNextLevel(DataViewer& data, const vector<file_index>& indices,
+			ostream& out, vector<file_index>& nextindices);
 };
 
 class GSSTreeCreator
 {
 	WorkFile objects;
-	WorkFile leaves;
+	WorkFile trees;
 
 	vector<WorkFile> nodes;
 
 	filesystem::path dbpath;
 
-	static void createNextLevel(DataViewer& data, const vector<file_index>& indices,
-			ostream& out, vector<file_index>& nextindices);
+	GSSLevelCreator *leveler;
 
 public:
-	GSSTreeCreator() {}
+	GSSTreeCreator(GSSLevelCreator *l):leveler(l) {}
 	~GSSTreeCreator() {}
 
 	bool create(filesystem::path dir, Object::iterator itr, float dim, float res);

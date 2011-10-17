@@ -47,6 +47,11 @@ public:
 		return dim;
 	}
 
+	float volume() const
+	{
+		return dim*dim*dim;
+	}
+
 	//return i'th octant
 	Cube getOctant(unsigned i) const
 	{

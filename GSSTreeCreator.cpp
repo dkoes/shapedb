@@ -7,16 +7,10 @@
 
 #include "GSSTreeCreator.h"
 
-DataViewer::DataViewer()
+class TreeViewer: public DataViewer
 {
-
-}
-
-class LeafViewer: public DataViewer
-{
-	const char *ptr;
 public:
-	LeafViewer(void *data): ptr((const char*)data)
+	TreeViewer(void *data): DataViewer(data)
 	{
 
 	}
@@ -29,6 +23,11 @@ public:
 	virtual const MappableOctTree* getMIV(file_index i) const
 	{
 		return NULL;
+	}
+
+	virtual bool isTree() const
+	{
+		return true;
 	}
 };
 
@@ -36,7 +35,7 @@ class NodeViewer: public DataViewer
 {
 	const char *ptr;
 public:
-	NodeViewer(void *data): ptr((const char*)data)
+	NodeViewer(void *data): DataViewer(data)
 	{
 
 	}
@@ -49,6 +48,11 @@ public:
 	virtual const MappableOctTree* getMIV(file_index i) const
 	{
 		return NULL;
+	}
+
+	virtual bool isTree() const
+	{
+		return false;
 	}
 };
 
@@ -107,7 +111,7 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator itr, float di
 
 	//write out objects and trees
 	objects.set(objfile.file_string().c_str());
-	leaves.set(leavesfile.file_string().c_str());
+	trees.set(leavesfile.file_string().c_str());
 	vector<file_index> indices;
 	unsigned cnt = 0;
 	for( ; itr ; ++itr)
@@ -117,10 +121,10 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator itr, float di
 		obj.write(*objects.file);
 
 		//leaf object
-		indices.push_back((file_index)leaves.file->tellp());
+		indices.push_back((file_index)trees.file->tellp());
 
 		MappableOctTree *tree = MappableOctTree::create(dim, res, obj);
-		GSSLeaf::writeLeaf(*leaves.file, pos, tree);
+		GSSTree::writeTree(*trees.file, pos, tree);
 		delete tree;
 		cnt++;
 	}
@@ -133,11 +137,11 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator itr, float di
 	nodes.push_back(WorkFile(nodesfile.file_string().c_str()));
 
 	//map the data
-	leaves.switchToMap();
-	LeafViewer leafdata(leaves.map->get_address());
+	trees.switchToMap();
+	TreeViewer leafdata(trees.map->get_address());
 
 	vector<file_index> nextindices; nextindices.reserve(indices.size()/2);
-	createNextLevel(leafdata, indices, *nodes.back().file, nextindices);
+	leveler->createNextLevel(leafdata, indices, *nodes.back().file, nextindices);
 
 	while(nextindices.size() > 1)
 	{
@@ -156,7 +160,7 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator itr, float di
 		swap(indices, nextindices);
 		nextindices.clear();
 
-		createNextLevel(nodedata, indices, *nodes.back().file, nextindices);
+		leveler->createNextLevel(nodedata, indices, *nodes.back().file, nextindices);
 	}
 
 	//output general info
@@ -166,3 +170,74 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator itr, float di
 
 	return true;
 }
+
+
+//top down partition
+void GSSLevelCreator::createNextLevel(DataViewer& data, const vector<file_index>& indices,
+		ostream& o, vector<file_index>& next)
+{
+	if(indices.size() == 0)
+		return;
+
+	TopDownPartitioner *thispart = partitioner->create(&data, indices);
+
+	packingSize = nodePack;
+	if(data.isTree()) //making leaf nodes
+		packingSize = leafPack;
+
+	out = &o;
+	nextindices = &next;
+	//recursively partition
+	createNextLevelR(thispart);
+	delete thispart;
+}
+
+void GSSLevelCreator::createNextLevelR(TopDownPartitioner *P)
+{
+	if(P->size() == 0)
+		return;
+
+	if(P->size() <= packingSize)
+	{
+		//bottom up pack
+		vector<Packer::Cluster> clusters;
+		vector<file_index> indices;
+		P->extractIndicies(indices);
+		packer->pack(P->getData(), indices, clusters);
+		vector<const void*> children;
+		for(unsigned c = 0, nc = clusters.size(); c < nc; c++)
+		{
+			children.clear();
+			children.reserve(clusters[c].indices.size());
+			for(unsigned i = 0, n = clusters[c].indices.size(); i < n; i++)
+			{
+				file_index index = clusters[c].indices[i];
+				children.push_back(P->getData()->getAddress(index));
+			}
+
+		}
+
+		nextindices->push_back((file_index)out->tellp());
+		if(P->getData()->isTree())
+		{
+			//creating leaves from trees
+			GSSLeaf::writeLeaf(*out, children);
+		}
+		else
+		{
+			GSSInternalNode::writeNode(*out, children);
+		}
+	}
+	else
+	{
+		vector<TopDownPartitioner*> parts;
+		P->partition(parts);
+
+		for(unsigned i = 0, n = parts.size(); i < n; i++)
+		{
+			createNextLevelR(parts[i]);
+			delete parts[i];
+		}
+	}
+}
+

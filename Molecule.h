@@ -63,7 +63,7 @@ public:
 		}
 	}
 
-	bool intersects(const Cube& cube)
+	bool intersects(const Cube& cube) const
 	{
 		for(unsigned i = 0, n = spheres.size(); i < n; i++)
 		{
