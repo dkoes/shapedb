@@ -27,7 +27,10 @@
 #include "oesystem.h"
 
 #include "CommandLine2/CommandLine.h"
-#include "GSSTree.h"
+#include "GSSTreeCreator.h"
+#include "Molecule.h"
+#include "KSamplePartitioner.h"
+#include "FullMergePacker.h"
 
 using namespace OEChem;
 using namespace OESystem;
@@ -36,7 +39,7 @@ using namespace boost;
 
 enum CommandEnum
 {
-	Create, NNSearch, DCSearch, CreateSearch
+	Create, NNSearch, DCSearch
 };
 
 cl::opt<CommandEnum>
@@ -46,17 +49,8 @@ cl::opt<CommandEnum>
 				cl::values(clEnumVal(Create, "Create a molecule shape index."),
 				clEnumVal(NNSearch, "Nearest neighbor search")						,
 				clEnumVal(DCSearch, "Distance constraint search"),
-				clEnumVal(CreateSearch,"In memory database creation and search for testing"),
 				clEnumValEnd) );
 
-cl::opt<OctTreeFactory::OctTreeType>
-		OctType(
-				cl::desc("OctTree type to use:"),
-				cl::init(OctTreeFactory::Array),
-				cl::values(clEnumValN(OctTreeFactory::Linear, "linear-octtree", "Use a space efficient leaf-only representation"),
-						clEnumValN(OctTreeFactory::Pointer, "ptr-octtree", "Use a full pointer based representation"),
-						clEnumValN(OctTreeFactory::Array, "arr-octtree", "Array storage of full oct tree"),
-				clEnumValEnd) );
 
 cl::opt<string> Input("in", cl::desc("Input file"));
 cl::opt<string> Output("out", cl::desc("Output file"));
@@ -66,10 +60,21 @@ cl::opt<double> LessDist("less",
 		cl::desc("Distance to reduce query mol by for constraint search (default 1A)."), cl::init(1.0));
 cl::opt<double> MoreDist("more",
 		cl::desc("Distance to increase query mol by for constraint search (default 1A)."), cl::init(1.0));
-cl::opt<double> Resolution("resolution", cl::desc("Best resolution for shape database creation."),cl::init(1.0));
+cl::opt<double> MaxDimension("max-dim", cl::desc("Maximum dimension."),cl::init(64));
+cl::opt<double> Resolution("resolution", cl::desc("Best resolution for shape database creation."),cl::init(.5));
 
 cl::opt<string> IncludeMol("incmol", cl::desc("Molecule to use for minimum included volume"));
 cl::opt<string> ExcludeMol("exmol", cl::desc("Molecule to use for excluded volume"));
+
+cl::opt<unsigned> KCenters("kcenters", cl::desc("number of centers for ksample-split"), cl::init(8));
+cl::opt<unsigned> KSampleMult("ksamplex", cl::desc("multiplictive factor for ksampling"),cl::init(10));
+
+cl::opt<unsigned> LeafPack("leaf-pack",
+		cl::desc("Cutoff to trigger leaf packing"), cl::init(256));
+cl::opt<unsigned> NodePack("node-pack",
+		cl::desc("Cutoff to trigger leaf packing"), cl::init(256));
+
+cl::opt<unsigned> Pack("pack", cl::desc("Maximum quantities per a node"), cl::init(8));
 
 cl::opt<bool> Verbose("v", cl::desc("Verbose output"));
 
@@ -107,112 +112,56 @@ int main(int argc, char *argv[])
 	switch (Command)
 	{
 	case Create:
-	case CreateSearch:
 	{
 		//read in all the molecules and calculate the max bounding box
-		oemolistream inmols(Input);
-		OEMol mol;
-		float ctr[3], ext[3];
-	    array<float,6> box = { {FLT_MAX,FLT_MAX,FLT_MAX,FLT_MIN,FLT_MIN,FLT_MIN} };
+		KSamplePartitioner topdown(KCenters, KSampleMult);
+		FullMergePacker packer(Pack);
 
-	    vector<vector<MolSphere> > allmols;
+		GSSLevelCreator leveler(&topdown, &packer, NodePack, LeafPack);
 
-	    while (OEReadMolecule(inmols, mol))
+		GSSTreeCreator creator(&leveler);
+
+		filesystem::path dbpath(Database);
+		Molecule::iterator molitr(Input);
+		if(!creator.create(dbpath, molitr, MaxDimension, Resolution))
 		{
-	    	OEAssignBondiVdWRadii(mol);
-
-			for (OEIter<OEConfBase> conf = mol.GetConfs(); conf; ++conf)
-			{
-				OEGetCenterAndExtents(conf, ctr, ext);
-				box[0] = min(box[0], ctr[0] - ext[0]);
-				box[1] = max(box[3], ctr[0] + ext[0]);
-				box[2] = min(box[1], ctr[1] - ext[1]);
-				box[3] = max(box[4], ctr[1] + ext[1]);
-				box[4] = min(box[2], ctr[2] - ext[2]);
-				box[5] = max(box[5], ctr[2] + ext[2]);
-
-				vector<MolSphere> spheres;
-				spheres.reserve(conf->NumAtoms());
-				for(OEIter<OEAtomBase> atom = conf->GetAtoms(); atom; ++atom)
-				{
-					float xyz[3];
-					conf->GetCoords(atom, xyz);
-					spheres.push_back(MolSphere(xyz[0], xyz[1], xyz[2], atom->GetRadius()));
-				}
-				allmols.push_back(spheres);
-			}
-
+			cerr << "Error creating database\n";
+			exit(1);
 		}
 
-	    //create gss tree
-	    OctTreeFactory octGen(OctType);
-	    GSSTree gss(octGen, box, Resolution);
-	    gss.load(allmols);
-
-	    if(Command == Create)
-	    {
-	    	ofstream out(Output.c_str());
-	    	gss.write(out);
-	    }
-	    else //create and search (in mem test)
-	    {
-	    	inmols.rewind();
-			ofstream out(Output.c_str());
-	    	while(OEReadMolecule(inmols, mol))
-	    	{
-	    		vector<MolSphere> spheres;
-				spherizeMol(mol, spheres);
-				vector<MolSphere> res;
-				gss.nn_search(spheres, res);
-				//just output in xyz w/o radii
-				outputRes(out, res);
-			}
-
-	    }
 	}
 		break;
 	case NNSearch:
 	{
 		//read in database
-		GSSTree gss;
 		ifstream dbfile(Database.c_str());
 		if(!dbfile)
 		{
 			cerr << "Could not read database " << Database << "\n";
 			exit(-1);
 		}
-		gss.read(dbfile);
+		//TODO: load db
 
 		//read query molecule(s)
-		oemolistream inmols(Input);
-		OEMol mol;
-		ofstream out(Output.c_str());
-    	while(OEReadMolecule(inmols, mol))
-    	{
-    		vector<MolSphere> spheres;
-			spherizeMol(mol, spheres);
-			vector<MolSphere> res;
-			gss.nn_search(spheres, res);
-			//just output in xyz w/o radii
-			outputRes(out, res);
+		for(Molecule::iterator molitr(Input); molitr; ++molitr)
+		{
+
 		}
+
 
 	}
 	break;
 	case DCSearch:
 	{
 		//read in database
-		GSSTree gss;
 		ifstream dbfile(Database.c_str());
 		if(!dbfile)
 		{
 			cerr << "Could not read database " << Database << "\n";
 			exit(-1);
 		}
-		gss.read(dbfile);
+		//TODO: load db
 
-		if(Verbose)
-			gss.printStats();
 
 		ofstream out(Output.c_str());
 
@@ -252,7 +201,9 @@ int main(int argc, char *argv[])
 			}
 
 			vector<vector<MolSphere> > res;
-			gss.inex_search(insphere, exsphere, res);
+
+			//TODO: search
+
 			//just output in xyz w/o radii
 			for (unsigned i = 0, n = res.size(); i < n; i++)
 				outputRes(out, res[i]);
@@ -275,7 +226,8 @@ int main(int argc, char *argv[])
 				}
 
 				vector<vector<MolSphere> > res;
-				gss.dc_search(littlespheres, bigspheres, res);
+				//TODO: search
+
 				//just output in xyz w/o radii
 				for (unsigned i = 0, n = res.size(); i < n; i++)
 					outputRes(out, res[i]);

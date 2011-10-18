@@ -12,16 +12,24 @@
 using namespace boost;
 
 //create an instances of ksamplepartitioner with all of this's settings and the specified data
-TopDownPartitioner* KSamplePartitioner::create(const DataViewer* dv, const vector<file_index>& ind) const
+//initialize to fully represent the data
+TopDownPartitioner* KSamplePartitioner::create(const DataViewer* dv) const
 {
-	KSamplePartitioner* ret = new KSamplePartitioner(kcenters, ksamples);
-	ret->data = dv;
-	ret->indices = ind;
+	TopDownPartitioner* ret = new KSamplePartitioner(dv, kcenters, ksamples);
+	ret->initFromData();
+	return ret;
+}
+
+//initialize using a slice of the data from ind
+TopDownPartitioner* KSamplePartitioner::create(const DataViewer* dv, vector<unsigned>& ind) const
+{
+	KSamplePartitioner* ret = new KSamplePartitioner(dv, kcenters, ksamples);
+	swap(ret->indices, ind);
 	return ret;
 }
 
 //take the intersection of everything represented by ind
-MappableOctTree* KSamplePartitioner::computeMIV(const vector<file_index>& ind) const
+MappableOctTree* KSamplePartitioner::computeMIV(const vector<unsigned>& ind) const
 {
 	const MappableOctTree* trees[ind.size()];
 	for(unsigned i = 0, n = ind.size(); i < n; i++)
@@ -32,7 +40,7 @@ MappableOctTree* KSamplePartitioner::computeMIV(const vector<file_index>& ind) c
 }
 
 //take the union of everything represented by ind
-MappableOctTree* KSamplePartitioner::computeMSV(const vector<file_index>& ind) const
+MappableOctTree* KSamplePartitioner::computeMSV(const vector<unsigned>& ind) const
 {
 	const MappableOctTree* trees[ind.size()];
 	for(unsigned i = 0, n = ind.size(); i < n; i++)
@@ -51,21 +59,21 @@ void KSamplePartitioner::partition(vector<TopDownPartitioner*>& parts)
 	unsigned inc = indices.size()/nsamples;
 	if(inc == 0) inc = 1;
 
-	vector<file_index> sampleIndices; sampleIndices.reserve(nsamples+1);
+	vector<unsigned> sampleIndices; sampleIndices.reserve(nsamples+1);
 	for(unsigned i = 0, n = indices.size(); i < n; i += inc)
 	{
 		sampleIndices.push_back(indices[i]);
 	}
 
 	//cluster samples
-	vector< vector<file_index> > clusters;
+	vector< vector<unsigned> > clusters;
 	kCluster(sampleIndices, clusters);
 
 	//compute cluster "centers": MIV/MSV
 	vector<const MappableOctTree*> MSVcenters; MSVcenters.reserve(kcenters);
 	vector<const MappableOctTree*> MIVcenters; MIVcenters.reserve(kcenters);
 
-	vector< vector<file_index> > partitions;
+	vector< vector<unsigned> > partitions;
 	partitions.resize(clusters.size());
 	for(unsigned i = 0, n = clusters.size(); i < n; i++)
 	{
@@ -142,7 +150,7 @@ void KSamplePartitioner::partition(vector<TopDownPartitioner*>& parts)
 
 
 //use aglomerative clusters (complete linkage) to create k clusters of variable size
-void KSamplePartitioner::kCluster(const vector<file_index>& indices, vector< vector<file_index> >& clusters)
+void KSamplePartitioner::kCluster(const vector<unsigned>& indices, vector< vector<unsigned> >& clusters)
 {
 	//compute pairwise distances between all members
 	unsigned N = indices.size();
@@ -160,7 +168,7 @@ void KSamplePartitioner::kCluster(const vector<file_index>& indices, vector< vec
 			const MappableOctTree *jmsv = data->getMSV(indices[j]);
 			distances[i][j] = distances[j][i] = shapeDistance(imiv, imsv, jmiv, jmsv);
 		}
-		clusters.push_back(vector<file_index> ());
+		clusters.push_back(vector<unsigned>());
 		clusters.back().push_back(i);
 	}
 

@@ -11,7 +11,7 @@
 
 MappableOctTree* MappableOctTree::clone() const
 {
-	unsigned sz = sizeof(MappableOctTree)+N*sizeof(MOctNode);
+	unsigned sz = bytes();
 	void* mem = malloc(sz);
 	memcpy(mem, this, sz);
 	return (MappableOctTree*)mem;

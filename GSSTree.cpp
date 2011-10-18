@@ -32,10 +32,8 @@ cl::opt<unsigned> ReshuffleLimit("reshuffle-limit",
 cl::opt<bool> InsertionLoad("insert-load",
 		cl::desc("Load be simply inserting"), cl::init(false));
 
-cl::opt<unsigned> LeafPack("leaf-pack",
-		cl::desc("Cutoff to trigger leaf packing"), cl::init(256));
-cl::opt<unsigned> NodePack("node-pack",
-		cl::desc("Cutoff to trigger leaf packing"), cl::init(256));
+extern cl::opt<unsigned> LeafPack;
+extern cl::opt<unsigned> NodePack;
 
 cl::opt<unsigned> LeafMerge("leaf-merge",
 		cl::desc("Cutoff to merge small leaf clusters"), cl::init(4));
@@ -111,8 +109,8 @@ cl::opt<PackingEnum>		PackingAlgorithm(
 
 const unsigned GSSTree::MaxSplit = 8; //number of children in each node
 
-cl::opt<unsigned> KCenters("kcenters", cl::desc("number of centers for ksample-split"), cl::init(8));
-cl::opt<unsigned> KSampleMult("ksamplex", cl::desc("multiplictive factor for ksampling"),cl::init(10));
+extern cl::opt<unsigned> KCenters;
+extern cl::opt<unsigned> KSampleMult;
 
 GSSTree::GSSNode::~GSSNode()
 {

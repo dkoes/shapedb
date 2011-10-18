@@ -13,25 +13,45 @@
 #define GSSTREESTRUCTURES_H_
 
 #include "MappableOctTree.h"
+#include "GSSTypes.h"
+#include <cassert>
 
-typedef unsigned long file_index;
 
-struct GSSTree
+struct GSSDoubleTree
 {
-	file_index object_pos;
-	MappableOctTree tree;
+	unsigned msvOffset;
+	unsigned char data[]; //miv than msv
 
 	//write out tree data in a manner consistent with structure layout
-	static void writeTree(ostream& out, file_index pos, MappableOctTree *tree)
+	static void writeTreeS(ostream& out, MappableOctTree *miv, MappableOctTree *msv)
 	{
-		out.write((char*)&pos, sizeof(file_index));
-		tree->write(out);
+		unsigned p = miv->bytes();
+		out.write((char*)&p, sizeof(unsigned));
+		miv->write(out);
+		msv->write(out);
 	}
+
+	const MappableOctTree* getMIV() const
+	{
+		return (const MappableOctTree*)data;
+	}
+
+	const MappableOctTree* getMSV() const
+	{
+		return (const MappableOctTree*)data[msvOffset];
+	}
+};
+
+//header of leaf and internal nodes
+struct GSSNodeCommon
+{
+	bool isLeaf: 1;
+	unsigned N: 31;
 };
 
 //a GSSLeaf only needs to store a single tree for each object, and the positions
 //are within the object file, not the nodes file
-struct GSSLeaf
+class GSSLeaf
 {
 	struct Child
 	{
@@ -39,16 +59,17 @@ struct GSSLeaf
 		MappableOctTree tree;
 	};
 
-	bool isLeaf: 1;
-	file_index object_pos: 63;
-	unsigned N; //number of objects
-	unsigned tree_positions[]; //variable length, offset of trees after tree_positions
+	GSSNodeCommon info;
+	unsigned child_positions[]; //variable length, offset of trees after tree_positions
+	unsigned char data[]; //convenient data ptr
 
-	static void writeLeaf(ostream& out, const vector<const void*>& trees);
+public:
+	static void writeLeaf(const DataViewer *data, const Cluster& cluster, ostream& outNodes, ostream& outTrees);
+
 };
 
 //a GSSInternalNode stores both the MIV and MSV for each subnode, and points to their locations
-struct GSSInternalNode
+class GSSInternalNode
 {
 	struct Child
 	{
@@ -57,13 +78,18 @@ struct GSSInternalNode
 		unsigned char data[];
 	};
 
-	bool isLeaf: 1;
-	file_index object_pos: 63;
-	unsigned N; //number of objects
-	unsigned node_positions[]; //offset of children after node_positions
+	GSSNodeCommon info;
+	unsigned child_positions[]; //offset of children after node_positions
+	unsigned char data[]; //convienent data pointer
 
-	static void writeLeaf(ostream& out, const vector<const void*>& nodes);
+public:
+	static void writeNode(const DataViewer *data, const Cluster& cluster, ostream& outNodes, ostream& outTrees);
 
 };
+
+
+
+
+
 
 #endif /* GSSTREESTRUCTURES_H_ */

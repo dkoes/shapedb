@@ -16,17 +16,20 @@ class KSamplePartitioner: public TopDownPartitioner
 	unsigned kcenters; //number of centers
 	unsigned ksamples; //sample ksamples*kcenters
 
-	void kCluster(const vector<file_index>& indices, vector< vector<file_index> >& clusters);
+	void kCluster(const vector<unsigned>& indices, vector< vector<unsigned> >& clusters);
 
-	MappableOctTree* computeMIV(const vector<file_index>& ind) const;
-	MappableOctTree* computeMSV(const vector<file_index>& ind) const;
+	MappableOctTree* computeMIV(const vector<unsigned>& ind) const;
+	MappableOctTree* computeMSV(const vector<unsigned>& ind) const;
+
+	virtual TopDownPartitioner* create(const DataViewer* dv, vector<unsigned>& ind) const;
 
 public:
 	KSamplePartitioner(): kcenters(8), ksamples(10) {}
 	KSamplePartitioner(unsigned kc, unsigned ks): kcenters(kc), ksamples(ks) {}
+	KSamplePartitioner(const DataViewer *dv, unsigned kc, unsigned ks): TopDownPartitioner(dv), kcenters(kc), ksamples(ks) {}
 	~KSamplePartitioner() {}
 
-	virtual TopDownPartitioner* create(const DataViewer* dv, const vector<file_index>& indices) const;
+	virtual TopDownPartitioner* create(const DataViewer* dv) const;
 	virtual void partition(vector<TopDownPartitioner*>& parts);
 };
 

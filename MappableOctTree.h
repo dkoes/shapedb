@@ -130,6 +130,11 @@ public:
 	float relativeVolumeDistance(const MappableOctTree * B) const;
 	float absoluteVolumeDistance(const MappableOctTree * B) const;
 
+	unsigned bytes() const
+	{
+		return sizeof(MappableOctTree) + N*sizeof(MOctNode);
+	}
+
 private:
 	template<class Object>
 	static MChildNode create_r(float res, const Cube& cube, const Object& obj,

@@ -6,98 +6,23 @@
  */
 
 #include "GSSTreeCreator.h"
+#include "DataViewers.h"
+#include "TopDownPartitioner.h"
 
-class TreeViewer: public DataViewer
+
+//convience function for creating an indexed path name
+static string nextString(filesystem::path p, const char *base, unsigned i)
 {
-public:
-	TreeViewer(void *data): DataViewer(data)
-	{
-
-	}
-
-	virtual const MappableOctTree* getMSV(file_index i) const
-	{
-		return NULL;
-	}
-
-	virtual const MappableOctTree* getMIV(file_index i) const
-	{
-		return NULL;
-	}
-
-	virtual bool isTree() const
-	{
-		return true;
-	}
-};
-
-class NodeViewer: public DataViewer
-{
-	const char *ptr;
-public:
-	NodeViewer(void *data): DataViewer(data)
-	{
-
-	}
-
-	virtual const MappableOctTree* getMSV(file_index i) const
-	{
-		return NULL;
-	}
-
-	virtual const MappableOctTree* getMIV(file_index i) const
-	{
-		return NULL;
-	}
-
-	virtual bool isTree() const
-	{
-		return false;
-	}
-};
-
-WorkFile::WorkFile(const char *name): map(NULL)
-{
-	file = new ofstream(name);
-	mapping = new file_mapping(name, read_only);
+	stringstream str;
+	str << base << i;
+	return filesystem::path(p/ str.str()).file_string();
 }
-
-WorkFile::~WorkFile()
-{
-	if(file) delete file;
-	if(mapping) delete mapping;
-	if(map) delete map;
-}
-
-void WorkFile::set(const char *name)
-{
-	clear();
-	file = new ofstream(name);
-	mapping = new file_mapping(name, read_only);
-}
-
-void WorkFile::switchToMap()
-{
-	file->close();
-	map = new mapped_region(*mapping, read_only);
-}
-
-//deallocate and reset
-void WorkFile::clear()
-{
-	if(file) delete file;
-	if(mapping) delete mapping;
-	if(map) delete map;
-	file = NULL;
-	mapping = NULL;
-	map = NULL;
-}
-
-
 
 //return true if successfull
-bool GSSTreeCreator::create(filesystem::path dir, Object::iterator itr, float dim, float res)
+bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr, float dim, float res)
 {
+	WorkFile currenttrees;
+	WorkFile nexttrees;
 	//create directory
 	if (!filesystem::create_directory(dir))
 	{
@@ -107,61 +32,62 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator itr, float di
 	dbpath = dir;
 
 	filesystem::path objfile = dbpath / "objs";
-	filesystem::path leavesfile = dbpath / "leaves";
+	string curtreesfile = filesystem::path(dbpath / "trees").file_string();
+	string nexttreesfile = filesystem::path(dbpath / "nexttrees").file_string();
 
 	//write out objects and trees
 	objects.set(objfile.file_string().c_str());
-	trees.set(leavesfile.file_string().c_str());
-	vector<file_index> indices;
+	currenttrees.set(curtreesfile.c_str());
+	vector<file_index> treeindices;
+	vector<file_index> objindices;
 	unsigned cnt = 0;
 	for( ; itr ; ++itr)
 	{
 		const Object& obj = *itr;
-		file_index pos = objects.file->tellp();
+		objindices.push_back((file_index)objects.file->tellp());
 		obj.write(*objects.file);
 
 		//leaf object
-		indices.push_back((file_index)trees.file->tellp());
-
+		treeindices.push_back((file_index)currenttrees.file->tellp());
 		MappableOctTree *tree = MappableOctTree::create(dim, res, obj);
-		GSSTree::writeTree(*trees.file, pos, tree);
+		tree->write(*currenttrees.file);
 		delete tree;
 		cnt++;
 	}
 
 	//partition leaves into bottom level
 	//setup level
-	stringstream levelname;
-	levelname << "level" << nodes.size();
-	filesystem::path nodesfile = dbpath / levelname.str();
-	nodes.push_back(WorkFile(nodesfile.file_string().c_str()));
+	nodes.push_back(WorkFile(nextString(dbpath, "level", nodes.size()).c_str()));
+	vector<file_index> nodeindices; nodeindices.reserve(objindices.size()/2);
+
+	//setup next trees
+	nexttrees.set(nexttreesfile.c_str());
 
 	//map the data
-	trees.switchToMap();
-	TreeViewer leafdata(trees.map->get_address());
+	currenttrees.switchToMap();
+	//this clears the indices
+	LeafViewer leafdata(currenttrees.map->get_address(), treeindices, objindices);
 
-	vector<file_index> nextindices; nextindices.reserve(indices.size()/2);
-	leveler->createNextLevel(leafdata, indices, *nodes.back().file, nextindices);
+	leveler->createNextLevel(leafdata, *nodes.back().file, nodeindices, *nexttrees.file, treeindices);
 
-	while(nextindices.size() > 1)
+	while(nodeindices.size() > 1)
 	{
-		//map current level
-		nodes.back().switchToMap();
-		void *currentLevel = nodes.back().map->get_address();
-		NodeViewer nodedata(currentLevel);
+		//setup curr/next trees
+		currenttrees.remove();
+		swap(currenttrees, nexttrees);
+		currenttrees.switchToMap();
+
+		//this stores and resets the indices
+		NodeViewer nodedata(currenttrees.map->get_address(), treeindices, nodeindices);
 
 		//setup next level
-		levelname.str("level");
-		levelname << nodes.size();
-		nodesfile = dbpath / levelname.str();
-		nodes.push_back(WorkFile(nodesfile.file_string().c_str()));
+		nodes.push_back(WorkFile(nextString(dbpath, "level", nodes.size()).c_str()));
+		nexttrees.set(nextString(dbpath, "trees", nodes.size()).c_str());
 
-		//shuffle indices
-		swap(indices, nextindices);
-		nextindices.clear();
-
-		leveler->createNextLevel(nodedata, indices, *nodes.back().file, nextindices);
+		leveler->createNextLevel(nodedata, *nodes.back().file, nodeindices, *nexttrees.file, treeindices);
 	}
+	currenttrees.remove();
+	nexttrees.remove();
 
 	//output general info
 	filesystem::path infoname = dbpath / "info";
@@ -173,20 +99,22 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator itr, float di
 
 
 //top down partition
-void GSSLevelCreator::createNextLevel(DataViewer& data, const vector<file_index>& indices,
-		ostream& o, vector<file_index>& next)
+void GSSLevelCreator::createNextLevel(DataViewer& data, ostream& nodefile, vector<file_index>& nodeindices,
+		ostream& treefile, vector<file_index>& treeindices)
 {
-	if(indices.size() == 0)
+	if(data.size() == 0)
 		return;
 
-	TopDownPartitioner *thispart = partitioner->create(&data, indices);
+	TopDownPartitioner *thispart = partitioner->create(&data);
 
 	packingSize = nodePack;
-	if(data.isTree()) //making leaf nodes
+	if(data.isLeaf()) //making leaf nodes
 		packingSize = leafPack;
 
-	out = &o;
-	nextindices = &next;
+	outNodes = &nodefile;
+	outTrees = &treefile;
+	nodeIndices = &nodeindices;
+	treeIndices = &treeindices;
 	//recursively partition
 	createNextLevelR(thispart);
 	delete thispart;
@@ -200,32 +128,27 @@ void GSSLevelCreator::createNextLevelR(TopDownPartitioner *P)
 	if(P->size() <= packingSize)
 	{
 		//bottom up pack
-		vector<Packer::Cluster> clusters;
-		vector<file_index> indices;
+		const DataViewer* data = P->getData();
+		vector<Cluster> clusters;
+		vector<unsigned> indices;
 		P->extractIndicies(indices);
-		packer->pack(P->getData(), indices, clusters);
-		vector<const void*> children;
+		packer->pack(data, indices, clusters);
+
+		//each cluster creates a new node
 		for(unsigned c = 0, nc = clusters.size(); c < nc; c++)
 		{
-			children.clear();
-			children.reserve(clusters[c].indices.size());
-			for(unsigned i = 0, n = clusters[c].indices.size(); i < n; i++)
+			//write out node
+			nodeIndices->push_back((file_index)outNodes->tellp());
+			treeIndices->push_back((file_index)outTrees->tellp());
+			if(data->isLeaf())
 			{
-				file_index index = clusters[c].indices[i];
-				children.push_back(P->getData()->getAddress(index));
+				//the children are all single trees
+				GSSLeaf::writeLeaf(data, clusters[c], *outNodes, *outTrees);
 			}
-
-		}
-
-		nextindices->push_back((file_index)out->tellp());
-		if(P->getData()->isTree())
-		{
-			//creating leaves from trees
-			GSSLeaf::writeLeaf(*out, children);
-		}
-		else
-		{
-			GSSInternalNode::writeNode(*out, children);
+			else
+			{
+				GSSInternalNode::writeNode(data, clusters[c], *outNodes, *outTrees);
+			}
 		}
 	}
 	else
