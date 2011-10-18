@@ -7,18 +7,18 @@
 
 #include "WorkFile.h"
 #include <fstream>
+#include <iostream>
 
 WorkFile::WorkFile(const char *name): map(NULL)
 {
 	file = new ofstream(name);
+	assert(*file);
 	mapping = new file_mapping(name, read_only);
 }
 
 WorkFile::~WorkFile()
 {
-	if(file) delete file;
-	if(mapping) delete mapping;
-	if(map) delete map;
+	//these must be manually cleared
 }
 
 void WorkFile::set(const char *name)

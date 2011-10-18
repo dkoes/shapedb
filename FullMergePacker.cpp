@@ -65,7 +65,7 @@ bool FullMergePacker::fullMergeClusters(const DataViewer *D, vector<Cluster>& cl
 	}
 	sort(distances.begin(), distances.end());
 
-	vector<Cluster> newclusters; newclusters.reserve(N/2);
+	vector<Cluster> newclusters; newclusters.reserve(N/2+1);
 	unsigned merged = 0;
 	bool didmerge = false;
 	for(unsigned d = 0, maxdists = distances.size(); d < maxdists; d++)

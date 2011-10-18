@@ -47,7 +47,9 @@ MappableOctTree* KSamplePartitioner::computeMSV(const vector<unsigned>& ind) con
 	{
 		trees[i] = data->getMSV(ind[i]);
 	}
-	return MappableOctTree::createFromUnion(ind.size(), trees);
+	MappableOctTree* ret = MappableOctTree::createFromUnion(ind.size(), trees);
+
+	return ret;
 }
 
 void KSamplePartitioner::partition(vector<TopDownPartitioner*>& parts)
@@ -77,8 +79,8 @@ void KSamplePartitioner::partition(vector<TopDownPartitioner*>& parts)
 	partitions.resize(clusters.size());
 	for(unsigned i = 0, n = clusters.size(); i < n; i++)
 	{
-		MSVcenters.push_back(computeMIV(clusters[i]));
-		MIVcenters.push_back(computeMSV(clusters[i]));
+		MIVcenters.push_back(computeMIV(clusters[i]));
+		MSVcenters.push_back(computeMSV(clusters[i]));
 	}
 
 	unsigned numclusters = clusters.size();

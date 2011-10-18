@@ -39,6 +39,7 @@
 #include <fstream>
 #include <vector>
 
+#include "GSSTypes.h"
 #include "GSSTreeStructures.h"
 #include "TopDownPartitioner.h"
 #include "Packer.h"
@@ -48,8 +49,8 @@ using namespace std;
 
 #include "WorkFile.h"
 #include "Molecule.h"
-typedef Molecule Object;
 
+typedef Molecule Object; //eventually template this
 
 
 //class for creating levels, follows the CM-tree bulk loading algorithm,
@@ -78,8 +79,8 @@ public:
 
 	virtual ~GSSLevelCreator() {}
 
-	virtual void createNextLevel(DataViewer& data, ostream& nodefile, vector<file_index>& nodeindices,
-			ostream& treefile, vector<file_index>& treeindices);
+	virtual void createNextLevel(DataViewer& data, ostream* nodefile, vector<file_index>& nodeindices,
+			ostream* treefile, vector<file_index>& treeindices);
 };
 
 class GSSTreeCreator

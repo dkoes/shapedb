@@ -27,6 +27,22 @@ struct Cluster
 
 	Cluster(): MIV(NULL), MSV(NULL) {}
 
+	Cluster(const Cluster& rhs): MIV(NULL), MSV(NULL)
+	{
+		indices = rhs.indices;
+		if(rhs.MIV) MIV = rhs.MIV->clone();
+		if(rhs.MSV) MSV = rhs.MSV->clone();
+	}
+
+	friend void swap(Cluster& first, Cluster& second)
+	{
+		// enable ADL (not necessary in our case, but good practice)
+		using std::swap;
+		swap(first.indices, second.indices);
+		swap(first.MIV, second.MIV);
+		swap(first.MSV, second.MSV);
+	}
+
 	void setToSingleton(unsigned i, const MappableOctTree* miv, const MappableOctTree* msv)
 	{
 		clear();

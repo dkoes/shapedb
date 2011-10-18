@@ -89,14 +89,16 @@ MChildNode MappableOctTree::createFrom_r(unsigned N, MChildNode* nodes, const Ma
 			newtree[pos].children[i] = nchild;
 			if(nchild.isLeaf)
 			{
-				if(nchild.isFull) numFull++;
-				else numEmpty++;
+				if(nchild.isFull)
+					numFull++;
+				else
+					numEmpty++;
 			}
 
 			ret.vol += nchild.volume();
 		}
 
-		if(numEmpty == n)
+		if(numEmpty == 8)
 		{
 			newtree.pop_back();
 			ret.isLeaf = true;
@@ -104,7 +106,7 @@ MChildNode MappableOctTree::createFrom_r(unsigned N, MChildNode* nodes, const Ma
 			ret.index = 0;
 			ret.vol = 0;
 		}
-		else if(numFull == n)
+		else if(numFull == 8)
 		{
 			newtree.pop_back();
 			ret.isLeaf = true;

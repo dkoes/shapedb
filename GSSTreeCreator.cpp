@@ -24,6 +24,11 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr, float d
 	WorkFile currenttrees;
 	WorkFile nexttrees;
 	//create directory
+	if(filesystem::exists(dir))
+	{
+		cerr << dir << " already exists.  Exiting\n";
+		return false;
+	}
 	if (!filesystem::create_directory(dir))
 	{
 		cerr << "Unable to create database directory ";
@@ -58,6 +63,7 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr, float d
 	//partition leaves into bottom level
 	//setup level
 	nodes.push_back(WorkFile(nextString(dbpath, "level", nodes.size()).c_str()));
+
 	vector<file_index> nodeindices; nodeindices.reserve(objindices.size()/2);
 
 	//setup next trees
@@ -67,8 +73,7 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr, float d
 	currenttrees.switchToMap();
 	//this clears the indices
 	LeafViewer leafdata(currenttrees.map->get_address(), treeindices, objindices);
-
-	leveler->createNextLevel(leafdata, *nodes.back().file, nodeindices, *nexttrees.file, treeindices);
+	leveler->createNextLevel(leafdata, nodes.back().file, nodeindices, nexttrees.file, treeindices);
 
 	while(nodeindices.size() > 1)
 	{
@@ -82,25 +87,32 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr, float d
 
 		//setup next level
 		nodes.push_back(WorkFile(nextString(dbpath, "level", nodes.size()).c_str()));
+
 		nexttrees.set(nextString(dbpath, "trees", nodes.size()).c_str());
 
-		leveler->createNextLevel(nodedata, *nodes.back().file, nodeindices, *nexttrees.file, treeindices);
+		leveler->createNextLevel(nodedata, nodes.back().file, nodeindices, nexttrees.file, treeindices);
 	}
 	currenttrees.remove();
 	nexttrees.remove();
+
 
 	//output general info
 	filesystem::path infoname = dbpath / "info";
 	ofstream info(infoname.file_string().c_str());
 	info << dim <<" " << res <<" " << nodes.size() << " " << cnt << "\n";
 
+	//clear workfile memory
+	for(unsigned i = 0, n = nodes.size(); i < n; i++)
+	{
+		nodes[i].clear();
+	}
 	return true;
 }
 
 
 //top down partition
-void GSSLevelCreator::createNextLevel(DataViewer& data, ostream& nodefile, vector<file_index>& nodeindices,
-		ostream& treefile, vector<file_index>& treeindices)
+void GSSLevelCreator::createNextLevel(DataViewer& data, ostream* nodefile, vector<file_index>& nodeindices,
+		ostream* treefile, vector<file_index>& treeindices)
 {
 	if(data.size() == 0)
 		return;
@@ -111,8 +123,8 @@ void GSSLevelCreator::createNextLevel(DataViewer& data, ostream& nodefile, vecto
 	if(data.isLeaf()) //making leaf nodes
 		packingSize = leafPack;
 
-	outNodes = &nodefile;
-	outTrees = &treefile;
+	outNodes = nodefile;
+	outTrees = treefile;
 	nodeIndices = &nodeindices;
 	treeIndices = &treeindices;
 	//recursively partition

@@ -38,7 +38,7 @@ struct GSSDoubleTree
 
 	const MappableOctTree* getMSV() const
 	{
-		return (const MappableOctTree*)data[msvOffset];
+		return (const MappableOctTree*)&data[msvOffset];
 	}
 };
 
