@@ -68,6 +68,7 @@ public:
 	static void writeLeaf(const DataViewer *data, const Cluster& cluster, ostream& outNodes, ostream& outTrees);
 	const Child* getChild(unsigned i) const { return (Child*)&data[child_positions[i]]; }
 	unsigned size() const { return info.N; }
+	unsigned bytes() const;
 };
 
 //a GSSInternalNode stores both the MIV and MSV for each subnode, and points to their locations

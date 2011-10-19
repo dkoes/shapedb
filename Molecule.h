@@ -39,6 +39,8 @@ public:
 	Molecule() {}
 	~Molecule() {}
 
+	Molecule(const vector<MolSphere>& sph): spheres(sph) {}
+
 	Molecule(const char *data)
 	{
 		oemolistream inm;
@@ -83,6 +85,11 @@ public:
 		unsigned n = mstr.length();
 
 		out.write(mstr.c_str(), n);
+	}
+
+	void writeMol(oemolostream& out) const
+	{
+		OEWriteMolecule(out, mol);
 	}
 };
 

@@ -9,6 +9,7 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 #include "MappableOctTree.h"
+#include "Timer.h"
 
 //load a gsstree database by mmapping files, return true if successfull
 bool GSSTreeSearcher::load(const filesystem::path& dbpath)
@@ -74,7 +75,7 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
 	const MappableOctTree *bigTree = MappableOctTree::create(dimension, resolution, bigObj);
 
 	const GSSNodeCommon* root = (GSSNodeCommon*)nodes.back().begin();
-
+	Timer t;
 	vector<file_index> respos;
 	findTweeners(root, nodes.size()-1, smallTree, bigTree, respos);
 
@@ -86,6 +87,10 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
 		res.push_back(Object(addr));
 	}
 
+	if(verbose)
+	{
+		cout << "Found " << res.size() << " objects out of " << total << " in " << t.elapsed() << "s\n";
+	}
 	delete smallTree;
 	delete bigTree;
 }
@@ -94,7 +99,6 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
 static bool fitsInbetween(const MappableOctTree *MIV, const MappableOctTree *MSV,
 		const MappableOctTree  *min, const MappableOctTree *max)
 {
-	//TODO: more efficient
 	//the MSV must completely enclose min
 	if (!min->containedIn(MSV))
 		return false;
@@ -104,6 +108,42 @@ static bool fitsInbetween(const MappableOctTree *MIV, const MappableOctTree *MSV
 
 	return true;
 }
+
+
+//find everyting between small and big using linear scan
+void GSSTreeSearcher::dc_scan_search(const Object& smallObj, const Object& bigObj,
+		vector<Object>& res)
+{
+	res.clear();
+	const MappableOctTree *smallTree = MappableOctTree::create(dimension, resolution, smallObj);
+	const MappableOctTree *bigTree = MappableOctTree::create(dimension, resolution, bigObj);
+
+	const GSSLeaf* leaf = (GSSLeaf*)nodes.front().begin();
+	const GSSLeaf* end = (GSSLeaf*)nodes.front().end();
+
+	Timer t;
+	vector<file_index> respos;
+	for( ; leaf != end; leaf = (const GSSLeaf*)((char*)leaf + leaf->bytes()))
+	{
+		findTweeners(leaf, smallTree, bigTree, respos);
+	}
+
+	//extract objects in sequential order
+	sort(respos.begin(), respos.end());
+	for(unsigned i = 0, n = respos.size(); i < n; i++)
+	{
+		const char * addr = objects.begin()+respos[i];
+		res.push_back(Object(addr));
+	}
+
+	if(verbose)
+	{
+		cout << "Scanned " << res.size() << " objects out of " << total << " in " << t.elapsed() << "s\n";
+	}
+	delete smallTree;
+	delete bigTree;
+}
+
 
 //dispatch between leaf and internal node
 void GSSTreeSearcher::findTweeners(const GSSNodeCommon* node, unsigned level, const MappableOctTree* min, const MappableOctTree* max, vector<file_index>& respos)
@@ -117,7 +157,7 @@ void GSSTreeSearcher::findTweeners(const GSSNodeCommon* node, unsigned level, co
 void GSSTreeSearcher::findTweeners(const GSSInternalNode* node, unsigned level, const MappableOctTree* min, const MappableOctTree* max, vector<file_index>& respos)
 {
 	unsigned nextlevel = level-1;
-	assert(nextlevel > 0); //otherwise shoudl be leaf
+	assert(level > 0); //otherwise shoudl be leaf
 	for(unsigned i = 0, n = node->size(); i < n; i++)
 	{
 		const GSSInternalNode::Child *child = node->getChild(i);

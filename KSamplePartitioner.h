@@ -13,18 +13,22 @@
 
 class KSamplePartitioner: public TopDownPartitioner
 {
+public:
+	enum CenterChoice {AveCenter, MinMaxCenter};
+private:
 	unsigned kcenters; //number of centers
 	unsigned ksamples; //sample ksamples*kcenters
+	CenterChoice centerFind; //algorithm for choosing center of a sampled cluster
 
 	void kCluster(const vector<unsigned>& indices, vector< vector<unsigned> >& clusters);
 
-	MappableOctTree* computeMIV(const vector<unsigned>& ind) const;
-	MappableOctTree* computeMSV(const vector<unsigned>& ind) const;
+	void getCenter(const vector<unsigned>& cluster, const MappableOctTree *& MIV, const MappableOctTree *& MSV) const;
+
 
 	virtual TopDownPartitioner* create(const DataViewer* dv, vector<unsigned>& ind) const;
 
 public:
-	KSamplePartitioner(): kcenters(8), ksamples(10) {}
+	KSamplePartitioner(): kcenters(8), ksamples(10), centerFind(AveCenter) {}
 	KSamplePartitioner(unsigned kc, unsigned ks): kcenters(kc), ksamples(ks) {}
 	KSamplePartitioner(const DataViewer *dv, unsigned kc, unsigned ks): TopDownPartitioner(dv), kcenters(kc), ksamples(ks) {}
 	~KSamplePartitioner() {}

@@ -51,6 +51,8 @@ cl::opt<CommandEnum>
 				clEnumVal(DCSearch, "Distance constraint search"),
 				clEnumValEnd) );
 
+cl::opt<bool> ScanCheck("scancheck",
+		cl::desc("Perform a full scan to check results"), cl::Hidden);
 
 cl::opt<string> Input("in", cl::desc("Input file"));
 cl::opt<string> Output("out", cl::desc("Output file"));
@@ -93,17 +95,6 @@ static void spherizeMol(OEMol& mol, vector<MolSphere>& spheres)
 
 }
 
-static void outputRes(ostream& out, const vector<MolSphere>& res)
-{
-	//just output in xyz w/o radii
-	out << res.size();
-	out << "\nTestShapeOutput\n";
-	for (unsigned i = 0, n = res.size(); i < n; i++)
-	{
-		out << "C " << res[i].x << " " << res[i].y << " "
-				<< res[i].z << "\n";
-	}
-}
 
 int main(int argc, char *argv[])
 {
@@ -155,7 +146,7 @@ int main(int argc, char *argv[])
 	{
 		//read in database
 		filesystem::path dbfile(Database.c_str());
-		GSSTreeSearcher gss;
+		GSSTreeSearcher gss(Verbose);
 
 		if(!gss.load(dbfile))
 		{
@@ -163,7 +154,6 @@ int main(int argc, char *argv[])
 			exit(-1);
 		}
 
-		ofstream out(Output.c_str());
 
 		//read query molecule(s)
 		if(IncludeMol.size() > 0 || ExcludeMol.size() > 0)
@@ -200,13 +190,24 @@ int main(int argc, char *argv[])
 				}
 			}
 
-			vector<vector<MolSphere> > res;
+			vector<Molecule> res;
 
-			//TODO: search
+			//search
+			gss.dc_search(Molecule(insphere), Molecule(exsphere), res);
 
-			//just output in xyz w/o radii
+			if(ScanCheck)
+			{
+				vector<Molecule> res2;
+				gss.dc_scan_search(Molecule(insphere), Molecule(exsphere), res2);
+				if(res2.size() != res.size())
+				{
+					cerr << "Scanning found different number\n";
+				}
+			}
+
+			oemolostream out(Output.c_str());
 			for (unsigned i = 0, n = res.size(); i < n; i++)
-				outputRes(out, res[i]);
+				res[i].writeMol(out);
 		}
 		else // range from single molecules
 		{
@@ -225,12 +226,23 @@ int main(int argc, char *argv[])
 					bigspheres[i].incrementRadius(MoreDist);
 				}
 
-				vector<vector<MolSphere> > res;
-				//TODO: search
+				vector<Molecule > res;
+				//search
+				gss.dc_search(Molecule(littlespheres), Molecule(bigspheres), res);
 
-				//just output in xyz w/o radii
+				if(ScanCheck)
+				{
+					vector<Molecule> res2;
+					gss.dc_scan_search(Molecule(littlespheres), Molecule(bigspheres), res2);
+					if(res2.size() != res.size())
+					{
+						cerr << "Scanning found different number\n";
+					}
+				}
+
+				oemolostream out(Output.c_str());
 				for (unsigned i = 0, n = res.size(); i < n; i++)
-					outputRes(out, res[i]);
+					res[i].writeMol(out);
 			}
 		}
 	}

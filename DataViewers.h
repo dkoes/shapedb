@@ -77,10 +77,13 @@ struct Cluster
 		copy(a.indices.begin(), a.indices.end(), inserter(indices, indices.end()));
 		const MappableOctTree *itrees[2] = {MIV, a.MIV};
 		MIV = MappableOctTree::createFromIntersection(2, itrees);
+
 		free((void*)itrees[0]);
 
 		const MappableOctTree *utrees[2] = {MSV, a.MSV};
 		MSV = MappableOctTree::createFromUnion(2, utrees);
+
+
 		free((void*)utrees[0]);
 
 		a.clear();

@@ -28,29 +28,70 @@ TopDownPartitioner* KSamplePartitioner::create(const DataViewer* dv, vector<unsi
 	return ret;
 }
 
-//take the intersection of everything represented by ind
-MappableOctTree* KSamplePartitioner::computeMIV(const vector<unsigned>& ind) const
+
+
+//find the SINGLE value that is most central in cluster
+//this is assumed to be a small partition since we calculate all n^2 distances
+void KSamplePartitioner::getCenter(const vector<unsigned>& cluster, const MappableOctTree *& MIV, const MappableOctTree *& MSV) const
 {
-	const MappableOctTree* trees[ind.size()];
-	for(unsigned i = 0, n = ind.size(); i < n; i++)
+	unsigned N = cluster.size();
+	boost::multi_array<float, 2> distances(boost::extents[N][N]);
+
+	//compute distances
+	for (unsigned i = 0; i < N; i++)
 	{
-		trees[i] = data->getMIV(ind[i]);
+		distances[i][i] = 0;
+		const MappableOctTree *imiv = data->getMIV(cluster[i]);
+		const MappableOctTree *imsv = data->getMSV(cluster[i]);
+		for (unsigned j = 0; j < i; j++)
+		{
+			const MappableOctTree *jmiv = data->getMIV(cluster[j]);
+			const MappableOctTree *jmsv = data->getMSV(cluster[j]);
+			distances[i][j] = distances[j][i] = shapeDistance(imiv, imsv, jmiv,
+						jmsv);
+		}
 	}
-	return MappableOctTree::createFromIntersection(ind.size(), trees);
+
+	//what is most central?  the row with the lowest average?
+	//or the minimum maximum value?
+	float bestave = HUGE_VAL;
+	unsigned bestavei = 0;
+	float minmaxval = HUGE_VAL;
+	unsigned minmaxi = 0;
+	for (unsigned i = 0; i < N; i++)
+	{
+		float ave = 0;
+		float max = 0;
+		for(unsigned j = 0; j < N; j++)
+		{
+			ave += distances[i][j];
+			if(distances[i][j] > max)
+				max = distances[i][j];
+		}
+		ave /= N;
+
+		if(ave < bestave)
+		{
+			bestave = ave;
+			bestavei = i;
+		}
+		if(max < minmaxval)
+		{
+			minmaxval = max;
+			minmaxi = i;
+		}
+	}
+
+	unsigned best;
+	if(centerFind == AveCenter)
+		best = bestavei;
+	else
+		best = minmaxi;
+
+	MIV = data->getMIV(cluster[best]);
+	MSV = data->getMSV(cluster[best]);
 }
 
-//take the union of everything represented by ind
-MappableOctTree* KSamplePartitioner::computeMSV(const vector<unsigned>& ind) const
-{
-	const MappableOctTree* trees[ind.size()];
-	for(unsigned i = 0, n = ind.size(); i < n; i++)
-	{
-		trees[i] = data->getMSV(ind[i]);
-	}
-	MappableOctTree* ret = MappableOctTree::createFromUnion(ind.size(), trees);
-
-	return ret;
-}
 
 void KSamplePartitioner::partition(vector<TopDownPartitioner*>& parts)
 {
@@ -72,18 +113,18 @@ void KSamplePartitioner::partition(vector<TopDownPartitioner*>& parts)
 	kCluster(sampleIndices, clusters);
 
 	//compute cluster "centers": MIV/MSV
-	vector<const MappableOctTree*> MSVcenters; MSVcenters.reserve(kcenters);
-	vector<const MappableOctTree*> MIVcenters; MIVcenters.reserve(kcenters);
+	unsigned numclusters = clusters.size();
 
-	vector< vector<unsigned> > partitions;
-	partitions.resize(clusters.size());
+	vector<const MappableOctTree*> MSVcenters(numclusters, NULL);
+	vector<const MappableOctTree*> MIVcenters(numclusters, NULL);
 	for(unsigned i = 0, n = clusters.size(); i < n; i++)
 	{
-		MIVcenters.push_back(computeMIV(clusters[i]));
-		MSVcenters.push_back(computeMSV(clusters[i]));
+		getCenter(clusters[i], MIVcenters[i], MSVcenters[i]);
 	}
 
-	unsigned numclusters = clusters.size();
+	vector< vector<unsigned> > partitions;
+	partitions.resize(numclusters);
+
 	//now add each data iterm to the cluster whose center it is closest to
 	for (unsigned i = 0, n = indices.size(); i < n; i++)
 	{
@@ -142,12 +183,6 @@ void KSamplePartitioner::partition(vector<TopDownPartitioner*>& parts)
 		}
 	}
 
-	//clear memory
-	for(unsigned i = 0; i < numclusters; i++)
-	{
-		delete MIVcenters[i];
-		delete MSVcenters[i];
-	}
 }
 
 
@@ -157,6 +192,7 @@ void KSamplePartitioner::kCluster(const vector<unsigned>& indices, vector< vecto
 	//compute pairwise distances between all members
 	unsigned N = indices.size();
 	boost::multi_array<float, 2> distances(boost::extents[N][N]);
+	//compute distances indicesed by position in indices
 	clusters.clear();
 	clusters.reserve(1 + N);
 	for (unsigned i = 0; i < N; i++)
@@ -220,6 +256,16 @@ void KSamplePartitioner::kCluster(const vector<unsigned>& indices, vector< vecto
 		clusters[last - 1].insert(clusters[last - 1].end(), clusters[last].begin(),
 				clusters[last].end());
 		clusters.pop_back(); //remove
+	}
+
+	//clusters is now populated with indicies into indices
+	//replace with actual indices
+	for(unsigned i = 0, n = clusters.size(); i < n; i++)
+	{
+		for(unsigned j = 0, m = clusters[i].size(); j < m; j++)
+		{
+			clusters[i][j] = indices[clusters[i][j]];
+		}
 	}
 
 }

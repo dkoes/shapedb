@@ -19,8 +19,7 @@
 
 using namespace std;
 
-cl::opt<bool> ScanCheck("scancheck",
-		cl::desc("Perform a full scan to check results"), cl::Hidden);
+extern cl::opt<bool> ScanCheck;
 cl::opt<unsigned> KBestInsertion("kinsert",
 		cl::desc("Evaluate k insertion points"), cl::value_desc("k"),
 		cl::init(0));

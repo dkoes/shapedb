@@ -30,6 +30,7 @@ public:
 	operator void*() const { return addr; }
 
 	const char * begin() const { return (const char*)addr; }
+	const char * end() const { return (const char*)addr + size; }
 	void clear();
 };
 

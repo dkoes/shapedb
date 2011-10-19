@@ -48,6 +48,11 @@ public:
 	//return everything with a shape between smallObj and bigObj
 	void dc_search(const Object& smallObj, const Object& bigObj,
 			vector<Object>& res);
+
+	//linear scan
+	void dc_scan_search(const Object& smallObj, const Object& bigObj,
+			vector<Object>& res);
+
 };
 
 #endif /* GSSTREESEARCHER_H_ */

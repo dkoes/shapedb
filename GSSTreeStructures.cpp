@@ -52,7 +52,7 @@ void GSSLeaf::writeLeaf(const DataViewer *data, const Cluster& cluster, ostream&
 void GSSInternalNode::writeNode(const DataViewer *data, const Cluster& cluster, ostream& outNodes, ostream& outTrees)
 {
 	GSSNodeCommon info;
-	info.isLeaf = true;
+	info.isLeaf = false;
 	info.N = cluster.size();
 
 	unsigned positions[info.N];
@@ -66,7 +66,7 @@ void GSSInternalNode::writeNode(const DataViewer *data, const Cluster& cluster, 
 		unsigned ind = cluster[i];
 		positions[i] = curoffset;
 		const MappableOctTree *miv = data->getMIV(ind);
-		const MappableOctTree *msv = data->getMIV(ind);
+		const MappableOctTree *msv = data->getMSV(ind);
 		curoffset += sizeof(file_index);
 		curoffset += sizeof(unsigned);
 		curoffset += miv->bytes();
@@ -86,7 +86,7 @@ void GSSInternalNode::writeNode(const DataViewer *data, const Cluster& cluster, 
 
 		//and both trees
 		const MappableOctTree *miv = data->getMIV(ind);
-		const MappableOctTree *msv = data->getMIV(ind);
+		const MappableOctTree *msv = data->getMSV(ind);
 		unsigned offset = miv->bytes();
 		outNodes.write((char*)&offset, sizeof(offset));
 		miv->write(outNodes);
@@ -101,3 +101,16 @@ void GSSInternalNode::writeNode(const DataViewer *data, const Cluster& cluster, 
 	cluster.MSV->write(outTrees);
 
 }
+
+unsigned GSSLeaf::bytes() const
+{
+	unsigned ret = sizeof(info);
+	if(info.N == 0) return ret;
+	ret += child_positions[info.N-1]; //offset to last child
+	const Child* child = (const Child*)&data[child_positions[info.N-1]];
+	//add size of last child
+	ret += sizeof(file_index);
+	ret += child->tree.bytes();
+	return ret;
+}
+
