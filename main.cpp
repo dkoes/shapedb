@@ -16,11 +16,10 @@
  coordinate system.  (But main will take in molecules).
  */
 
-#define BOOST_FILESYSTEM_VERSION 2
 
 #include <iostream>
 #include <string>
-#include "boost/filesystem.hpp"
+#include "GSSTypes.h"
 #include "boost/array.hpp"
 #include "openeye.h"
 #include "oechem.h"
@@ -28,6 +27,7 @@
 
 #include "CommandLine2/CommandLine.h"
 #include "GSSTreeCreator.h"
+#include "GSSTreeSearcher.h"
 #include "Molecule.h"
 #include "KSamplePartitioner.h"
 #include "FullMergePacker.h"
@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
 
 		GSSTreeCreator creator(&leveler);
 
-		filesystem::path dbpath(Database);
+		filesystem::path dbpath(Database.c_str());
 		Molecule::iterator molitr(Input);
 		if(!creator.create(dbpath, molitr, MaxDimension, Resolution))
 		{
@@ -154,14 +154,14 @@ int main(int argc, char *argv[])
 	case DCSearch:
 	{
 		//read in database
-		ifstream dbfile(Database.c_str());
-		if(!dbfile)
+		filesystem::path dbfile(Database.c_str());
+		GSSTreeSearcher gss;
+
+		if(!gss.load(dbfile))
 		{
 			cerr << "Could not read database " << Database << "\n";
 			exit(-1);
 		}
-		//TODO: load db
-
 
 		ofstream out(Output.c_str());
 

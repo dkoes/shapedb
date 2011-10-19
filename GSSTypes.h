@@ -10,9 +10,13 @@
 #ifndef GSSTYPES_H_
 #define GSSTYPES_H_
 
+#define BOOST_FILESYSTEM_VERSION 3
+
+#include <boost/filesystem.hpp>
 #include <vector>
 #include <cassert>
 using namespace std;
+using namespace boost;
 
 typedef unsigned long file_index;
 

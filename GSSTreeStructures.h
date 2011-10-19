@@ -53,38 +53,46 @@ struct GSSNodeCommon
 //are within the object file, not the nodes file
 class GSSLeaf
 {
+public:
 	struct Child
 	{
 		file_index object_pos;
 		MappableOctTree tree;
 	};
-
+private:
 	GSSNodeCommon info;
-	unsigned child_positions[]; //variable length, offset of trees after tree_positions
+	unsigned child_positions[]; //variable length, offset of trees within data section
 	unsigned char data[]; //convenient data ptr
 
 public:
 	static void writeLeaf(const DataViewer *data, const Cluster& cluster, ostream& outNodes, ostream& outTrees);
-
+	const Child* getChild(unsigned i) const { return (Child*)&data[child_positions[i]]; }
+	unsigned size() const { return info.N; }
 };
 
 //a GSSInternalNode stores both the MIV and MSV for each subnode, and points to their locations
 class GSSInternalNode
 {
+public:
 	struct Child
 	{
 		file_index node_pos;
+	private:
 		unsigned MSVindex; //where in data MSV starts (MIV at 0)
 		unsigned char data[];
+	public:
+		const MappableOctTree* getMIV() const { return (const MappableOctTree*)data; }
+		const MappableOctTree* getMSV() const { return (MappableOctTree*)&data[MSVindex];}
 	};
-
+private:
 	GSSNodeCommon info;
-	unsigned child_positions[]; //offset of children after node_positions
+	unsigned child_positions[]; //offset of children within data section
 	unsigned char data[]; //convienent data pointer
 
 public:
 	static void writeNode(const DataViewer *data, const Cluster& cluster, ostream& outNodes, ostream& outTrees);
-
+	const Child* getChild(unsigned i) const { return (Child*)&data[child_positions[i]]; }
+	unsigned size() const { return info.N; }
 };
 
 

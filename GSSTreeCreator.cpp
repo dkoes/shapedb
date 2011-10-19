@@ -15,7 +15,7 @@ static string nextString(filesystem::path p, const char *base, unsigned i)
 {
 	stringstream str;
 	str << base << i;
-	return filesystem::path(p/ str.str()).file_string();
+	return filesystem::path(p/ str.str()).string();
 }
 
 //return true if successfull
@@ -37,11 +37,11 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr, float d
 	dbpath = dir;
 
 	filesystem::path objfile = dbpath / "objs";
-	string curtreesfile = filesystem::path(dbpath / "trees").file_string();
-	string nexttreesfile = filesystem::path(dbpath / "nexttrees").file_string();
+	string curtreesfile = filesystem::path(dbpath / "trees").string();
+	string nexttreesfile = filesystem::path(dbpath / "nexttrees").string();
 
 	//write out objects and trees
-	objects.set(objfile.file_string().c_str());
+	objects.set(objfile.string().c_str());
 	currenttrees.set(curtreesfile.c_str());
 	vector<file_index> treeindices;
 	vector<file_index> objindices;
@@ -98,7 +98,7 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr, float d
 
 	//output general info
 	filesystem::path infoname = dbpath / "info";
-	ofstream info(infoname.file_string().c_str());
+	ofstream info(infoname.string().c_str());
 	info << dim <<" " << res <<" " << nodes.size() << " " << cnt << "\n";
 
 	//clear workfile memory

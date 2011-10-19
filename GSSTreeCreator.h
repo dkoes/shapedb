@@ -34,7 +34,6 @@
 #define GSSTREECREATOR_H_
 
 
-#include <boost/filesystem.hpp>
 #include <iostream>
 #include <fstream>
 #include <vector>
