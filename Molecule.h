@@ -46,7 +46,12 @@ public:
 		oemolistream inm;
 		inm.SetFormat(OEFormat::OEB);
 		inm.Setgz(true);
-		inm.openstring(data);
+
+		unsigned n = 0;
+		memcpy(&n, data, sizeof(unsigned));
+		const unsigned char* mdata = (const unsigned char*)data+sizeof(unsigned);
+
+		inm.openstring(mdata, n);
 		OEReadMolecule(inm, mol);
 
 		//don't bother with spheres
@@ -83,7 +88,7 @@ public:
 		OEWriteMolecule(ostr, mol);
 		const string& mstr = ostr.GetString();
 		unsigned n = mstr.length();
-
+		out.write((char*)&n, sizeof(unsigned));
 		out.write(mstr.c_str(), n);
 	}
 
