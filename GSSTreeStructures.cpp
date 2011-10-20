@@ -135,3 +135,10 @@ unsigned GSSInternalNode::bytes() const
 	return ret;
 }
 
+void GSSInternalNode::setChildPos(unsigned i, file_index newpos)
+{
+	Child *child =  (Child*)&data[child_positions[i]];
+	child->node_pos = newpos;
+}
+
+

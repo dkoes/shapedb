@@ -97,6 +97,8 @@ public:
 	const Child* getChild(unsigned i) const { return (Child*)&data[child_positions[i]]; }
 	unsigned size() const { return info.N; }
 	unsigned bytes() const;
+
+	void setChildPos(unsigned i, file_index newpos);
 };
 
 
