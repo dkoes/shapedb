@@ -36,6 +36,9 @@ class GSSTreeSearcher
 	void findTweeners(const GSSInternalNode* node, unsigned level, const MappableOctTree* min, const MappableOctTree* max, vector<file_index>& res);
 	void findTweeners(const GSSLeaf* node, const MappableOctTree* min, const MappableOctTree* max, vector<file_index>& res);
 
+	unsigned fitsCheck;
+	bool fitsInbetween(const MappableOctTree *MIV, const MappableOctTree *MSV,
+			const MappableOctTree  *min, const MappableOctTree *max);
 public:
 	GSSTreeSearcher(bool v = false): verbose(v), total(0) {}
 

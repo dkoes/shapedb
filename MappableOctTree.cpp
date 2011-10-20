@@ -21,44 +21,47 @@ MappableOctTree* MappableOctTree::clone() const
 
 MChildNode MappableOctTree::createFrom_r(unsigned N, MChildNode* nodes, const MappableOctTree** trees, vector<MOctNode>& newtree, bool isUnion)
 {
-	unsigned numEmpty = 0, numFull = 0;
-
-
-	float fullVol = 0;
+	float bitvol = 0;
+	unsigned numFilled = 0;
+	unsigned andpat = 0xff, orpat = 0;
 	for(unsigned i = 0; i < N; i++)
 	{
 		if(nodes[i].isLeaf)
 		{
-			if(nodes[i].isFull)
+			numFilled++;
+			andpat &= nodes[i].pattern;
+			orpat |= nodes[i].pattern;
+
+			if(nodes[i].pattern != 0 && bitvol == 0)
 			{
-				numFull++;
-				fullVol = nodes[i].volume(); //this should be the same for all at this level
+				//compute volume of a single bit pattern
+				bitvol = nodes[i].volume()/nodes[i].index;
 			}
-			else
-				numEmpty++;
 		}
 	}
 
-	if((isUnion && numFull > 0) || numFull == N) //just return a full node
+	if(isUnion && (numFilled == N || orpat == 0xff)) //just return a patterned node
 	{
-		MChildNode ret(true, true, 0, fullVol);
+		unsigned nb = __builtin_popcount(orpat);
+		MChildNode ret(true, orpat,nb, bitvol*nb);
 		return ret;
 	}
-	else if((!isUnion && numEmpty > 0) || numEmpty == N) //return empty node
+	else if(!isUnion && (numFilled == N || andpat == 0))
 	{
-		MChildNode ret(true, false, 0, 0);
+		unsigned nb = __builtin_popcount(andpat);
+		MChildNode ret(true, andpat,nb, bitvol*nb);
 		return ret;
 	}
 	else //need to look at non-leaf children
 	{
 		unsigned pos = newtree.size();
-		MChildNode ret(false, false, pos, 0);
+		MChildNode ret(false, 0, pos, 0);
 		newtree.push_back(MOctNode());
 
-		unsigned numFull = 0;
-		unsigned numEmpty = 0;
-		MChildNode nextnodes[N];
-		const MappableOctTree *nexttrees[N];
+		unsigned numFullEmpty = 0;
+		unsigned newPattern = 0;
+		MChildNode nextnodes[N+1];
+		const MappableOctTree *nexttrees[N+1];
 
 		//setup nonleaf trees
 		unsigned n = 0;
@@ -70,7 +73,8 @@ MChildNode MappableOctTree::createFrom_r(unsigned N, MChildNode* nodes, const Ma
 				n++;
 			}
 		}
-
+		if(numFilled > 0)
+			nexttrees[n++] = NULL; //dummy for merge of leaves
 		for (unsigned i = 0; i < 8; i++)
 		{
 			//create array of sub-octants from non-leafs
@@ -83,36 +87,38 @@ MChildNode MappableOctTree::createFrom_r(unsigned N, MChildNode* nodes, const Ma
 					cnt++;
 				}
 			}
+			//summerize filled nodes
+			if(numFilled > 0)
+			{
+				unsigned pat = isUnion ? orpat : andpat;
+				if(pat & (1<<i))
+					pat = 0xff;
+				else
+					pat = 0;
+				nextnodes[cnt] = MChildNode(true, pat, pat ? 8 : 0, pat ? bitvol : 0);
+				cnt++;
+			}
 			assert(cnt == n);
 
 			MChildNode nchild = createFrom_r(n, nextnodes, nexttrees, newtree, isUnion);
 			newtree[pos].children[i] = nchild;
-			if(nchild.isLeaf)
+			if(nchild.isLeaf && (nchild.pattern == 0 || nchild.pattern == 0xff))
 			{
-				if(nchild.isFull)
-					numFull++;
-				else
-					numEmpty++;
+				numFullEmpty++;
+				if(nchild.pattern == 0xff)
+					newPattern |= 1<<i;
 			}
 
 			ret.vol += nchild.volume();
 		}
 
-		if(numEmpty == 8)
+		if(numFullEmpty == 8)
 		{
 			newtree.pop_back();
 			ret.isLeaf = true;
-			ret.isFull = false;
-			ret.index = 0;
-			ret.vol = 0;
-		}
-		else if(numFull == 8)
-		{
-			newtree.pop_back();
-			ret.isLeaf = true;
-			ret.isFull = true;
-			ret.index = 0;
-			//ret.vol is correct
+			ret.pattern = newPattern;
+			ret.index = __builtin_popcount(newPattern);
+			//volume is correct
 		}
 		return ret;
 	}
@@ -161,13 +167,18 @@ MappableOctTree* MappableOctTree::createFromIntersection(unsigned N, const Mappa
 //volume calculations that don't require creating a tmp tree
 float MappableOctTree::intersectVolume(const MappableOctTree * rhs) const
 {
-	return root.intersectVolume(tree, rhs->root, rhs->tree);
+	float ival = 0, uval = 0;
+	root.intersectUnionVolume(tree,  rhs->root, rhs->tree, ival, uval);
+	return ival;
 }
 
 float MappableOctTree::unionVolume(const MappableOctTree *rhs) const
 {
-	return root.unionVolume(tree, rhs->root, rhs->tree);
+	float ival = 0, uval = 0;
+	root.intersectUnionVolume(tree,  rhs->root, rhs->tree, ival, uval);
+	return uval;
 }
+
 
 bool MappableOctTree::containedIn(const MappableOctTree *rhs) const
 {
@@ -218,103 +229,15 @@ float MappableOctTree::absoluteVolumeDistance(const MappableOctTree * rhs) const
 	return uval - ival;
 }
 
-//compute the interesection volume
-float MChildNode::intersectVolume(
-		const MOctNode* tree, const MChildNode& rhs, const MOctNode* rtree) const
-{
-	if(rhs.isLeaf && isLeaf && rhs.isFull == isFull)
-	{
-		if(isFull)
-			return volume();
-		else
-			return 0;
-	}
-	else if(isLeaf && !isFull)
-	{
-		return 0;
-	}
-	else if (rhs.isLeaf && !rhs.isFull)
-	{
-		return 0;
-	}
-	else if (rhs.isLeaf && rhs.isFull)
-	{
-		//same as now
-		return volume();
-	}
-	else if (isLeaf && isFull)
-	{
-		//same as rhs
-		return rhs.volume();
-	}
-	else //both have children
-	{
-		float ret = 0;
-		for (unsigned i = 0; i < 8; i++)
-		{
-			ret += tree[index].children[i].intersectVolume(tree,
-					rtree[rhs.index].children[i], rtree);
-		}
 
-		return ret;
-	}
-}
-
-float MChildNode::unionVolume(
-		const MOctNode* tree, const MChildNode& rhs, const MOctNode* rtree) const
-{
-	if(rhs.isLeaf && isLeaf && rhs.isFull == isFull)
-	{
-		if(isFull)
-			return volume();
-		else
-			return 0;
-	}
-	else if(isLeaf && isFull)
-	{
-		return volume();
-	}
-	else if (rhs.isLeaf && rhs.isFull)
-	{
-		return rhs.volume();
-	}
-	else if (rhs.isLeaf && !rhs.isFull)
-	{
-		//vol of this tree
-		return volume();
-	}
-	else if (isLeaf && !isFull)
-	{
-		// from rhs
-		return rhs.volume();
-	}
-	else //both have children
-	{
-		float ret = 0;
-		for (unsigned i = 0; i < 8; i++)
-		{
-			ret += tree[index].children[i].unionVolume(tree,
-					rtree[rhs.index].children[i], rtree);
-		}
-
-		return ret;
-	}
-}
 
 void MChildNode::invert(MOctNode* tree, float maxvol)
 {
 	if(isLeaf)
 	{
-		if(isFull)
-		{
-			isFull = false;
-			vol = 0;
-		}
-		else
-		{
-			isFull = true;
-			vol = maxvol;
-		}
+		pattern = ~pattern;
+		index = 8 - index;
+		vol = maxvol - vol;
 	}
 	else
 	{
@@ -333,33 +256,88 @@ void MChildNode::intersectUnionVolume(
 		const MOctNode* tree, const MChildNode& rhs, const MOctNode* rtree, float& intersectval, float& unionval) const
 
 {
-	if(rhs.isLeaf && isLeaf && rhs.isFull == isFull)
+	if(rhs.isLeaf && isLeaf)
 	{
-		if(isFull)
+		if(pattern == 0 || rhs.pattern == 0)
+			intersectval += 0; //no intersect val
+		else
 		{
-			intersectval += volume();
+			float bitv = vol/index; //volume of each bit
+			unsigned intpat = pattern & rhs.pattern;
+
+			intersectval += __builtin_popcount(intpat)*bitv;
+		}
+		if(pattern == 0)
+			unionval += rhs.volume();
+		else if(rhs.pattern == 0)
 			unionval += volume();
+		else
+		{
+			float bitv = vol/index; //volume of each bit
+			unsigned orpat = pattern | rhs.pattern;
+
+			unionval += __builtin_popcount(orpat)*bitv;
 		}
 	}
-	else if(isLeaf && isFull)
+	else if(isLeaf && pattern == 0xff)
 	{
 		unionval += volume();
 		intersectval += rhs.volume();
 	}
-	else if (rhs.isLeaf && rhs.isFull)
+	else if (rhs.isLeaf && rhs.pattern == 0xff)
 	{
 		unionval += rhs.volume();
 		intersectval += volume();
 	}
-	else if (rhs.isLeaf && !rhs.isFull)
+	else if (rhs.isLeaf && rhs.pattern == 0)
 	{
 		//vol of this tree
 		unionval += volume();
 	}
-	else if (isLeaf && !isFull)
+	else if (isLeaf && pattern == 0)
 	{
 		// from rhs
 		unionval += rhs.volume();
+	}
+	else if(isLeaf)
+	{
+		assert(!rhs.isLeaf);
+		assert(index > 0);
+		//rhs has children, have to compare bit by bit
+		float bvol = vol/index;
+		for(unsigned i = 0; i < 8; i++)
+		{
+			MChildNode rchild = rtree[rhs.index].children[i];
+			if(pattern & (1<<i))
+			{
+				unionval += bvol;
+				intersectval += rchild.volume();
+			}
+			else
+			{
+				unionval += rchild.volume();
+			}
+		}
+	}
+	else if(rhs.isLeaf)
+	{
+		assert(!isLeaf);
+		assert(rhs.index > 0);
+		//rhs has children, have to compare bit by bit
+		float bvol = rhs.vol/rhs.index;
+		for(unsigned i = 0; i < 8; i++)
+		{
+			MChildNode child = tree[index].children[i];
+			if(rhs.pattern & (1<<i))
+			{
+				unionval += bvol;
+				intersectval += child.volume();
+			}
+			else
+			{
+				unionval += child.volume();
+			}
+		}
 	}
 	else //both have children
 	{
@@ -375,25 +353,57 @@ void MChildNode::intersectUnionVolume(
 bool MChildNode::containedIn(
 		const MOctNode* tree, const MChildNode& rhs, const MOctNode* rtree) const
 {
-	if(rhs.isLeaf && isLeaf && rhs.isFull == isFull)
+	if(rhs.isLeaf && isLeaf)
+	{
+		return (pattern & rhs.pattern) == pattern;
+	}
+	else if(isLeaf && pattern == 0)
 	{
 		return true;
 	}
-	else if(isLeaf && !isFull)
-	{
-		return true;
-	}
-	else if (rhs.isLeaf && !rhs.isFull)
+	else if (rhs.isLeaf && rhs.pattern == 0)
 	{
 		return false; //somthing not in nothing (nothing handled above)
 	}
-	else if (rhs.isLeaf && rhs.isFull)
+	else if (rhs.isLeaf && rhs.pattern == 0xff)
 	{
 		return true;
 	}
-	else if (isLeaf && isFull)
+	else if (isLeaf && pattern == 0xff)
 	{
 		return false;
+	}
+	else if(isLeaf)
+	{
+		assert(!rhs.isLeaf);
+		assert(index > 0);
+		//rhs has children, have to compare bit by bit
+		for(unsigned i = 0; i < 8; i++)
+		{
+			if(pattern & (1<<i))
+			{
+				MChildNode rchild = rtree[rhs.index].children[i];
+				//rchild must be a leaf and full
+				if(!rchild.isLeaf || rchild.pattern != 0xff)
+					return false;
+			}
+		}
+	}
+	else if(rhs.isLeaf)
+	{
+		assert(!isLeaf);
+		assert(rhs.index > 0);
+		//rhs has children, have to compare bit by bit
+		for(unsigned i = 0; i < 8; i++)
+		{
+			if(!(rhs.pattern & (1<<i)))
+			{
+				MChildNode child = tree[index].children[i];
+				//if rhs's bit is empty, then our child must be empty
+				if(!child.isLeaf || child.pattern != 0)
+					return false;
+			}
+		}
 	}
 	else //both have children
 	{

@@ -81,6 +81,7 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj, bo
 	const GSSNodeCommon* root = (GSSNodeCommon*)nodes.back().begin();
 	Timer t;
 	vector<file_index> respos;
+	fitsCheck = 0;
 	findTweeners(root, nodes.size()-1, smallTree, bigTree, respos);
 
 	//extract objects in sequential order
@@ -93,7 +94,7 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj, bo
 
 	if(verbose)
 	{
-		cout << "Found " << res.size() << " objects out of " << total << " in " << t.elapsed() << "s\n";
+		cout << "Found " << res.size() << " objects out of " << total << " in " << t.elapsed() << "s with " << fitsCheck << " checks\n";
 	}
 	delete smallTree;
 	delete bigTree;
@@ -101,9 +102,10 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj, bo
 
 
 //return true if the object(s) represented by MIV/MSV might fit in between min and max
-static bool fitsInbetween(const MappableOctTree *MIV, const MappableOctTree *MSV,
+bool GSSTreeSearcher::fitsInbetween(const MappableOctTree *MIV, const MappableOctTree *MSV,
 		const MappableOctTree  *min, const MappableOctTree *max)
 {
+	fitsCheck++;
 	//the MSV must completely enclose min
 	if (!min->containedIn(MSV))
 		return false;

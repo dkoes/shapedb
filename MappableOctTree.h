@@ -23,25 +23,18 @@ struct MOctNode;
 struct MChildNode
 {
 	bool isLeaf :1;
-	bool isFull :1; //only relevant if leaf
-	unsigned index :30;
+	unsigned pattern: 8; //leaf pattern
+	unsigned index :23; //ptr to next node, or bit cnt if leaf
 	float vol; //this doubles the size of the tree, but makes similarity computation much faster, is the trade off worth it?
 
 	MChildNode() :
-			isLeaf(true), isFull(false), index(0), vol(-1)
+			isLeaf(true), pattern(0), index(0), vol(-1)
 	{
 	}
 
-	MChildNode(bool leaf, bool full) :
-			isLeaf(leaf), isFull(full), index(0), vol(-1)
-	{
-	}
-	MChildNode(bool leaf, bool full, unsigned i) :
-			isLeaf(leaf), isFull(full), index(i), vol(-1)
-	{
-	}
-	MChildNode(bool leaf, bool full, unsigned i, float v) :
-			isLeaf(leaf), isFull(full), index(i), vol(v)
+
+	MChildNode(bool leaf, unsigned pat, unsigned i, float v) :
+			isLeaf(leaf), pattern(pat), index(i), vol(v)
 	{
 	}
 	void intersectUnionVolume(const MOctNode* tree, const MChildNode& rhs, const MOctNode* rtree,
@@ -152,20 +145,24 @@ private:
 		{
 			//no overlap, all done
 			ret.isLeaf = true;
-			ret.isFull = false;
+			ret.pattern = 0;
+			ret.index = 0;
 			ret.vol = 0;
 		}
 		else if (cube.getDimension() <= res) //consider it full
 		{
 			ret.isLeaf = true;
-			ret.isFull = true;
+			ret.pattern = 0xff;
+			ret.index = 8;
 			ret.vol = cube.volume();
 		}
 		else //subdivide into children
 		{
 			//assume this is an interior node
 			ret.isLeaf = false;
-			unsigned fullcnt = 0;
+			unsigned filledcnt = 0;
+			unsigned pat = 0;
+			unsigned bitcnt = 0;
 			//allocate space
 			unsigned pos = tree.size();
 			ret.index = tree.size();
@@ -176,19 +173,28 @@ private:
 				Cube newc = cube.getOctant(i);
 				MChildNode child = create_r(res, newc, obj, tree);
 				tree[pos].children[i] = child;
-				if (child.isLeaf && child.isFull)
-					fullcnt++;
+				if (child.isLeaf)
+				{
+					if(child.pattern == 0)
+						filledcnt++;
+					else if(child.pattern == 0xff)
+					{
+						filledcnt++;
+						pat |= (1<<i);
+						bitcnt++;
+					}
+				}
 				ret.vol += child.volume();
 			}
 
-			//are all the children full? then truncate and mark node as full
-			if (fullcnt == 8)
+			//are all the children full or empty? then can represent as a pattern
+			if (filledcnt == 8)
 			{
 				tree.pop_back();
 				ret.isLeaf = true;
-				ret.isFull = true;
-				ret.vol = cube.volume();
-				ret.index = 0;
+				ret.pattern = pat;
+				//volume is correct
+				ret.index = bitcnt;
 			}
 		}
 		return ret;
