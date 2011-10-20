@@ -95,6 +95,7 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr, float d
 	currenttrees.remove();
 	nexttrees.remove();
 
+	optimizeLevels();
 
 	//output general info
 	filesystem::path infoname = dbpath / "info";
@@ -109,6 +110,48 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr, float d
 	return true;
 }
 
+
+//recursive helper for optimizing level output
+void GSSTreeCreator::optimizeLevelsR(ostream& outnodes, ostream& outleaves, const GSSNodeCommon *n, unsigned level)
+{
+	if(n->isLeaf)
+	{
+		const GSSLeaf* leaf = (const GSSLeaf*)n;
+		outleaves.write((const char*)leaf, leaf->bytes());
+	}
+	else
+	{
+		const GSSInternalNode* node = (const GSSInternalNode*)n;
+		outnodes.write((const char*)node, node->bytes());
+		unsigned nextlevel = level-1;
+
+		for(unsigned i = 0, n = node->size(); i < n; i++)
+		{
+			const GSSInternalNode::Child *child = node->getChild(i);
+			const GSSNodeCommon* next = (const GSSNodeCommon*)((const char*)nodes[nextlevel].map->get_address() + child->node_pos);
+			optimizeLevelsR(outnodes, outleaves, next, nextlevel);
+		}
+	}
+}
+
+//re-write levels in depth first order; leaves get their own file
+void GSSTreeCreator::optimizeLevels()
+{
+	for(unsigned i = 0, n = nodes.size(); i < n; i++)
+	{
+		nodes[i].switchToMap();
+	}
+
+	filesystem::path npath = dbpath / "nodes";
+	ofstream outnodes(npath.string().c_str());
+
+	filesystem::path lpath = dbpath / "leaves";
+	ofstream outleaves(lpath.string().c_str());
+
+	const GSSNodeCommon* root = (GSSNodeCommon*)nodes.back().map->get_address();
+
+	optimizeLevelsR(outnodes, outleaves, root, nodes.size()-1);
+}
 
 //top down partition
 void GSSLevelCreator::createNextLevel(DataViewer& data, ostream* nodefile, vector<file_index>& nodeindices,

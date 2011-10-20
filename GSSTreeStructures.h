@@ -84,6 +84,8 @@ public:
 	public:
 		const MappableOctTree* getMIV() const { return (const MappableOctTree*)data; }
 		const MappableOctTree* getMSV() const { return (MappableOctTree*)&data[MSVindex];}
+
+		unsigned bytes() const;
 	};
 private:
 	GSSNodeCommon info;
@@ -94,6 +96,7 @@ public:
 	static void writeNode(const DataViewer *data, const Cluster& cluster, ostream& outNodes, ostream& outTrees);
 	const Child* getChild(unsigned i) const { return (Child*)&data[child_positions[i]]; }
 	unsigned size() const { return info.N; }
+	unsigned bytes() const;
 };
 
 

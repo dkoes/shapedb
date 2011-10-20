@@ -104,13 +104,34 @@ void GSSInternalNode::writeNode(const DataViewer *data, const Cluster& cluster, 
 
 unsigned GSSLeaf::bytes() const
 {
-	unsigned ret = sizeof(info);
+	unsigned ret = sizeof(GSSLeaf);
 	if(info.N == 0) return ret;
 	ret += child_positions[info.N-1]; //offset to last child
 	const Child* child = (const Child*)&data[child_positions[info.N-1]];
 	//add size of last child
 	ret += sizeof(file_index);
 	ret += child->tree.bytes();
+	return ret;
+}
+
+unsigned GSSInternalNode::Child::bytes() const
+{
+	unsigned ret = sizeof(Child);
+	ret += MSVindex;
+	const MappableOctTree* msv = getMSV();
+	ret += msv->bytes();
+
+	return ret;
+}
+
+unsigned GSSInternalNode::bytes() const
+{
+	unsigned ret = sizeof(GSSInternalNode);
+	if(info.N == 0) return ret;
+	ret += child_positions[info.N-1]; //offset to last child
+	const Child* child = (const Child*)&data[child_positions[info.N-1]];
+	//add size of last child
+	ret += child->bytes();
 	return ret;
 }
 

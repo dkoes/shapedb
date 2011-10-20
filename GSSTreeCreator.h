@@ -92,6 +92,9 @@ class GSSTreeCreator
 
 	GSSLevelCreator *leveler;
 
+	void optimizeLevelsR(ostream& outnodes, ostream& outleaves, const GSSNodeCommon *n, unsigned level);
+	void optimizeLevels();
+
 public:
 	GSSTreeCreator(GSSLevelCreator *l):leveler(l) {}
 	~GSSTreeCreator() {}
