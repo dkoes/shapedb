@@ -46,11 +46,11 @@ public:
 	unsigned size() const { return total; }
 
 	//return everything with a shape between smallObj and bigObj
-	void dc_search(const Object& smallObj, const Object& bigObj,
+	void dc_search(const Object& smallObj, const Object& bigObj, bool invertBig,
 			vector<Object>& res);
 
 	//linear scan
-	void dc_scan_search(const Object& smallObj, const Object& bigObj,
+	void dc_scan_search(const Object& smallObj, const Object& bigObj, bool invertBig,
 			vector<Object>& res);
 
 };

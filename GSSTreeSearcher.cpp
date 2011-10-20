@@ -67,12 +67,16 @@ GSSTreeSearcher::~GSSTreeSearcher()
 }
 
 //find all the shapes in the database that lie bewtween smallObj and bigObj
-void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
+//if invertBig is set, than treat as an excluded volume
+void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj, bool invertBig,
 		vector<Object>& res)
 {
 	res.clear();
 	const MappableOctTree *smallTree = MappableOctTree::create(dimension, resolution, smallObj);
-	const MappableOctTree *bigTree = MappableOctTree::create(dimension, resolution, bigObj);
+	MappableOctTree *bigTree = MappableOctTree::create(dimension, resolution, bigObj);
+
+	if(invertBig)
+		bigTree->invert(dimension);
 
 	const GSSNodeCommon* root = (GSSNodeCommon*)nodes.back().begin();
 	Timer t;
@@ -95,6 +99,7 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
 	delete bigTree;
 }
 
+
 //return true if the object(s) represented by MIV/MSV might fit in between min and max
 static bool fitsInbetween(const MappableOctTree *MIV, const MappableOctTree *MSV,
 		const MappableOctTree  *min, const MappableOctTree *max)
@@ -111,13 +116,14 @@ static bool fitsInbetween(const MappableOctTree *MIV, const MappableOctTree *MSV
 
 
 //find everyting between small and big using linear scan
-void GSSTreeSearcher::dc_scan_search(const Object& smallObj, const Object& bigObj,
+void GSSTreeSearcher::dc_scan_search(const Object& smallObj, const Object& bigObj, bool invertBig,
 		vector<Object>& res)
 {
 	res.clear();
 	const MappableOctTree *smallTree = MappableOctTree::create(dimension, resolution, smallObj);
-	const MappableOctTree *bigTree = MappableOctTree::create(dimension, resolution, bigObj);
-
+	MappableOctTree *bigTree = MappableOctTree::create(dimension, resolution, bigObj);
+	if(invertBig)
+		bigTree->invert(dimension);
 	const GSSLeaf* leaf = (GSSLeaf*)nodes.front().begin();
 	const GSSLeaf* end = (GSSLeaf*)nodes.front().end();
 

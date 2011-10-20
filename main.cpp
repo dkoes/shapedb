@@ -193,12 +193,12 @@ int main(int argc, char *argv[])
 			vector<Molecule> res;
 
 			//search
-			gss.dc_search(Molecule(insphere), Molecule(exsphere), res);
+			gss.dc_search(Molecule(insphere), Molecule(exsphere), true, res);
 
 			if(ScanCheck)
 			{
 				vector<Molecule> res2;
-				gss.dc_scan_search(Molecule(insphere), Molecule(exsphere), res2);
+				gss.dc_scan_search(Molecule(insphere), Molecule(exsphere), true, res2);
 				if(res2.size() != res.size())
 				{
 					cerr << "Scanning found different number\n";
@@ -228,12 +228,12 @@ int main(int argc, char *argv[])
 
 				vector<Molecule > res;
 				//search
-				gss.dc_search(Molecule(littlespheres), Molecule(bigspheres), res);
+				gss.dc_search(Molecule(littlespheres), Molecule(bigspheres), false, res);
 
 				if(ScanCheck)
 				{
 					vector<Molecule> res2;
-					gss.dc_scan_search(Molecule(littlespheres), Molecule(bigspheres), res2);
+					gss.dc_scan_search(Molecule(littlespheres), Molecule(bigspheres), false, res2);
 					if(res2.size() != res.size())
 					{
 						cerr << "Scanning found different number\n";

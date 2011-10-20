@@ -55,6 +55,8 @@ struct MChildNode
 	unionVolume(const MOctNode* tree, const MChildNode& rhs,
 			const MOctNode* rtree) const;
 
+	void invert(MOctNode* tree, float maxvol);
+
 	bool containedIn(const MOctNode* tree, const MChildNode& rhs, const MOctNode* rtree) const;
 
 	float volume() const
@@ -106,6 +108,8 @@ class MappableOctTree
 public:
 
 	MappableOctTree* clone() const;
+
+	void invert(float dim);
 
 	//return intersect of the n trees found in arr
 	static MappableOctTree* createFromIntersection(unsigned N, const MappableOctTree** in);

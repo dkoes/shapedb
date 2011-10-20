@@ -118,6 +118,14 @@ MChildNode MappableOctTree::createFrom_r(unsigned N, MChildNode* nodes, const Ma
 	}
 }
 
+//invert tree, this can be done inplace
+void MappableOctTree::invert(float dim)
+{
+	float expectedV = dim*dim*dim-root.volume();
+	root.invert(tree, dim*dim*dim);
+	assert(root.volume() == expectedV);
+}
+
 //union
 MappableOctTree* MappableOctTree::createFromUnion(unsigned N, const MappableOctTree** in)
 {
@@ -293,6 +301,31 @@ float MChildNode::unionVolume(
 	}
 }
 
+void MChildNode::invert(MOctNode* tree, float maxvol)
+{
+	if(isLeaf)
+	{
+		if(isFull)
+		{
+			isFull = false;
+			vol = 0;
+		}
+		else
+		{
+			isFull = true;
+			vol = maxvol;
+		}
+	}
+	else
+	{
+		vol = 0;
+		for (unsigned i = 0; i < 8; i++)
+		{
+			tree[index].children[i].invert(tree, maxvol/8);
+			vol += tree[index].children[i].vol;
+		}
+	}
+}
 
 
 //compute both the intersection and union volume at once
