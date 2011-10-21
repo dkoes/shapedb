@@ -87,7 +87,7 @@ public:
 		const MappableOctTree* getMSV() const { return (MappableOctTree*)&data[MSVindex];}
 
 		file_index position() const { return (signed long)node_pos < 0 ? -node_pos : node_pos; }
-		bool leafPosition() const { return (signed long)node_pos < 0; }
+		bool isLeafPosition() const { return (signed long)node_pos < 0; }
 		unsigned bytes() const;
 	};
 private:

@@ -25,18 +25,11 @@ bool GSSTreeSearcher::load(const filesystem::path& dbpath)
 	info >> dimension  >> resolution >> levels  >> total;
 
 	//memory map files form db directory
-	nodes.resize(levels);
-	for(unsigned i = 0; i < levels; i++)
-	{
-		stringstream name;
-		name << "level" << i;
-		filesystem::path level = dbpath/name.str();
-		if(!nodes[i].map(level.string(), true, true))
-		{
-			clear();
-			return false;
-		}
-	}
+	filesystem::path nodepath = dbpath/"nodes";
+	internalNodes.map(nodepath.string(), true, true);
+
+	filesystem::path leavespath = dbpath/"leaves";
+	leaves.map(leavespath.string(), true, true);
 
 	filesystem::path objfile = dbpath / "objs";
 	if(!objects.map(objfile.string(), true, false))
@@ -54,11 +47,8 @@ void GSSTreeSearcher::clear()
 {
 	total = 0;
 	objects.clear();
-	for(unsigned i = 0, n = nodes.size(); i < n; i++)
-	{
-		nodes[i].clear();
-	}
-	nodes.clear();
+	internalNodes.clear();
+	leaves.clear();
 }
 
 GSSTreeSearcher::~GSSTreeSearcher()
@@ -78,11 +68,20 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj, bo
 	if(invertBig)
 		bigTree->invert(dimension);
 
-	const GSSNodeCommon* root = (GSSNodeCommon*)nodes.back().begin();
 	Timer t;
 	vector<file_index> respos;
 	fitsCheck = 0;
-	findTweeners(root, nodes.size()-1, smallTree, bigTree, respos);
+	if(internalNodes.size() > 0)
+	{
+		const GSSInternalNode* root = (GSSInternalNode*)internalNodes.begin();
+		findTweeners(root, smallTree, bigTree, respos);
+	}
+	else
+	{
+		//very small tree with just a leaf
+		const GSSLeaf* leaf = (GSSLeaf*)leaves.begin();
+		findTweeners(leaf, smallTree, bigTree, respos);
+	}
 
 	//extract objects in sequential order
 	sort(respos.begin(), respos.end());
@@ -126,8 +125,8 @@ void GSSTreeSearcher::dc_scan_search(const Object& smallObj, const Object& bigOb
 	MappableOctTree *bigTree = MappableOctTree::create(dimension, resolution, bigObj);
 	if(invertBig)
 		bigTree->invert(dimension);
-	const GSSLeaf* leaf = (GSSLeaf*)nodes.front().begin();
-	const GSSLeaf* end = (GSSLeaf*)nodes.front().end();
+	const GSSLeaf* leaf = (GSSLeaf*)leaves.begin();
+	const GSSLeaf* end = (GSSLeaf*)leaves.end();
 
 	Timer t;
 	vector<file_index> respos;
@@ -153,27 +152,26 @@ void GSSTreeSearcher::dc_scan_search(const Object& smallObj, const Object& bigOb
 }
 
 
-//dispatch between leaf and internal node
-void GSSTreeSearcher::findTweeners(const GSSNodeCommon* node, unsigned level, const MappableOctTree* min, const MappableOctTree* max, vector<file_index>& respos)
-{
-	if(node->isLeaf)
-		findTweeners((const GSSLeaf*)node, min, max, respos);
-	else
-		findTweeners((const GSSInternalNode*)node, level, min, max, respos);
-}
 
-void GSSTreeSearcher::findTweeners(const GSSInternalNode* node, unsigned level, const MappableOctTree* min, const MappableOctTree* max, vector<file_index>& respos)
+
+void GSSTreeSearcher::findTweeners(const GSSInternalNode* node, const MappableOctTree* min, const MappableOctTree* max, vector<file_index>& respos)
 {
-	unsigned nextlevel = level-1;
-	assert(level > 0); //otherwise shoudl be leaf
 	for(unsigned i = 0, n = node->size(); i < n; i++)
 	{
 		const GSSInternalNode::Child *child = node->getChild(i);
 
 		if(fitsInbetween(child->getMIV(), child->getMSV(), min, max))
 		{
-			const GSSNodeCommon* next = (const GSSNodeCommon*)(nodes[nextlevel].begin() + child->position());
-			findTweeners(next, nextlevel, min, max, respos);
+			if(child->isLeafPosition())
+			{
+				const GSSLeaf* next = (const GSSLeaf*)(leaves.begin() + child->position());
+				findTweeners(next, min, max, respos);
+			}
+			else
+			{
+				const GSSInternalNode* next = (const GSSInternalNode*)(internalNodes.begin() + child->position());
+				findTweeners(next, min, max, respos);
+			}
 		}
 	}
 }

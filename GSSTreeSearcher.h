@@ -25,15 +25,15 @@ typedef Molecule Object; //eventually template this
 class GSSTreeSearcher
 {
 	MemMapped objects; //memory mapped objects
-	vector<MemMapped> nodes;
+	MemMapped internalNodes;
+	MemMapped leaves;
 
 	bool verbose; //for debugging
 	unsigned total;
 	float dimension;
 	float resolution;
 
-	void findTweeners(const GSSNodeCommon* node, unsigned level, const MappableOctTree* min, const MappableOctTree* max, vector<file_index>& res);
-	void findTweeners(const GSSInternalNode* node, unsigned level, const MappableOctTree* min, const MappableOctTree* max, vector<file_index>& res);
+	void findTweeners(const GSSInternalNode* node,  const MappableOctTree* min, const MappableOctTree* max, vector<file_index>& res);
 	void findTweeners(const GSSLeaf* node, const MappableOctTree* min, const MappableOctTree* max, vector<file_index>& res);
 
 	unsigned fitsCheck;

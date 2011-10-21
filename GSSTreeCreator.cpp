@@ -144,7 +144,7 @@ file_index GSSTreeCreator::optimizeLevelsR(ostream& outnodes, ostream& outleaves
 		}
 
 		outnodes.seekp(ret, ios_base::beg);
-		memcpy(nodebuff, (const char*)node, nodesz);
+		outnodes.write((const char*)nodebuff, nodesz);
 		outnodes.seekp(0, ios_base::end);
 
 		return ret;

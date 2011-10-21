@@ -18,9 +18,9 @@
 class MemMapped
 {
 	void *addr;
-	unsigned long size;
+	unsigned long sz;
 public:
-	MemMapped(): addr(NULL), size(0) {}
+	MemMapped(): addr(NULL), sz(0) {}
 	~MemMapped() {} //does not unmap, must explicitly clear
 
 	//map a file into memory
@@ -30,8 +30,9 @@ public:
 	operator void*() const { return addr; }
 
 	const char * begin() const { return (const char*)addr; }
-	const char * end() const { return (const char*)addr + size; }
+	const char * end() const { return (const char*)addr + sz; }
 	void clear();
+	unsigned long size() const { return sz; }
 };
 
 #endif /* MEMMAPPED_H_ */

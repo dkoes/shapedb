@@ -15,15 +15,15 @@
 void MemMapped::clear()
 {
 	if(addr != NULL)
-		munmap(addr, size);
+		munmap(addr, sz);
 	addr = NULL;
-	size = 0;
+	sz = 0;
 }
 
 bool MemMapped::map(const string& fname, bool readOnly, bool sequential, bool populate/*=false*/, bool readonce/*=false*/)
 {
 	if(addr != NULL)
-		munmap(addr, size);
+		munmap(addr, sz);
 	addr = NULL;
 	unsigned flags = readOnly ? O_RDONLY : O_RDWR;
 	int fd = open(fname.c_str(), flags);
@@ -37,16 +37,16 @@ bool MemMapped::map(const string& fname, bool readOnly, bool sequential, bool po
 		posix_fadvise(fd, 0, 0, POSIX_FADV_NOREUSE);
 #endif
 	flags = readOnly ? PROT_READ : (PROT_READ | PROT_WRITE);
-	size = filesystem::file_size(fname);
-	if (size > 0)
+	sz = filesystem::file_size(fname);
+	if (sz > 0)
 	{
-		addr =  mmap(NULL, size, flags, (readOnly ? MAP_PRIVATE
+		addr =  mmap(NULL, sz, flags, (readOnly ? MAP_PRIVATE
 				: MAP_SHARED) |(populate ? MAP_POPULATE : 0) , fd, 0);
 	}
 	else
 	{
 		addr = NULL;
-		size = 0;
+		sz = 0;
 	}
 	if ((long) addr == -1)
 	{
