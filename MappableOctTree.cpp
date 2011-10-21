@@ -388,6 +388,7 @@ bool MChildNode::containedIn(
 					return false;
 			}
 		}
+		return true;
 	}
 	else if(rhs.isLeaf)
 	{
@@ -404,6 +405,7 @@ bool MChildNode::containedIn(
 					return false;
 			}
 		}
+		return true;
 	}
 	else //both have children
 	{
