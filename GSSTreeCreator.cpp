@@ -120,7 +120,7 @@ file_index GSSTreeCreator::optimizeLevelsR(ostream& outnodes, ostream& outleaves
 		const GSSLeaf* leaf = (const GSSLeaf*)n;
 		file_index ret = outleaves.tellp();
 		outleaves.write((const char*)leaf, leaf->bytes());
-		return ret;
+		return -ret; //leaves are neg
 	}
 	else
 	{
@@ -138,7 +138,7 @@ file_index GSSTreeCreator::optimizeLevelsR(ostream& outnodes, ostream& outleaves
 		for(unsigned i = 0, n = node->size(); i < n; i++)
 		{
 			const GSSInternalNode::Child *child = node->getChild(i);
-			const GSSNodeCommon* next = (const GSSNodeCommon*)((const char*)nodes[nextlevel].map->get_address() + child->node_pos);
+			const GSSNodeCommon* next = (const GSSNodeCommon*)((const char*)nodes[nextlevel].map->get_address() + child->position());
 			file_index newpos = optimizeLevelsR(outnodes, outleaves, next, nextlevel);
 			newnode->setChildPos(i, newpos);
 		}

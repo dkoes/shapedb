@@ -172,7 +172,7 @@ void GSSTreeSearcher::findTweeners(const GSSInternalNode* node, unsigned level, 
 
 		if(fitsInbetween(child->getMIV(), child->getMSV(), min, max))
 		{
-			const GSSNodeCommon* next = (const GSSNodeCommon*)(nodes[nextlevel].begin() + child->node_pos);
+			const GSSNodeCommon* next = (const GSSNodeCommon*)(nodes[nextlevel].begin() + child->position());
 			findTweeners(next, nextlevel, min, max, respos);
 		}
 	}

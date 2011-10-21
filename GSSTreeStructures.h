@@ -77,14 +77,17 @@ class GSSInternalNode
 public:
 	struct Child
 	{
-		file_index node_pos;
+		friend class GSSInternalNode;
 	private:
+		file_index node_pos;
 		unsigned MSVindex; //where in data MSV starts (MIV at 0)
 		unsigned char data[];
 	public:
 		const MappableOctTree* getMIV() const { return (const MappableOctTree*)data; }
 		const MappableOctTree* getMSV() const { return (MappableOctTree*)&data[MSVindex];}
 
+		file_index position() const { return (signed long)node_pos < 0 ? -node_pos : node_pos; }
+		bool leafPosition() const { return (signed long)node_pos < 0; }
 		unsigned bytes() const;
 	};
 private:
