@@ -15,12 +15,15 @@
 
 class FullMergePacker: public Packer
 {
-	bool fullMergeClusters(const DataViewer* D, vector<Cluster>& clusters) const;
+public:
 
+private:
+	bool fullMergeClusters(const DataViewer* D, vector<Cluster>& clusters) const;
 	float clusterDistance(const DataViewer* D, const Cluster& a, const Cluster& b) const;
 
 public:
-	FullMergePacker(unsigned ps): Packer(ps) {}
+
+	FullMergePacker(unsigned ps, ClusterDistance metric=AverageLink): Packer(ps, metric) {}
 	virtual ~FullMergePacker() {}
 
 	virtual void pack(const DataViewer* dv, const vector<unsigned>& indices, vector<Cluster>& clusters) const;

@@ -113,13 +113,15 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr, float d
 
 //recursive helper for optimizing level output
 //return new position
-file_index GSSTreeCreator::optimizeLevelsR(ostream& outnodes, ostream& outleaves, const GSSNodeCommon *n, unsigned level)
+file_index GSSTreeCreator::optimizeLevelsR(ostream& outnodes, ostream& outleaves, const GSSNodeCommon *n, unsigned level, file_index& lstart, file_index& lend)
 {
 	if(n->isLeaf)
 	{
 		const GSSLeaf* leaf = (const GSSLeaf*)n;
 		file_index ret = outleaves.tellp();
 		outleaves.write((const char*)leaf, leaf->bytes());
+		lstart = ret;
+		lend = outleaves.tellp();
 		return -ret; //leaves are neg
 	}
 	else
@@ -135,12 +137,17 @@ file_index GSSTreeCreator::optimizeLevelsR(ostream& outnodes, ostream& outleaves
 		outnodes.write((const char*)nodebuff, nodesz);
 		unsigned nextlevel = level-1;
 
+		lstart = ULONG_MAX;
+		lend = 0;
 		for(unsigned i = 0, n = node->size(); i < n; i++)
 		{
+			file_index ls = ULONG_MAX, le = 0;
 			const GSSInternalNode::Child *child = node->getChild(i);
 			const GSSNodeCommon* next = (const GSSNodeCommon*)((const char*)nodes[nextlevel].map->get_address() + child->position());
-			file_index newpos = optimizeLevelsR(outnodes, outleaves, next, nextlevel);
-			newnode->setChildPos(i, newpos);
+			file_index newpos = optimizeLevelsR(outnodes, outleaves, next, nextlevel, ls, le);
+			lstart = min(lstart, ls);
+			lend = max(lend, le);
+			newnode->setChildPos(i, newpos, ls, le);
 		}
 
 		outnodes.seekp(ret, ios_base::beg);
@@ -167,7 +174,13 @@ void GSSTreeCreator::optimizeLevels()
 
 	const GSSNodeCommon* root = (GSSNodeCommon*)nodes.back().map->get_address();
 
-	optimizeLevelsR(outnodes, outleaves, root, nodes.size()-1);
+	file_index ls, le;
+	optimizeLevelsR(outnodes, outleaves, root, nodes.size()-1, ls, le);
+
+	for(unsigned i = 0, n = nodes.size(); i < n; i++)
+	{
+		nodes[i].remove();
+	}
 }
 
 //top down partition

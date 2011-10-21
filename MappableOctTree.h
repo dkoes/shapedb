@@ -57,7 +57,7 @@ struct MChildNode
 		return vol;
 	}
 
-};
+}__attribute__((__packed__));
 
 struct MOctNode
 {
@@ -71,7 +71,7 @@ struct MOctNode
 	{
 		std::fill_n(children, 8, init);
 	}
-};
+}__attribute__((__packed__));
 
 class MappableOctTree
 {
@@ -216,6 +216,6 @@ public:
 
 		return ret;
 	}
-};
+} __attribute__((__packed__));
 
 #endif /* MAPPABLEOCTTREE_H_ */

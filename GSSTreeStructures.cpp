@@ -56,7 +56,6 @@ void GSSInternalNode::writeNode(const DataViewer *data, const Cluster& cluster, 
 	info.N = cluster.size();
 
 	unsigned positions[info.N];
-
 	outNodes.write((char*)&info, sizeof(info));
 
 	//compute the position offsets
@@ -67,8 +66,7 @@ void GSSInternalNode::writeNode(const DataViewer *data, const Cluster& cluster, 
 		positions[i] = curoffset;
 		const MappableOctTree *miv = data->getMIV(ind);
 		const MappableOctTree *msv = data->getMSV(ind);
-		curoffset += sizeof(file_index);
-		curoffset += sizeof(unsigned);
+		curoffset += sizeof(Child);
 		curoffset += miv->bytes();
 		curoffset += msv->bytes();
 	}
@@ -80,15 +78,14 @@ void GSSInternalNode::writeNode(const DataViewer *data, const Cluster& cluster, 
 	for(unsigned i = 0, n = cluster.size(); i < n; i++)
 	{
 		unsigned ind = cluster[i];
-		//for leaf, write out node file index
-		file_index index = data->getIndex(ind);
-		outNodes.write((char*)&index, sizeof(file_index));
-
-		//and both trees
 		const MappableOctTree *miv = data->getMIV(ind);
 		const MappableOctTree *msv = data->getMSV(ind);
-		unsigned offset = miv->bytes();
-		outNodes.write((char*)&offset, sizeof(offset));
+
+		Child child;
+		child.MSVindex = miv->bytes();
+		child.node_pos = data->getIndex(ind);
+		outNodes.write((char*)&child, sizeof(Child));
+
 		miv->write(outNodes);
 		msv->write(outNodes);
 	}
@@ -135,10 +132,12 @@ unsigned GSSInternalNode::bytes() const
 	return ret;
 }
 
-void GSSInternalNode::setChildPos(unsigned i, file_index newpos)
+void GSSInternalNode::setChildPos(unsigned i, file_index newpos, file_index lstart, file_index lend)
 {
 	Child *child =  (Child*)&data[child_positions[i]];
 	child->node_pos = newpos;
+	child->leaves_start = lstart;
+	child->leaves_end = lend;
 }
 
 

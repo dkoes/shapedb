@@ -92,7 +92,7 @@ class GSSTreeCreator
 
 	GSSLevelCreator *leveler;
 
-	file_index optimizeLevelsR(ostream& outnodes, ostream& outleaves, const GSSNodeCommon *n, unsigned level);
+	file_index optimizeLevelsR(ostream& outnodes, ostream& outleaves, const GSSNodeCommon *n, unsigned level, file_index& lstart, file_index& lend);
 	void optimizeLevels();
 
 public:

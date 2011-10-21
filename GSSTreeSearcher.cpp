@@ -71,6 +71,7 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj, bo
 	Timer t;
 	vector<file_index> respos;
 	fitsCheck = 0;
+	fullLeaves = 0;
 	if(internalNodes.size() > 0)
 	{
 		const GSSInternalNode* root = (GSSInternalNode*)internalNodes.begin();
@@ -93,7 +94,7 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj, bo
 
 	if(verbose)
 	{
-		cout << "Found " << res.size() << " objects out of " << total << " in " << t.elapsed() << "s with " << fitsCheck << " checks\n";
+		cout << "Found " << res.size() << " objects out of " << total << " in " << t.elapsed() << "s with " << fitsCheck << " checks " << fullLeaves << " full leaves\n";
 	}
 	delete smallTree;
 	delete bigTree;
@@ -179,6 +180,7 @@ void GSSTreeSearcher::findTweeners(const GSSInternalNode* node, const MappableOc
 //identify and trees in this leaf that fit
 void GSSTreeSearcher::findTweeners(const GSSLeaf* node, const MappableOctTree* min, const MappableOctTree* max, vector<file_index>& respos)
 {
+	unsigned cnt = 0;
 	for(unsigned i = 0, n = node->size(); i < n; i++)
 	{
 		const GSSLeaf::Child *child = node->getChild(i);
@@ -186,8 +188,11 @@ void GSSTreeSearcher::findTweeners(const GSSLeaf* node, const MappableOctTree* m
 		if(fitsInbetween(&child->tree, &child->tree, min, max))
 		{
 			respos.push_back(child->object_pos);
+			cnt++;
 		}
 	}
+	if(cnt == node->size())
+		fullLeaves++;
 }
 
 

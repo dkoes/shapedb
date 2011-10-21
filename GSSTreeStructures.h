@@ -58,7 +58,7 @@ public:
 	{
 		file_index object_pos;
 		MappableOctTree tree;
-	};
+	} __attribute__((__packed__));
 private:
 	GSSNodeCommon info;
 	unsigned child_positions[]; //variable length, offset of trees within data section
@@ -69,7 +69,7 @@ public:
 	const Child* getChild(unsigned i) const { return (Child*)&data[child_positions[i]]; }
 	unsigned size() const { return info.N; }
 	unsigned bytes() const;
-};
+} __attribute__((__packed__));
 
 //a GSSInternalNode stores both the MIV and MSV for each subnode, and points to their locations
 class GSSInternalNode
@@ -80,16 +80,20 @@ public:
 		friend class GSSInternalNode;
 	private:
 		file_index node_pos;
+		file_index leaves_start;
+		file_index leaves_end;
 		unsigned MSVindex; //where in data MSV starts (MIV at 0)
 		unsigned char data[];
 	public:
+		Child(): node_pos(0), leaves_start(0), leaves_end(0), MSVindex(0) {}
+
 		const MappableOctTree* getMIV() const { return (const MappableOctTree*)data; }
 		const MappableOctTree* getMSV() const { return (MappableOctTree*)&data[MSVindex];}
 
 		file_index position() const { return (signed long)node_pos < 0 ? -node_pos : node_pos; }
 		bool isLeafPosition() const { return (signed long)node_pos < 0; }
 		unsigned bytes() const;
-	};
+	} __attribute__((__packed__));
 private:
 	GSSNodeCommon info;
 	unsigned child_positions[]; //offset of children within data section
@@ -101,8 +105,8 @@ public:
 	unsigned size() const { return info.N; }
 	unsigned bytes() const;
 
-	void setChildPos(unsigned i, file_index newpos);
-};
+	void setChildPos(unsigned i, file_index newpos, file_index lstart, file_index lend);
+} __attribute__((__packed__));
 
 
 

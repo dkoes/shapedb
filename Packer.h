@@ -12,11 +12,14 @@
 //abstract class for a bottom up packer, can run in quadratic time
 class Packer
 {
+public:
+	enum ClusterDistance { CompleteLink, AverageLink, SingleLink };
 protected:
 	unsigned packSize;
+	ClusterDistance distMetric;
 public:
 
-	Packer(unsigned ps): packSize(ps) {}
+	Packer(unsigned ps, ClusterDistance metric): packSize(ps), distMetric(metric) {}
 	virtual ~Packer() {}
 	virtual void pack(const DataViewer* dv, const vector<unsigned>& indices, vector<Cluster>& clusters) const = 0;
 };

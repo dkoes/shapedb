@@ -80,6 +80,15 @@ cl::opt<unsigned> Pack("pack", cl::desc("Maximum quantities per a node"), cl::in
 
 cl::opt<bool> Verbose("v", cl::desc("Verbose output"));
 
+
+cl::opt<Packer::ClusterDistance>		ClusterDist(
+				cl::desc("Metric for cluster packing distance:"),
+				cl::values(clEnumValN(Packer::AverageLink, "ave-dist", "Use 'average' metric between MIV/MSV representations of clusters"),
+						clEnumValN(Packer::CompleteLink, "complete-dist", "Use complete linkage value between cluster members"),
+						clEnumValN(Packer::SingleLink, "single-dist", "Use single linkage value between cluster members"),
+				clEnumValEnd),cl::init(Packer::AverageLink) );
+
+
 static void spherizeMol(OEMol& mol, vector<MolSphere>& spheres)
 {
 	OEAssignBondiVdWRadii(mol);
