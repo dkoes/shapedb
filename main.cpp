@@ -115,7 +115,7 @@ int main(int argc, char *argv[])
 	{
 		//read in all the molecules and calculate the max bounding box
 		KSamplePartitioner topdown(KCenters, KSampleMult);
-		FullMergePacker packer(Pack);
+		FullMergePacker packer(Pack, ClusterDist);
 
 		GSSLevelCreator leveler(&topdown, &packer, NodePack, LeafPack);
 
