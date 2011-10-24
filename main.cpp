@@ -31,11 +31,15 @@
 #include "Molecule.h"
 #include "KSamplePartitioner.h"
 #include "FullMergePacker.h"
+#include "SpectralPacker.h"
+#include <boost/shared_ptr.hpp>
 
 using namespace OEChem;
 using namespace OESystem;
 using namespace std;
 using namespace boost;
+
+typedef shared_ptr<Packer> PackerPtr;
 
 enum CommandEnum
 {
@@ -50,6 +54,17 @@ cl::opt<CommandEnum>
 				clEnumVal(NNSearch, "Nearest neighbor search")						,
 				clEnumVal(DCSearch, "Distance constraint search"),
 				clEnumValEnd) );
+
+enum PackerEnum
+{
+	FullMerge, Spectral
+};
+cl::opt<PackerEnum>
+		Packer(
+				cl::desc("Packing algorithm:"),
+				cl::values(clEnumValN(FullMerge,"full-merge", "Greedy full merge."),
+				clEnumValN(Spectral, "spectral", "Spectral packing"),
+				clEnumValEnd), cl::init(FullMerge) );
 
 cl::opt<bool> ScanCheck("scancheck",
 		cl::desc("Perform a full scan to check results"), cl::Hidden);
@@ -115,9 +130,20 @@ int main(int argc, char *argv[])
 	{
 		//read in all the molecules and calculate the max bounding box
 		KSamplePartitioner topdown(KCenters, KSampleMult);
-		FullMergePacker packer(Pack, ClusterDist);
 
-		GSSLevelCreator leveler(&topdown, &packer, NodePack, LeafPack);
+		PackerPtr packer;
+		switch(Packer)
+		{
+		case FullMerge:
+			packer = PackerPtr(new FullMergePacker(Pack, ClusterDist));
+			break;
+		case Spectral:
+			packer = PackerPtr(new SpectralPacker(Pack));
+			break;
+		}
+
+
+		GSSLevelCreator leveler(&topdown, packer.get(), NodePack, LeafPack);
 
 		GSSTreeCreator creator(&leveler);
 
@@ -128,6 +154,9 @@ int main(int argc, char *argv[])
 			cerr << "Error creating database\n";
 			exit(1);
 		}
+
+		if(Verbose)
+			creator.printStats(cout);
 
 	}
 		break;

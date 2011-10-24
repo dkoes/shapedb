@@ -79,7 +79,8 @@ public:
 	{
 		friend class GSSInternalNode;
 	private:
-		file_index node_pos;
+		bool isLeaf: 1;
+		file_index node_pos: 63;
 		file_index leaves_start;
 		file_index leaves_end;
 		unsigned MSVindex; //where in data MSV starts (MIV at 0)
@@ -90,8 +91,8 @@ public:
 		const MappableOctTree* getMIV() const { return (const MappableOctTree*)data; }
 		const MappableOctTree* getMSV() const { return (MappableOctTree*)&data[MSVindex];}
 
-		file_index position() const { return (signed long)node_pos < 0 ? -node_pos : node_pos; }
-		bool isLeafPosition() const { return (signed long)node_pos < 0; }
+		file_index position() const { return node_pos; }
+		bool isLeafPosition() const { return isLeaf; }
 		unsigned bytes() const;
 	} __attribute__((__packed__));
 private:
@@ -105,7 +106,7 @@ public:
 	unsigned size() const { return info.N; }
 	unsigned bytes() const;
 
-	void setChildPos(unsigned i, file_index newpos, file_index lstart, file_index lend);
+	void setChildPos(unsigned i, file_index newpos, bool isLeaf, file_index lstart, file_index lend);
 } __attribute__((__packed__));
 
 

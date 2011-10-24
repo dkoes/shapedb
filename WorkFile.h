@@ -15,15 +15,14 @@
 
 using namespace boost;
 using namespace std;
-using namespace boost::interprocess;
 
 //store infor for files that are being created and will be memory mapped
 struct WorkFile
 {
 	//none of these has a real copy constructor
 	ofstream *file;
-	mapped_region *map;
-	file_mapping *mapping;
+	interprocess::mapped_region *map;
+	interprocess::file_mapping *mapping;
 
 	WorkFile(): file(NULL), map(NULL), mapping(NULL) {}
 	WorkFile(const char *name);

@@ -90,6 +90,7 @@ public:
 			break;
 		default:
 			abort();
+			break;
 		}
 		return res;
 	}

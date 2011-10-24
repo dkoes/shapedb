@@ -80,6 +80,8 @@ public:
 
 	virtual void createNextLevel(DataViewer& data, ostream* nodefile, vector<file_index>& nodeindices,
 			ostream* treefile, vector<file_index>& treeindices);
+
+	unsigned getPack() const { return packer->getPack(); }
 };
 
 class GSSTreeCreator
@@ -92,6 +94,11 @@ class GSSTreeCreator
 
 	GSSLevelCreator *leveler;
 
+	//some bookkeeping for analysis purposes
+	unsigned numNodes;
+	unsigned numLeaves;
+	vector<unsigned> nodeContentDistribution;
+	vector<unsigned> leafContentDistribution;
 	file_index optimizeLevelsR(ostream& outnodes, ostream& outleaves, const GSSNodeCommon *n, unsigned level, file_index& lstart, file_index& lend);
 	void optimizeLevels();
 
@@ -100,6 +107,8 @@ public:
 	~GSSTreeCreator() {}
 
 	bool create(filesystem::path dir, Object::iterator& itr, float dim, float res);
+
+	void printStats(ostream& out) const;
 };
 
 #endif /* GSSTREECREATOR_H_ */

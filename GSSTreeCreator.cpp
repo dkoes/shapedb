@@ -122,12 +122,23 @@ file_index GSSTreeCreator::optimizeLevelsR(ostream& outnodes, ostream& outleaves
 		outleaves.write((const char*)leaf, leaf->bytes());
 		lstart = ret;
 		lend = outleaves.tellp();
-		return -ret; //leaves are neg
+
+		numLeaves++;
+		if(leaf->size() >= leafContentDistribution.size())
+			leafContentDistribution.resize(leaf->size()+1);
+		leafContentDistribution[leaf->size()]++;
+
+		return ret; //leaves are neg
 	}
 	else
 	{
+		numNodes++;
 		const GSSInternalNode* node = (const GSSInternalNode*)n;
 		file_index ret = outnodes.tellp();
+
+		if(node->size() >= nodeContentDistribution.size())
+			nodeContentDistribution.resize(node->size()+1);
+		nodeContentDistribution[node->size()]++;
 
 		unsigned nodesz = node->bytes();
 		unsigned char nodebuff[nodesz];
@@ -147,7 +158,7 @@ file_index GSSTreeCreator::optimizeLevelsR(ostream& outnodes, ostream& outleaves
 			file_index newpos = optimizeLevelsR(outnodes, outleaves, next, nextlevel, ls, le);
 			lstart = min(lstart, ls);
 			lend = max(lend, le);
-			newnode->setChildPos(i, newpos, ls, le);
+			newnode->setChildPos(i, newpos, next->isLeaf, ls, le);
 		}
 
 		outnodes.seekp(ret, ios_base::beg);
@@ -165,6 +176,12 @@ void GSSTreeCreator::optimizeLevels()
 	{
 		nodes[i].switchToMap();
 	}
+	numNodes = 0;
+	numLeaves = 0;
+	nodeContentDistribution.clear();
+	nodeContentDistribution.resize(leveler->getPack()+1, 0);
+	leafContentDistribution.clear();
+	leafContentDistribution.resize(leveler->getPack()+1, 0);
 
 	filesystem::path npath = dbpath / "nodes";
 	ofstream outnodes(npath.string().c_str());
@@ -181,7 +198,24 @@ void GSSTreeCreator::optimizeLevels()
 	{
 		nodes[i].remove();
 	}
+
 }
+
+//print out some distributions
+void GSSTreeCreator::printStats(ostream& out) const
+{
+	out << "Nodes " << numNodes << "  Leaves " << numLeaves << "\n";
+
+	unsigned mind = min(nodeContentDistribution.size(), leafContentDistribution.size());
+	unsigned nsum = 0, lsum = 0;
+	for(unsigned i = 0; i < mind; i++)
+	{
+		out << i << ": " << nodeContentDistribution[i] << "\t" << leafContentDistribution[i] << "\n";
+		nsum += nodeContentDistribution[i];
+		lsum += leafContentDistribution[i];
+	}
+}
+
 
 //top down partition
 void GSSLevelCreator::createNextLevel(DataViewer& data, ostream* nodefile, vector<file_index>& nodeindices,

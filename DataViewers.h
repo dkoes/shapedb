@@ -34,6 +34,12 @@ struct Cluster
 		if(rhs.MSV) MSV = rhs.MSV->clone();
 	}
 
+	Cluster(const vector<unsigned>& inds, const MappableOctTree **mivs, const MappableOctTree **msvs): indices(inds)
+	{
+		MIV = MappableOctTree::createFromIntersection(inds.size(), mivs);
+		MSV = MappableOctTree::createFromUnion(inds.size(), msvs);
+	}
+
 	friend void swap(Cluster& first, Cluster& second)
 	{
 		// enable ADL (not necessary in our case, but good practice)

@@ -556,6 +556,7 @@ bool ArrayOctTree::ChildNode::containedIn(
 		}
 		return true;;
 	}
+	return false;
 }
 
 //return volume of big - this, assumes this is contained in big

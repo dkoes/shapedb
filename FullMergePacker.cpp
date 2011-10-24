@@ -189,6 +189,9 @@ float FullMergePacker::clusterDistance(const DataViewer* D, const Cluster& a,
 		}
 		return min;
 	}
+	default:
+		abort();
+		break;
 	}
 	return 0;
 }

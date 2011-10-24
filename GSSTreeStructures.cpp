@@ -132,10 +132,11 @@ unsigned GSSInternalNode::bytes() const
 	return ret;
 }
 
-void GSSInternalNode::setChildPos(unsigned i, file_index newpos, file_index lstart, file_index lend)
+void GSSInternalNode::setChildPos(unsigned i, file_index newpos, bool isLeaf, file_index lstart, file_index lend)
 {
 	Child *child =  (Child*)&data[child_positions[i]];
 	child->node_pos = newpos;
+	child->isLeaf = isLeaf;
 	child->leaves_start = lstart;
 	child->leaves_end = lend;
 }

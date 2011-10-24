@@ -101,8 +101,8 @@ enum PackingEnum
 
 cl::opt<PackingEnum>		PackingAlgorithm(
 				cl::desc("Cluster packing method:"),
-				cl::values(clEnumValN(IterativeMerge, "itr-merge", "Greedy iterative merging"),
-				clEnumValN(FullMerge, "full-merge", "Merge everything simultaneously"),
+				cl::values(clEnumValN(IterativeMerge, "oitr-merge", "Greedy iterative merging"),
+				clEnumValN(FullMerge, "ofull-merge", "Merge everything simultaneously"),
 				clEnumValEnd) ,cl::init(FullMerge));
 
 

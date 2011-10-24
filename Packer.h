@@ -13,7 +13,7 @@
 class Packer
 {
 public:
-	enum ClusterDistance { CompleteLink, AverageLink, SingleLink };
+	enum ClusterDistance { CompleteLink, AverageLink, SingleLink, NotApplicable };
 protected:
 	unsigned packSize;
 	ClusterDistance distMetric;
@@ -22,6 +22,8 @@ public:
 	Packer(unsigned ps, ClusterDistance metric): packSize(ps), distMetric(metric) {}
 	virtual ~Packer() {}
 	virtual void pack(const DataViewer* dv, const vector<unsigned>& indices, vector<Cluster>& clusters) const = 0;
+
+	unsigned getPack() const { return packSize; }
 };
 
 
