@@ -94,7 +94,7 @@ cl::opt<unsigned> NodePack("node-pack",
 cl::opt<unsigned> Pack("pack", cl::desc("Maximum quantities per a node"), cl::init(8));
 
 cl::opt<bool> Verbose("v", cl::desc("Verbose output"));
-
+cl::opt<bool> UseUnnorm("use-unnorm", cl::desc("Use unnormalized laplacian in spectral packing"), cl::init(false));
 
 cl::opt<Packer::ClusterDistance>		ClusterDist(
 				cl::desc("Metric for cluster packing distance:"),
@@ -138,7 +138,7 @@ int main(int argc, char *argv[])
 			packer = PackerPtr(new FullMergePacker(Pack, ClusterDist));
 			break;
 		case Spectral:
-			packer = PackerPtr(new SpectralPacker(Pack));
+			packer = PackerPtr(new SpectralPacker(Pack, !UseUnnorm));
 			break;
 		}
 

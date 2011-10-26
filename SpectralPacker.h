@@ -26,17 +26,15 @@ class SpectralPacker: public Packer
 	//small container for storing and sorting values from eigen vector and index
 	struct EigenInd
 	{
-		double value;
+		const MatrixXd* eigens;
 		unsigned index; //value from indices
 		unsigned index_of_index; //position within indices, for referencing whole eigenvalue
+		double distance_to_next;
+		EigenInd(): eigens(NULL), index(0), index_of_index(0), distance_to_next(0) {}
+		EigenInd(unsigned i, unsigned i2, const MatrixXd& e): eigens(&e), index(i2), index_of_index(i), distance_to_next(0) {}
 
-		EigenInd(): value(0), index(0), index_of_index(0) {}
-		EigenInd(unsigned i, unsigned i2, double v): value(v), index(i2), index_of_index(i) {}
-
-		bool operator<(const EigenInd& rhs) const
-		{
-			return value < rhs.value;
-		}
+		bool operator<(const EigenInd& rhs) const;
+		void computeNextDistance(const EigenInd& next);
 	};
 	typedef shared_ptr< SelfAdjointEigenSolver<MatrixXd> > SolverPtr;
 
@@ -48,6 +46,9 @@ class SpectralPacker: public Packer
 			unsigned start, unsigned end, vector<Cluster>& clusters) const;
 
 	void createDenseClusters(const DataViewer* dv, const vector<EigenInd>& vals,
+			unsigned start, unsigned end, SolverPtr solver, vector<Cluster>& clusters) const;
+
+	void createPartitionedClusters(const DataViewer* dv, const vector<EigenInd>& vals,
 			unsigned start, unsigned end, SolverPtr solver, vector<Cluster>& clusters) const;
 public:
 	SpectralPacker(unsigned pk, bool norm=true): Packer(pk, NotApplicable), useNormalizedLaplacian(norm) {}

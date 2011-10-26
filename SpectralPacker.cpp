@@ -9,6 +9,30 @@
 #include "ShapeDistance.h"
 #include <boost/shared_ptr.hpp>
 
+bool SpectralPacker::EigenInd::operator<(const EigenInd& rhs) const
+{
+	const double threshold = 0.00001;
+	for(unsigned i = 0, n = eigens->cols(); i < n; i++)
+	{
+		double lval = (*eigens)(index_of_index,i);
+		double rval = (*rhs.eigens)(rhs.index_of_index,i);
+
+		if(lval < rval - threshold)
+			return true;
+		if(lval > rval+threshold)
+			return false;
+	}
+	return false;
+}
+
+//compute distances to next
+void SpectralPacker::EigenInd::computeNextDistance(const EigenInd& next)
+{
+	VectorXd diff = eigens->row(index_of_index) - next.eigens->row(next.index_of_index);
+	distance_to_next = sqrt(diff.dot(diff));
+}
+
+
 //create a similarity matrix from graph
 //compute log(n) nearest neighbors to determine a good sigma
 //or alternatively compute an actual knn graph (todo - a little tricky
@@ -16,7 +40,7 @@
 void SpectralPacker::transformDistancesToSimilarity(const multi_array<double, 2>& distances, MatrixXd& graph) const
 {
 	unsigned N = distances.size(); //must be square
-	graph.resize(N,N);
+	graph = MatrixXd::Zero(N,N);
 	unsigned k = max(ceil(log2(N)),1.0);
 
 	vector<double> kthdist(N, 0);
@@ -37,8 +61,7 @@ void SpectralPacker::transformDistancesToSimilarity(const multi_array<double, 2>
 		kthdist[i] = row[k-1];
 		sum += row[k-1];
 	}
-
-	double sigma = sum/N;
+	double sigma =  sum/N/4; //arbitrary
 	double denom = 2*sigma*sigma;
 	//now compute Gaussian similarity
 	for(unsigned i = 0; i < N; i++)
@@ -107,13 +130,46 @@ void SpectralPacker::createDenseClusters(const DataViewer* dv, const vector<Eige
 			createCluster(dv, vals, i, i+packSize, clusters);
 		}
 	}
+	else if(sz < packSize)
+	{
+		createCluster(dv, vals, start, end, clusters);
+	}
 	else //peel off the largest chunk we can to get balanced clusters
 	{
-		unsigned d = ceil(sz / (double)packSize);
-		unsigned min = sz / d;
+		unsigned two = (sz % packSize) + packSize;
+		unsigned first = two/2;
+		unsigned second = two-first;
+		createCluster(dv, vals, start, start+first, clusters);
+		createCluster(dv, vals, start+first, start+first+second, clusters);
+		createDenseClusters(dv, vals, start+first+second, end, solver, clusters);
+	}
+}
 
-		createCluster(dv, vals, start, start+min, clusters);
-		createDenseClusters(dv, vals, start+min, end, solver, clusters);
+//split along the largest difference
+void SpectralPacker::createPartitionedClusters(const DataViewer* dv, const vector<EigenInd>& vals,
+			unsigned start, unsigned end, SolverPtr solver, vector<Cluster>& clusters) const
+{
+	unsigned sz = end-start;
+	if(sz < 4*packSize)
+	{
+		createDenseClusters(dv, vals, start, end, solver, clusters);
+	}
+	else
+	{
+		double max = 0;
+		unsigned pos = start + sz/2;
+		//find largest difference
+		for(unsigned i = start+packSize; i < end -packSize; i++)
+		{
+			if(vals[i].distance_to_next > max)
+			{
+				max = vals[i].distance_to_next;
+				pos = i+1;
+			}
+		}
+
+		createPartitionedClusters(dv, vals, start, pos, solver, clusters);
+		createPartitionedClusters(dv, vals, pos, end, solver, clusters);
 	}
 }
 
@@ -144,6 +200,7 @@ void SpectralPacker::pack(const DataViewer* dv, const vector<unsigned>& indices,
 	//compute unnormalized graph laplacian
 	MatrixXd D(N,N);
 	transformSimilarityToLaplacian(graph, D);
+	cout << "laplace\n" << graph << "\n--\n";
 	//find the second eigenvectors (first should be unit)
 	SolverPtr solver;
 	if(useNormalizedLaplacian)
@@ -155,10 +212,16 @@ void SpectralPacker::pack(const DataViewer* dv, const vector<unsigned>& indices,
 	vector<EigenInd> vals(N);
 	for(unsigned i = 0; i < N; i++)
 	{
-		vals[i] = EigenInd(i, indices[i], (double)solver->eigenvectors()(i,1));
+		vals[i] = EigenInd(i, indices[i], solver->eigenvectors());
 	}
 
 	//pack as densely as possible
 	sort(vals.begin(), vals.end());
+
+	for(unsigned i = 0; i < N-1; i++)
+	{
+		vals[i].computeNextDistance(vals[i+1]);
+	}
+	//createPartitionedClusters(dv, vals, 0, vals.size(), solver, clusters);
 	createDenseClusters(dv, vals, 0, vals.size(), solver, clusters);
 }

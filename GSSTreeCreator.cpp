@@ -214,6 +214,7 @@ void GSSTreeCreator::printStats(ostream& out) const
 		nsum += nodeContentDistribution[i];
 		lsum += leafContentDistribution[i];
 	}
+	cout << nodeContentDistribution.size() << "\t" << leafContentDistribution.size() << "\n";
 }
 
 
