@@ -66,6 +66,14 @@ cl::opt<PackerEnum>
 				clEnumValN(Spectral, "spectral", "Spectral packing"),
 				clEnumValEnd), cl::init(FullMerge) );
 
+cl::opt<SpectralPacker::SpectralAlgEnum>
+	SpectralAlg(cl::desc("Spectral packing sub-algorithm:"),
+			cl::values(clEnumValN(SpectralPacker::SortDense, "sort-dense", "Simple sort followed by dense packing"),
+					clEnumValN(SpectralPacker::SortPartition, "sort-partition", "Simple sort followed by largest separator partition packing"),
+					clEnumValN(SpectralPacker::ClusterFullEigen, "cluster-eigen", "Cluster eigen values using greedy packer"),
+					clEnumValN(SpectralPacker::RelaxationPacking, "relax", "Cluster form relaxation values"),
+					clEnumValEnd), cl::init(SpectralPacker::SortDense));
+
 cl::opt<bool> ScanCheck("scancheck",
 		cl::desc("Perform a full scan to check results"), cl::Hidden);
 
@@ -138,7 +146,7 @@ int main(int argc, char *argv[])
 			packer = PackerPtr(new FullMergePacker(Pack, ClusterDist));
 			break;
 		case Spectral:
-			packer = PackerPtr(new SpectralPacker(Pack, !UseUnnorm));
+			packer = PackerPtr(new SpectralPacker(Pack, SpectralAlg, !UseUnnorm));
 			break;
 		}
 

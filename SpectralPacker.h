@@ -23,6 +23,9 @@ using namespace Eigen;
 
 class SpectralPacker: public Packer
 {
+public:
+	enum SpectralAlgEnum {SortDense, SortPartition, ClusterFullEigen,RelaxationPacking};
+private:
 	//small container for storing and sorting values from eigen vector and index
 	struct EigenInd
 	{
@@ -39,19 +42,29 @@ class SpectralPacker: public Packer
 	typedef shared_ptr< SelfAdjointEigenSolver<MatrixXd> > SolverPtr;
 
 	bool useNormalizedLaplacian;
+	SpectralAlgEnum algo;
+
+
 	void transformDistancesToSimilarity(const multi_array<double, 2>& distances, MatrixXd& graph) const;
 	void transformSimilarityToLaplacian(MatrixXd& graph, MatrixXd& degrees) const;
 
 	void createCluster(const DataViewer* dv, const vector<EigenInd>& vals,
 			unsigned start, unsigned end, vector<Cluster>& clusters) const;
+	void createCluster(const DataViewer* dv,
+			const vector<unsigned>& vals /* index into indices */, const vector<unsigned>& indices,
+			vector<Cluster>& clusters) const;
 
+	void createClustersFromRelaxation(const DataViewer *dv, const MatrixXd& relax,  const vector<unsigned>& indices, vector<Cluster>& clusters) const;
 	void createDenseClusters(const DataViewer* dv, const vector<EigenInd>& vals,
 			unsigned start, unsigned end, SolverPtr solver, vector<Cluster>& clusters) const;
 
 	void createPartitionedClusters(const DataViewer* dv, const vector<EigenInd>& vals,
 			unsigned start, unsigned end, SolverPtr solver, vector<Cluster>& clusters) const;
+
+	bool mergeRowIndices(const MatrixXd& D, vector<vector<unsigned> >& clusters) const;
+
 public:
-	SpectralPacker(unsigned pk, bool norm=true): Packer(pk, NotApplicable), useNormalizedLaplacian(norm) {}
+	SpectralPacker(unsigned pk, SpectralAlgEnum alg=SortDense, bool norm=true): Packer(pk, NotApplicable), useNormalizedLaplacian(norm), algo(alg) {}
 	~SpectralPacker() {}
 
 	void pack(const DataViewer* dv, const vector<unsigned>& indices, vector<Cluster>& clusters) const;
