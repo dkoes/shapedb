@@ -31,7 +31,9 @@
 #include "Molecule.h"
 #include "KSamplePartitioner.h"
 #include "FullMergePacker.h"
+#include "MatcherPacker.h"
 #include "SpectralPacker.h"
+#include "GreedyPacker.h"
 #include <boost/shared_ptr.hpp>
 
 using namespace OEChem;
@@ -57,12 +59,14 @@ cl::opt<CommandEnum>
 
 enum PackerEnum
 {
-	FullMerge, Spectral
+	FullMerge, Spectral,GreedyMerge,MatchPack
 };
 cl::opt<PackerEnum>
 		Packer(
 				cl::desc("Packing algorithm:"),
 				cl::values(clEnumValN(FullMerge,"full-merge", "Greedy full merge."),
+						clEnumValN(GreedyMerge,"greedy-merge", "Greedy iterative merge."),
+						clEnumValN(MatchPack,"match-merge", "Optimal matching merging."),
 				clEnumValN(Spectral, "spectral", "Spectral packing"),
 				clEnumValEnd), cl::init(FullMerge) );
 
@@ -144,6 +148,12 @@ int main(int argc, char *argv[])
 		{
 		case FullMerge:
 			packer = PackerPtr(new FullMergePacker(Pack, ClusterDist));
+			break;
+		case MatchPack:
+			packer = PackerPtr(new MatcherPacker(Pack, ClusterDist));
+			break;
+		case GreedyMerge:
+			packer = PackerPtr(new GreedyPacker(Pack, ClusterDist));
 			break;
 		case Spectral:
 			packer = PackerPtr(new SpectralPacker(Pack, SpectralAlg, !UseUnnorm));

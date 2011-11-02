@@ -17,6 +17,9 @@ public:
 protected:
 	unsigned packSize;
 	ClusterDistance distMetric;
+
+	float clusterDistance(const DataViewer* D, const Cluster& a,
+			const Cluster& b) const;
 public:
 
 	Packer(unsigned ps, ClusterDistance metric): packSize(ps), distMetric(metric) {}

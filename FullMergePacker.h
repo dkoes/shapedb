@@ -19,7 +19,6 @@ public:
 
 private:
 	bool fullMergeClusters(const DataViewer* D, vector<Cluster>& clusters) const;
-	float clusterDistance(const DataViewer* D, const Cluster& a, const Cluster& b) const;
 
 public:
 

@@ -35,6 +35,18 @@ float averageAbsVolume(const MappableOctTree* leftMIV, const MappableOctTree* le
 	return leftMIV->absoluteVolumeDistance(rightMIV) + leftMSV->relativeVolumeDistance(rightMSV);
 }
 
+float averageRelVolumeSim(const MappableOctTree* leftMIV, const MappableOctTree* leftMSV,
+		const MappableOctTree* rightMIV, const MappableOctTree* rightMSV)
+{
+	//handle leaves differently
+	if(leftMIV == leftMSV && rightMIV == rightMSV)
+	{
+		return 1-leftMIV->relativeVolumeDistance(rightMIV);
+	}
 
-shapeDistanceFn shapeDistance = averageRelVolume;
+	return ((1-leftMIV->relativeVolumeDistance(rightMIV)) + (1-leftMSV->relativeVolumeDistance(rightMSV)))/2.0;
+}
+
+shapeMetricFn shapeDistance = averageRelVolume;
+shapeMetricFn shapeSimilarity = averageRelVolumeSim;
 

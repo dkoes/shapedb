@@ -10,10 +10,11 @@
 #include "MappableOctTree.h"
 
 typedef
-float (*shapeDistanceFn)(const MappableOctTree* leftMIV, const MappableOctTree* leftMSV,
+float (*shapeMetricFn)(const MappableOctTree* leftMIV, const MappableOctTree* leftMSV,
 		const MappableOctTree* rightMIV, const MappableOctTree* rightMSV);
 
 //a global function for performing shape comparisons between MIV/MSV pairs
-extern shapeDistanceFn shapeDistance;
+extern shapeMetricFn shapeDistance;
+extern shapeMetricFn shapeSimilarity;
 
 #endif /* SHAPEDISTANCE_H_ */

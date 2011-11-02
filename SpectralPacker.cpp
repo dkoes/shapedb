@@ -355,7 +355,7 @@ void SpectralPacker::createClustersFromRelaxation(const DataViewer *dv, const Ma
 		for(unsigned j = 0, nr = relax.rows(); j < nr; j++)
 		{
 			if(!packed[j]) {
-				Is.push_back(UDPair(j,relax(j, c)));
+				Is.push_back(UDPair(j,(double)relax(j, c)));
 			}
 		}
 		sort(Is.begin(), Is.end());
