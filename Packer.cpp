@@ -11,7 +11,7 @@
 
 //return the distance between two clusters, this may be configurable to other metrics
 float Packer::clusterDistance(const DataViewer* D, const Cluster& a,
-		const Cluster& b) const
+		const Cluster& b, DCache& dcache) const
 {
 	switch (distMetric)
 	{
@@ -31,8 +31,16 @@ float Packer::clusterDistance(const DataViewer* D, const Cluster& a,
 				unsigned l = a[i];
 				unsigned r = b[j];
 
-				dist = shapeDistance(D->getMIV(l), D->getMSV(l), D->getMIV(r),
+				if(dcache[l][r] > 0)
+				{
+					dist = dcache[l][r];
+				}
+				else
+				{
+					dist = shapeDistance(D->getMIV(l), D->getMSV(l), D->getMIV(r),
 						D->getMSV(r));
+					dcache[l][r] = dist;
+				}
 
 				if (dist < min)
 					min = dist;

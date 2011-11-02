@@ -25,14 +25,16 @@ void MatcherPacker::pack(const DataViewer* dv, const vector<unsigned>& indices, 
 		clusters[i].setToSingleton(index, dv->getMIV(index), dv->getMSV(index));
 	}
 
+	DCache dcache(boost::extents[indices.size()][indices.size()]);
+	std::fill(dcache.origin(),dcache.origin()+dcache.size(), 0);
 	//combine everything as much as possible
-	while (fullMergeClusters(dv, clusters))
+	while (fullMergeClusters(dv, clusters, dcache))
 		;
 }
 
 
 bool MatcherPacker::fullMergeClusters(const DataViewer *D,
-		vector<Cluster>& clusters) const
+		vector<Cluster>& clusters, DCache& dcache) const
 {
 	unsigned C = clusters.size();
 	if (C == 1)
@@ -49,7 +51,7 @@ bool MatcherPacker::fullMergeClusters(const DataViewer *D,
 	{
 		for (unsigned j = 0; j < i; j++)
 		{
-			float dist = clusterDistance(D, clusters[i], clusters[j]);
+			float dist = clusterDistance(D, clusters[i], clusters[j], dcache);
 			if(clusters[i].size() + clusters[j].size() > packSize)
 				dist = 1000000;
 			weights[G.arc(G(i),G(j))] = -dist; //because the algo maximizes

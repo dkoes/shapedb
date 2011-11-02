@@ -9,17 +9,22 @@
 #define PACKER_H_
 
 #include "DataViewers.h"
+#include <boost/unordered_map.hpp>
+#include <boost/multi_array.hpp>
+
 //abstract class for a bottom up packer, can run in quadratic time
 class Packer
 {
 public:
+	typedef pair<unsigned,unsigned> DCacheKey;
+	typedef multi_array<float, 2> DCache;
 	enum ClusterDistance { CompleteLink, AverageLink, SingleLink, NotApplicable };
 protected:
 	unsigned packSize;
 	ClusterDistance distMetric;
 
 	float clusterDistance(const DataViewer* D, const Cluster& a,
-			const Cluster& b) const;
+			const Cluster& b, DCache& dcache) const;
 public:
 
 	Packer(unsigned ps, ClusterDistance metric): packSize(ps), distMetric(metric) {}

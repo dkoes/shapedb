@@ -24,8 +24,11 @@ void FullMergePacker::pack(const DataViewer* dv,
 		clusters[i].setToSingleton(index, dv->getMIV(index), dv->getMSV(index));
 	}
 
+	DCache dcache(boost::extents[indices.size()][indices.size()]);
+	std::fill(dcache.origin(),dcache.origin()+dcache.size(), 0);
+
 	//combine everything as much as possible
-	while (fullMergeClusters(dv, clusters))
+	while (fullMergeClusters(dv, clusters, dcache))
 		;
 
 }
@@ -54,7 +57,7 @@ struct IntraClusterDist
 };
 
 bool FullMergePacker::fullMergeClusters(const DataViewer *D,
-		vector<Cluster>& clusters) const
+		vector<Cluster>& clusters, DCache& dcache) const
 {
 	unsigned N = clusters.size();
 	if (N == 1)
@@ -68,7 +71,7 @@ bool FullMergePacker::fullMergeClusters(const DataViewer *D,
 	{
 		for (unsigned j = 0; j < i; j++)
 		{
-			float dist = clusterDistance(D, clusters[i], clusters[j]);
+			float dist = clusterDistance(D, clusters[i], clusters[j], dcache);
 			distances.push_back(IntraClusterDist(i, j, dist));
 		}
 	}
@@ -118,7 +121,7 @@ bool FullMergePacker::fullMergeClusters(const DataViewer *D,
 		unsigned best = 0;
 		for (unsigned i = 0, n = newclusters.size() - 1; i < n; i++)
 		{
-			float dist = clusterDistance(D, newclusters.back(), newclusters[i]);
+			float dist = clusterDistance(D, newclusters.back(), newclusters[i], dcache);
 			if (dist < minval)
 			{
 				minval = dist;

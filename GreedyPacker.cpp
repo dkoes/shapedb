@@ -103,13 +103,15 @@ void GreedyPacker::pack(const DataViewer* dv, const vector<unsigned>& indices, v
 	//compute all intra cluster distances
 	vector<IntraClusterDist> distances; distances.reserve(N*N / 2);
 	boost::multi_array<float, 2> darray(boost::extents[N][N]);
+	DCache dcache(boost::extents[indices.size()][indices.size()]);
+	std::fill(dcache.origin(),dcache.origin()+dcache.size(), 0);
 
 	for (unsigned i = 0; i < N; i++)
 	{
 		darray[i][i] = 0;
 		for (unsigned j = 0; j < i; j++)
 		{
-			float dist = clusterDistance(dv, clusters[i], clusters[j]);
+			float dist = clusterDistance(dv, clusters[i], clusters[j], dcache);
 			darray[i][j] = darray[j][i] = dist;
 			distances.push_back(IntraClusterDist(i,j,dist));
 		}
@@ -141,7 +143,7 @@ void GreedyPacker::pack(const DataViewer* dv, const vector<unsigned>& indices, v
 				{
 					if(clusters[d].isValid())
 					{
-						float dist = clusterDistance(dv, clusters.back(), clusters[d]);
+						float dist = clusterDistance(dv, clusters.back(), clusters[d], dcache);
 						pQ.push(IntraClusterDist(c,d,dist));
 					}
 				}
