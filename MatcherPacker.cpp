@@ -25,8 +25,7 @@ void MatcherPacker::pack(const DataViewer* dv, const vector<unsigned>& indices, 
 		clusters[i].setToSingleton(index, dv->getMIV(index), dv->getMSV(index));
 	}
 
-	DCache dcache(boost::extents[indices.size()][indices.size()]);
-	std::fill(dcache.origin(),dcache.origin()+dcache.size(), 0);
+	DCache dcache;
 	//combine everything as much as possible
 	while (fullMergeClusters(dv, clusters, dcache))
 		;

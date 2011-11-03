@@ -31,15 +31,16 @@ float Packer::clusterDistance(const DataViewer* D, const Cluster& a,
 				unsigned l = a[i];
 				unsigned r = b[j];
 
-				if(dcache[l][r] > 0)
+				DCacheKey key(l,r);
+				if(dcache.count(key) > 0)
 				{
-					dist = dcache[l][r];
+					dist = dcache[key];
 				}
 				else
 				{
 					dist = shapeDistance(D->getMIV(l), D->getMSV(l), D->getMIV(r),
 						D->getMSV(r));
-					dcache[l][r] = dist;
+					dcache[key] = dist;
 				}
 
 				if (dist < min)

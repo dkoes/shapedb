@@ -17,7 +17,7 @@ class Packer
 {
 public:
 	typedef pair<unsigned,unsigned> DCacheKey;
-	typedef multi_array<float, 2> DCache;
+	typedef unordered_map< DCacheKey, double> DCache;
 	enum ClusterDistance { CompleteLink, AverageLink, SingleLink, NotApplicable };
 protected:
 	unsigned packSize;
