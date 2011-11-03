@@ -15,7 +15,7 @@
 
 class MatcherPacker: public Packer
 {
-	bool fullMergeClusters(const DataViewer* D, vector<Cluster>& clusters, DCache& dcache) const;
+	bool fullMergeClusters(const DataViewer* D, vector<Cluster>& clusters, unsigned maxSz, DCache& dcache) const;
 
 public:
 	MatcherPacker(unsigned ps, ClusterDistance metric=AverageLink): Packer(ps, metric) {}

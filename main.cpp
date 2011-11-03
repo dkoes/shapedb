@@ -68,7 +68,7 @@ cl::opt<PackerEnum>
 						clEnumValN(GreedyMerge,"greedy-merge", "Greedy iterative merge."),
 						clEnumValN(MatchPack,"match-merge", "Optimal matching merging."),
 				clEnumValN(Spectral, "spectral", "Spectral packing"),
-				clEnumValEnd), cl::init(FullMerge) );
+				clEnumValEnd), cl::init(MatchPack) );
 
 cl::opt<SpectralPacker::SpectralAlgEnum>
 	SpectralAlg(cl::desc("Spectral packing sub-algorithm:"),
@@ -80,6 +80,8 @@ cl::opt<SpectralPacker::SpectralAlgEnum>
 
 cl::opt<bool> ScanCheck("scancheck",
 		cl::desc("Perform a full scan to check results"), cl::Hidden);
+cl::opt<bool> ScanOnly("scanonly",
+		cl::desc("Search using only a scan"), cl::Hidden);
 
 cl::opt<string> Input("in", cl::desc("Input file"));
 cl::opt<string> Output("out", cl::desc("Output file"));
@@ -249,9 +251,10 @@ int main(int argc, char *argv[])
 			vector<Molecule> res;
 
 			//search
-			gss.dc_search(Molecule(insphere), Molecule(exsphere), true, res);
+			if(!ScanOnly)
+				gss.dc_search(Molecule(insphere), Molecule(exsphere), true, res);
 
-			if(ScanCheck)
+			if(ScanCheck || ScanOnly)
 			{
 				vector<Molecule> res2;
 				gss.dc_scan_search(Molecule(insphere), Molecule(exsphere), true, res2);
@@ -284,9 +287,10 @@ int main(int argc, char *argv[])
 
 				vector<Molecule > res;
 				//search
-				gss.dc_search(Molecule(littlespheres), Molecule(bigspheres), false, res);
+				if(!ScanOnly)
+					gss.dc_search(Molecule(littlespheres), Molecule(bigspheres), false, res);
 
-				if(ScanCheck)
+				if(ScanCheck || ScanOnly)
 				{
 					vector<Molecule> res2;
 					gss.dc_scan_search(Molecule(littlespheres), Molecule(bigspheres), false, res2);

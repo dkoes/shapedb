@@ -27,13 +27,16 @@ void MatcherPacker::pack(const DataViewer* dv, const vector<unsigned>& indices, 
 
 	DCache dcache;
 	//combine everything as much as possible
-	while (fullMergeClusters(dv, clusters, dcache))
-		;
+	unsigned curSz = 1;
+	while (curSz < packSize && fullMergeClusters(dv, clusters, curSz, dcache))
+		curSz *= 2;
 }
 
-
+/* find the optimal matching of every pair of clusters
+ * maxSz is what the largest current cluster should be
+ */
 bool MatcherPacker::fullMergeClusters(const DataViewer *D,
-		vector<Cluster>& clusters, DCache& dcache) const
+		vector<Cluster>& clusters, unsigned maxSz, DCache& dcache) const
 {
 	unsigned C = clusters.size();
 	if (C == 1)
@@ -51,8 +54,6 @@ bool MatcherPacker::fullMergeClusters(const DataViewer *D,
 		for (unsigned j = 0; j < i; j++)
 		{
 			float dist = clusterDistance(D, clusters[i], clusters[j], dcache);
-			if(clusters[i].size() + clusters[j].size() > packSize)
-				dist = 1000000;
 			weights[G.arc(G(i),G(j))] = -dist; //because the algo maximizes
 		}
 	}
@@ -62,8 +63,17 @@ bool MatcherPacker::fullMergeClusters(const DataViewer *D,
 	{
 		for(unsigned j = 0; j < C; j++)
 		{
-			weights[G.arc(G(i),G(j))] = 0;
-			weights[G.arc(G(j),G(i))] = 0;
+			if(clusters[j].size() < maxSz)
+			{
+				//force smaller clusters to merge
+				weights[G.arc(G(i),G(j))] = -10000;
+				weights[G.arc(G(j),G(i))] = -10000;
+			}
+			else
+			{
+				weights[G.arc(G(i),G(j))] = 0;
+				weights[G.arc(G(j),G(i))] = 0;
+			}
 		}
 	}
 
