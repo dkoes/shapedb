@@ -30,10 +30,7 @@
 #include "GSSTreeSearcher.h"
 #include "Molecule.h"
 #include "KSamplePartitioner.h"
-#include "FullMergePacker.h"
-#include "MatcherPacker.h"
-#include "SpectralPacker.h"
-#include "GreedyPacker.h"
+#include "packers/Packers.h"
 #include <boost/shared_ptr.hpp>
 
 using namespace OEChem;
@@ -115,6 +112,7 @@ cl::opt<Packer::ClusterDistance>		ClusterDist(
 				cl::values(clEnumValN(Packer::AverageLink, "ave-dist", "Use 'average' metric between MIV/MSV representations of clusters"),
 						clEnumValN(Packer::CompleteLink, "complete-dist", "Use complete linkage value between cluster members"),
 						clEnumValN(Packer::SingleLink, "single-dist", "Use single linkage value between cluster members"),
+						clEnumValN(Packer::TotalLink, "total-dist", "Use total (sum) linkage value between cluster members"),
 				clEnumValEnd),cl::init(Packer::AverageLink) );
 
 

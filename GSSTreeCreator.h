@@ -41,7 +41,7 @@
 #include "GSSTypes.h"
 #include "GSSTreeStructures.h"
 #include "TopDownPartitioner.h"
-#include "Packer.h"
+#include "packers/Packer.h"
 
 using namespace boost;
 using namespace std;

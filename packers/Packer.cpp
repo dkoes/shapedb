@@ -51,6 +51,36 @@ float Packer::clusterDistance(const DataViewer* D, const Cluster& a,
 		}
 		return max;
 	}
+	case TotalLink:
+	{
+		//this is the total sum of all the linkages, distiguished from average link
+		//in that smaller clusters end up with smaller values
+		float sum = 0;
+		for (unsigned i = 0, ni = a.size(); i < ni; i++)
+		{
+			for (unsigned j = 0, nj = b.size(); j < nj; j++)
+			{
+				float dist = 0;
+				unsigned l = a[i];
+				unsigned r = b[j];
+
+				DCacheKey key(l,r);
+				if(dcache.count(key) > 0)
+				{
+					dist = dcache[key];
+				}
+				else
+				{
+					dist = shapeDistance(D->getMIV(l), D->getMSV(l), D->getMIV(r),
+						D->getMSV(r));
+					dcache[key] = dist;
+				}
+
+				sum += dist;
+			}
+		}
+		return sum;
+	}
 	case SingleLink:
 	{
 		//the minimum distance overall

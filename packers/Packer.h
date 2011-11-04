@@ -18,7 +18,7 @@ class Packer
 public:
 	typedef pair<unsigned,unsigned> DCacheKey;
 	typedef unordered_map< DCacheKey, double> DCache;
-	enum ClusterDistance { CompleteLink, AverageLink, SingleLink, NotApplicable };
+	enum ClusterDistance { CompleteLink, AverageLink, SingleLink, TotalLink, NotApplicable };
 protected:
 	unsigned packSize;
 	ClusterDistance distMetric;

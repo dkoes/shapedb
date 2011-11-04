@@ -86,7 +86,7 @@ public:
 		unsigned MSVindex; //where in data MSV starts (MIV at 0)
 		unsigned char data[];
 	public:
-		Child(): node_pos(0), leaves_start(0), leaves_end(0), MSVindex(0) {}
+		Child(): isLeaf(false), node_pos(0), leaves_start(0), leaves_end(0), MSVindex(0) {}
 
 		const MappableOctTree* getMIV() const { return (const MappableOctTree*)data; }
 		const MappableOctTree* getMSV() const { return (MappableOctTree*)&data[MSVindex];}

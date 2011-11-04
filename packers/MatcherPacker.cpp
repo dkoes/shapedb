@@ -63,7 +63,7 @@ bool MatcherPacker::fullMergeClusters(const DataViewer *D,
 	{
 		for(unsigned j = 0; j < C; j++)
 		{
-			if(clusters[j].size() < maxSz)
+			if(false && clusters[j].size() < maxSz)
 			{
 				//force smaller clusters to merge
 				weights[G.arc(G(i),G(j))] = -10000;
