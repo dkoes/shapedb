@@ -141,7 +141,7 @@ file_index GSSTreeCreator::optimizeLevelsR(ostream& outnodes, ostream& outleaves
 		nodeContentDistribution[node->size()]++;
 
 		unsigned nodesz = node->bytes();
-		unsigned char nodebuff[nodesz];
+		unsigned char*  nodebuff = (unsigned char*)malloc(nodesz*sizeof(unsigned char));
 		memcpy(nodebuff, (const char*)node, nodesz);
 
 		GSSInternalNode* newnode = (GSSInternalNode*)nodebuff;
@@ -164,6 +164,7 @@ file_index GSSTreeCreator::optimizeLevelsR(ostream& outnodes, ostream& outleaves
 		outnodes.seekp(ret, ios_base::beg);
 		outnodes.write((const char*)nodebuff, nodesz);
 		outnodes.seekp(0, ios_base::end);
+		free(nodebuff);
 
 		return ret;
 	}
