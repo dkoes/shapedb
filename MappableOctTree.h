@@ -16,8 +16,39 @@
 #include <fstream>
 
 #include "Cube.h"
-
+#include <boost/tuple/tuple.hpp>
 using namespace std;
+
+struct Vertex
+{
+	float x, y, z;
+
+	Vertex(): x(0), y(0), z(0) {}
+	Vertex(float X, float Y, float Z): x(X), y(Y), z(Z) {}
+
+	bool operator<(const Vertex& rhs) const
+	{
+		if(x != rhs.x)
+			return x < rhs.x;
+		if(y != rhs.y)
+			return y < rhs.y;
+		return z < rhs.z;
+	}
+
+	bool operator==(const Vertex& rhs) const
+	{
+		return x == rhs.x && y == rhs.y && z == rhs.z;
+	}
+
+	float distanceSq(const Vertex& rhs) const
+	{
+		float X = x-rhs.x;
+		float Y = y-rhs.y;
+		float Z = z-rhs.z;
+
+		return X*X+Y*Y+Z*Z;
+	}
+};
 
 struct MOctNode;
 struct MChildNode
@@ -56,6 +87,8 @@ struct MChildNode
 	{
 		return vol;
 	}
+
+	void collectVertices(vector<Vertex>& vertices, Cube box, const MOctNode* tree) const;
 
 }__attribute__((__packed__));
 
@@ -123,7 +156,7 @@ public:
 
 	void write(ostream& out) const;
 
-	float hausdorffDistance(const MappableOctTree* B) const;
+	float hausdorffDistance(const MappableOctTree* B, float dim) const;
 	float relativeVolumeDistance(const MappableOctTree * B) const;
 	float absoluteVolumeDistance(const MappableOctTree * B) const;
 

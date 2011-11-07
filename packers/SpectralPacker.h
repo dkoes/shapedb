@@ -67,7 +67,7 @@ public:
 	SpectralPacker(unsigned pk, SpectralAlgEnum alg=SortDense, bool norm=true): Packer(pk, NotApplicable), useNormalizedLaplacian(norm), algo(alg) {}
 	~SpectralPacker() {}
 
-	void pack(const DataViewer* dv, const vector<unsigned>& indices, vector<Cluster>& clusters) const;
+	void pack(const DataViewer* dv, vector<Cluster>& clusters) const;
 
 };
 

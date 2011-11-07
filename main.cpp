@@ -59,7 +59,7 @@ enum PackerEnum
 	FullMerge, Spectral,GreedyMerge,MatchPack
 };
 cl::opt<PackerEnum>
-		Packer(
+		PackerChoice(
 				cl::desc("Packing algorithm:"),
 				cl::values(clEnumValN(FullMerge,"full-merge", "Greedy full merge."),
 						clEnumValN(GreedyMerge,"greedy-merge", "Greedy iterative merge."),
@@ -115,6 +115,12 @@ cl::opt<Packer::ClusterDistance>		ClusterDist(
 						clEnumValN(Packer::TotalLink, "total-dist", "Use total (sum) linkage value between cluster members"),
 				clEnumValEnd),cl::init(Packer::AverageLink) );
 
+cl::opt<DistanceFunction> ShapeDist(cl::desc("Metric for distance between shapes:"),
+		cl::values(clEnumValN(RelativeVolume,"rel-volume","Relative volume difference"),
+				clEnumValN(AbsVolume,"abs-volume", "Absolute volume difference"),
+				clEnumValN(Hausdorff,"hausdorff", "Hausdorff distance"), clEnumValEnd),
+				cl::init(RelativeVolume));
+
 
 static void spherizeMol(OEMol& mol, vector<MolSphere>& spheres)
 {
@@ -144,7 +150,7 @@ int main(int argc, char *argv[])
 		KSamplePartitioner topdown(KCenters, KSampleMult);
 
 		PackerPtr packer;
-		switch(Packer)
+		switch(PackerChoice)
 		{
 		case FullMerge:
 			packer = PackerPtr(new FullMergePacker(Pack, ClusterDist));
@@ -160,6 +166,7 @@ int main(int argc, char *argv[])
 			break;
 		}
 
+		setDistance(ShapeDist, MaxDimension);
 
 		GSSLevelCreator leveler(&topdown, packer.get(), NodePack, LeafPack);
 
@@ -188,7 +195,7 @@ int main(int argc, char *argv[])
 			exit(-1);
 		}
 		//TODO: load db
-
+		abort();
 		//read query molecule(s)
 		for(Molecule::iterator molitr(Input); molitr; ++molitr)
 		{

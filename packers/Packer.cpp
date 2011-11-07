@@ -16,7 +16,14 @@ float Packer::clusterDistance(const DataViewer* D, const Cluster& a,
 	switch (distMetric)
 	{
 	case AverageLink:
-		return shapeDistance(a.MIV, a.MSV, b.MIV, b.MSV);
+		if(a.size() == 1 && b.size() == 1)
+		{
+			return dcache.get(a[0],b[0]);
+		}
+		else
+		{
+			return shapeDistance(a.MIV, a.MSV, b.MIV, b.MSV);
+		}
 	case CompleteLink:
 	{
 		//this is the maximum of the minimum distances between cluster members
@@ -27,21 +34,9 @@ float Packer::clusterDistance(const DataViewer* D, const Cluster& a,
 			float min = HUGE_VAL;
 			for (unsigned j = 0, nj = b.size(); j < nj; j++)
 			{
-				float dist = 0;
 				unsigned l = a[i];
 				unsigned r = b[j];
-
-				DCacheKey key(l,r);
-				if(dcache.count(key) > 0)
-				{
-					dist = dcache[key];
-				}
-				else
-				{
-					dist = shapeDistance(D->getMIV(l), D->getMSV(l), D->getMIV(r),
-						D->getMSV(r));
-					dcache[key] = dist;
-				}
+				float dist = dcache.get(l,r);
 
 				if (dist < min)
 					min = dist;
@@ -60,21 +55,9 @@ float Packer::clusterDistance(const DataViewer* D, const Cluster& a,
 		{
 			for (unsigned j = 0, nj = b.size(); j < nj; j++)
 			{
-				float dist = 0;
 				unsigned l = a[i];
 				unsigned r = b[j];
-
-				DCacheKey key(l,r);
-				if(dcache.count(key) > 0)
-				{
-					dist = dcache[key];
-				}
-				else
-				{
-					dist = shapeDistance(D->getMIV(l), D->getMSV(l), D->getMIV(r),
-						D->getMSV(r));
-					dcache[key] = dist;
-				}
+				float dist = dcache.get(l,r);
 
 				sum += dist;
 			}
@@ -89,12 +72,9 @@ float Packer::clusterDistance(const DataViewer* D, const Cluster& a,
 		{
 			for (unsigned j = 0, nj = b.size(); j < nj; j++)
 			{
-				float dist = 0;
-
 				unsigned l = a[i];
 				unsigned r = b[j];
-				dist = shapeDistance(D->getMIV(l), D->getMSV(l), D->getMIV(r),
-						D->getMSV(r));
+				float dist = dcache.get(l,r);
 
 				if (dist < min)
 					min = dist;

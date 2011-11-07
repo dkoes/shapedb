@@ -249,11 +249,14 @@ void GSSLevelCreator::createNextLevelR(TopDownPartitioner *P)
 	if(P->size() <= packingSize)
 	{
 		//bottom up pack
-		const DataViewer* data = P->getData();
+		const DataViewer* dv = P->getData();
 		vector<Cluster> clusters;
-		vector<unsigned> indices;
-		P->extractIndicies(indices);
-		packer->pack(data, indices, clusters);
+		vector<unsigned> dvindices;
+		P->extractIndicies(dvindices);
+
+		const DataViewer* data = dv->createSlice(dvindices); //reindex for better caching
+
+		packer->pack(data, clusters);
 
 		//each cluster creates a new node
 		for(unsigned c = 0, nc = clusters.size(); c < nc; c++)
@@ -271,6 +274,8 @@ void GSSLevelCreator::createNextLevelR(TopDownPartitioner *P)
 				GSSInternalNode::writeNode(data, clusters[c], *outNodes, *outTrees);
 			}
 		}
+
+		delete data;
 	}
 	else
 	{

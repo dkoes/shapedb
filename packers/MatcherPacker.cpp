@@ -11,10 +11,14 @@
 
 using namespace lemon;
 
-void MatcherPacker::pack(const DataViewer* dv, const vector<unsigned>& indices, vector<Cluster>& clusters) const
+void MatcherPacker::pack(const DataViewer* dv, vector<Cluster>& clusters) const
 {
-	if (indices.size() == 0)
+	if (dv->size() == 0)
 		return;
+
+	vector<unsigned> indices(dv->size());
+	for(unsigned i = 0, n = indices.size(); i < n; i++)
+		indices[i] = i;
 
 	//start with each object in its own cluster
 	clusters.clear();
@@ -25,11 +29,12 @@ void MatcherPacker::pack(const DataViewer* dv, const vector<unsigned>& indices, 
 		clusters[i].setToSingleton(index, dv->getMIV(index), dv->getMSV(index));
 	}
 
-	DCache dcache;
+	DCache dcache(dv);
 	//combine everything as much as possible
 	unsigned curSz = 1;
 	while (curSz < packSize && fullMergeClusters(dv, clusters, curSz, dcache))
 		curSz *= 2;
+
 }
 
 /* find the optimal matching of every pair of clusters
@@ -63,7 +68,7 @@ bool MatcherPacker::fullMergeClusters(const DataViewer *D,
 	{
 		for(unsigned j = 0; j < C; j++)
 		{
-			if(false && clusters[j].size() < maxSz)
+			if(clusters[j].size() < maxSz)
 			{
 				//force smaller clusters to merge
 				weights[G.arc(G(i),G(j))] = -10000;

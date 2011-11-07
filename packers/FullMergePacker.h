@@ -25,7 +25,7 @@ public:
 	FullMergePacker(unsigned ps, ClusterDistance metric=AverageLink): Packer(ps, metric) {}
 	virtual ~FullMergePacker() {}
 
-	virtual void pack(const DataViewer* dv, const vector<unsigned>& indices, vector<Cluster>& clusters) const;
+	virtual void pack(const DataViewer* dv, vector<Cluster>& clusters) const;
 
 };
 

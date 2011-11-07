@@ -84,10 +84,14 @@ public:
 
 };
 
-void GreedyPacker::pack(const DataViewer* dv, const vector<unsigned>& indices, vector<Cluster>& finalclusters) const
+void GreedyPacker::pack(const DataViewer* dv, vector<Cluster>& finalclusters) const
 {
-	if (indices.size() == 0)
+	if (dv->size() == 0)
 		return;
+
+	vector<unsigned> indices(dv->size());
+	for(unsigned i = 0, n = indices.size(); i < n; i++)
+		indices[i] = i;
 
 	//start with each object in its own cluster
 	unsigned N = indices.size();
@@ -103,7 +107,7 @@ void GreedyPacker::pack(const DataViewer* dv, const vector<unsigned>& indices, v
 	//compute all intra cluster distances
 	vector<IntraClusterDist> distances; distances.reserve(N*N / 2);
 	boost::multi_array<float, 2> darray(boost::extents[N][N]);
-	DCache dcache;
+	DCache dcache(dv);
 
 	for (unsigned i = 0; i < N; i++)
 	{

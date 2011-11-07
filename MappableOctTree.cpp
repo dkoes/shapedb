@@ -8,6 +8,8 @@
 #include "MappableOctTree.h"
 #include <cstring>
 #include <cassert>
+#include <boost/multi_array.hpp>
+using namespace boost;
 
 MappableOctTree* MappableOctTree::clone() const
 {
@@ -420,3 +422,127 @@ bool MChildNode::containedIn(
 	return false;
 }
 
+static void addVertices(vector<Vertex>& vertices, Cube box)
+{
+	for(unsigned i = 0; i < 8; i++)
+	{
+		float x = box.x;
+		float y = box.y;
+		float z = box.z;
+
+		if(i & 1)
+			x += box.dim;
+		if(i & 2)
+			y += box.dim;
+		if(i & 4)
+			z += box.dim;
+
+		vertices.push_back(Vertex(x,y,z));
+	}
+}
+
+//append vertices of this child to vertices, this child's box is provided
+void MChildNode::collectVertices(vector<Vertex>& vertices, Cube box, const MOctNode* tree) const
+{
+	if(isLeaf)
+	{
+		if(pattern == 0)
+			return; //empty, no vertices
+		else if(pattern == 0xff) //full, add this box's vertices
+		{
+			addVertices(vertices, box);
+		}
+		else
+		{
+			for(unsigned i = 0; i < 8; i++)
+			{
+				if(pattern&(1<<i))
+				{
+					addVertices(vertices, box.getOctant(i));
+				}
+			}
+		}
+	}
+	else
+	{
+		for (unsigned i = 0; i < 8; i++)
+		{
+			tree[index].children[i].collectVertices(vertices, box.getOctant(i), tree);
+		}
+	}
+}
+
+//sort, then remove duplicates and remove vertices that appear 8 times altogether
+static void uniqueRemove8ify(vector<Vertex>& V)
+{
+	sort(V.begin(), V.end());
+
+	unsigned i = 1;
+	unsigned n = V.size();
+	unsigned cnt = 1;
+	unsigned last = 0;
+	while(i < n)
+	{
+		if(V[i] == V[last])
+		{
+			cnt++;
+			i++;
+		}
+		else
+		{
+			if(cnt < 8)
+				last++; //keep what we copied
+			V[last] = V[i];
+			cnt = 1;
+		}
+	}
+
+	if(cnt < 8)
+		V.resize(last+1);
+	else
+		V.resize(last);
+}
+
+//the Hausdorff distance is the maximum minimum distance between the
+//two shapes; it is not symmetric, but this computes the symmetric
+//(max H(A,B),H(B,A)) distance
+//
+//TODO: make this efficient if it turns out to be worthwhile, right now
+//do the easiest implimentation: collect all leaf corner coordinates, sort,
+//remove completely buried (8 versions), compute all pairs distances
+float MappableOctTree::hausdorffDistance(const MappableOctTree* B, float dim) const
+{
+	vector<Vertex> Av, Bv;
+
+	Cube box(dim, -dim / 2, -dim / 2, -dim / 2);
+	root.collectVertices(Av, box, tree);
+	B->root.collectVertices(Bv, box, B->tree);
+
+	unsigned oldA = Av.size();
+	unsigned oldB = Bv.size();
+	uniqueRemove8ify(Av);
+	uniqueRemove8ify(Bv);
+
+	//compute distances once
+	vector<float> Bmin(Bv.size(), HUGE_VAL);
+	float Amax = 0;
+	for(unsigned i = 0, n = Av.size(); i < n; i++)
+	{
+		float Amin = HUGE_VAL;
+		for(unsigned j = 0, m = Bv.size(); j < m; j++)
+		{
+			float dist = Av[i].distanceSq(Bv[j]);
+			if(dist < Amin)
+				Amin = dist;
+
+			if(dist < Bmin[j])
+				Bmin[j] = dist;
+		}
+		if(Amin > Amax)
+			Amax = Amin;
+	}
+
+	float Bmax = *std::max_element(Bmin.begin(), Bmin.end());
+//cout << Av.size() << " " << oldA << " " << Bv.size() << " " << oldB << " " << Amax << " " << Bmax << "\n";
+	return sqrt(std::max(Amax, Bmax));
+}

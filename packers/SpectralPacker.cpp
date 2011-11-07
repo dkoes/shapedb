@@ -370,9 +370,16 @@ void SpectralPacker::createClustersFromRelaxation(const DataViewer *dv, const Ma
 }
 
 
-void SpectralPacker::pack(const DataViewer* dv, const vector<unsigned>& indices,
+void SpectralPacker::pack(const DataViewer* dv,
 		vector<Cluster>& clusters) const
 {
+	if (dv->size() == 0)
+		return;
+
+	vector<unsigned> indices(dv->size());
+	for(unsigned i = 0, n = indices.size(); i < n; i++)
+		indices[i] = i;
+
 	//first compute the n^2 distances
 	unsigned N = indices.size();
 	multi_array<double, 2> distances(extents[N][N]);

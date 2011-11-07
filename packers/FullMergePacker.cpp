@@ -9,11 +9,14 @@
 #include "ShapeDistance.h"
 
 //bottom up even clustering (merge all pairs, repeat)
-void FullMergePacker::pack(const DataViewer* dv,
-		const vector<unsigned>& indices, vector<Cluster>& clusters) const
+void FullMergePacker::pack(const DataViewer* dv, vector<Cluster>& clusters) const
 {
-	if (indices.size() == 0)
+	if (dv->size() == 0)
 		return;
+
+	vector<unsigned> indices(dv->size());
+	for(unsigned i = 0, n = indices.size(); i < n; i++)
+		indices[i] = i;
 
 	//start with each object in its own cluster
 	clusters.clear();
@@ -24,7 +27,7 @@ void FullMergePacker::pack(const DataViewer* dv,
 		clusters[i].setToSingleton(index, dv->getMIV(index), dv->getMSV(index));
 	}
 
-	DCache dcache;
+	DCache dcache(dv);
 	//combine everything as much as possible
 	while (fullMergeClusters(dv, clusters, dcache))
 		;

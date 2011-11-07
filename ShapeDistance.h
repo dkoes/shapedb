@@ -15,6 +15,10 @@ float (*shapeMetricFn)(const MappableOctTree* leftMIV, const MappableOctTree* le
 
 //a global function for performing shape comparisons between MIV/MSV pairs
 extern shapeMetricFn shapeDistance;
-extern shapeMetricFn shapeSimilarity;
+
+enum DistanceFunction {RelativeVolume, AbsVolume, Hausdorff};
+
+//set shapedistance to the requested function, hausdoff needs the dim
+extern void setDistance(DistanceFunction df, float dim);
 
 #endif /* SHAPEDISTANCE_H_ */
