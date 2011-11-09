@@ -107,7 +107,7 @@ void MatcherPacker::initialKNNSample(const DataViewer *D,
 		vector<Cluster>& clusters, unsigned maxSz, DCache& dcache,
 		vector<KNNSlice>& V) const
 {
-	unsigned N = D->size();
+	unsigned N = clusters.size();
 	V.resize(N);
 
 	vector<unsigned> indices(N);
