@@ -91,12 +91,14 @@ bool MatcherPacker::KNNSlice::update(const IndDist& item, unsigned k)
 
 //processed and unprocessed; once extracted becomes processed
 void MatcherPacker::KNNSlice::getOldNew(vector<unsigned>& O,
-		vector<unsigned>& N) const
+		vector<unsigned>& N)
 {
 	for (unsigned i = 0, n = neighbors.size(); i < n; i++)
 	{
-		if (neighbors[i].unprocessed)
+		if (neighbors[i].unprocessed) {
 			N.push_back(neighbors[i].j);
+			neighbors[i].unprocessed = false;
+		}
 		else
 			O.push_back(neighbors[i].j);
 	}
@@ -266,6 +268,7 @@ void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 
 			if (changed > 0)
 				keepgoing = true;
+			cout << changed << "\n";
 		}
 
 		G.reserveNode(N);

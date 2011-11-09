@@ -43,7 +43,7 @@ class MatcherPacker: public Packer
 		vector<IndDist> neighbors;
 
 		bool update(const IndDist& item, unsigned k); //insert in sorted order, make K items, no limit if 0
-		void getOldNew(vector<unsigned>& o, vector<unsigned>& n) const; //processed and unprocessed; once extracted becomes processed
+		void getOldNew(vector<unsigned>& o, vector<unsigned>& n); //processed and unprocessed; once extracted becomes processed
 
 		void getCommonNeighbors(const vector<unsigned>& rev, vector<unsigned>& neighs) const;
 	};
