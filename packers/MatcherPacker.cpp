@@ -82,6 +82,13 @@ bool MatcherPacker::KNNSlice::update(const IndDist& item, unsigned k)
 
 	if (k > 0 && (pos - neighbors.begin()) >= k)
 		return false;
+
+	for(vector<IndDist>::iterator look = pos; look != neighbors.end() && look->dist == pos->dist; look++)
+	{
+		if(look->j == item.j)
+			return false; //already in here
+	}
+
 	neighbors.insert(pos, item);
 	if (k > 0)
 		neighbors.resize(k);
