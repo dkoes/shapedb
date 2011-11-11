@@ -33,11 +33,13 @@ class GSSTreeSearcher
 	float dimension;
 	float resolution;
 
-	void findTweeners(const GSSInternalNode* node,  const MappableOctTree* min, const MappableOctTree* max, vector<file_index>& res);
+	void findTweeners(const GSSInternalNode* node,  const MappableOctTree* min, const MappableOctTree* max, vector<file_index>& res,unsigned level);
 	void findTweeners(const GSSLeaf* node, const MappableOctTree* min, const MappableOctTree* max, vector<file_index>& res);
 
 	unsigned fitsCheck;
 	unsigned nodesVisited;
+	vector<unsigned> levelCnts;
+	vector<unsigned> maxlevelCnts;
 	unsigned leavesVisited;
 	unsigned fullLeaves;
 	bool fitsInbetween(const MappableOctTree *MIV, const MappableOctTree *MSV,

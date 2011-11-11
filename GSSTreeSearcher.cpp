@@ -74,10 +74,11 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
 	fullLeaves = 0;
 	nodesVisited = 0;
 	leavesVisited = 0;
+	levelCnts.clear();
 	if (internalNodes.size() > 0)
 	{
 		const GSSInternalNode* root = (GSSInternalNode*) internalNodes.begin();
-		findTweeners(root, smallTree, bigTree, respos);
+		findTweeners(root, smallTree, bigTree, respos,0);
 	}
 	else
 	{
@@ -100,6 +101,10 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
 				<< t.elapsed() << "s with " << fitsCheck << " checks "
 				<< nodesVisited << " nodes " << leavesVisited << " leaves " << fullLeaves
 				<< " full leaves\n";
+		for(unsigned i = 0, n = levelCnts.size(); i < n; i++)
+		{
+			cout << " level " << i <<": " << levelCnts[i] << " " << maxlevelCnts[i] << "\n";
+		}
 	}
 	delete smallTree;
 	delete bigTree;
@@ -161,30 +166,47 @@ void GSSTreeSearcher::dc_scan_search(const Object& smallObj,
 
 void GSSTreeSearcher::findTweeners(const GSSInternalNode* node,
 		const MappableOctTree* min, const MappableOctTree* max,
-		vector<file_index>& respos)
+		vector<file_index>& respos, unsigned level)
 {
 	nodesVisited++;
-	for (unsigned i = 0, n = node->size(); i < n; i++)
+	if(levelCnts.size() <= level)
+	{
+		levelCnts.resize(level+1,0);
+		maxlevelCnts.resize(level+2,0);
+	}
+	levelCnts[level]++;
+
+	vector<const GSSInternalNode::Child *> goodchildren;
+	unsigned n = node->size();
+	for (unsigned i = 0; i < n; i++)
 	{
 		const GSSInternalNode::Child *child = node->getChild(i);
 
 		if (fitsInbetween(child->getMIV(), child->getMSV(), min, max))
 		{
-			if (child->isLeafPosition())
-			{
-				const GSSLeaf* next = (const GSSLeaf*) (leaves.begin()
-						+ child->position());
-				findTweeners(next, min, max, respos);
-			}
-			else
-			{
-				const GSSInternalNode* next =
-						(const GSSInternalNode*) (internalNodes.begin()
-								+ child->position());
-				findTweeners(next, min, max, respos);
-			}
+			goodchildren.push_back(child);
 		}
 	}
+
+	maxlevelCnts[level+1] += n;
+	for(unsigned i = 0, nc = goodchildren.size(); i < nc; i++)
+	{
+		const GSSInternalNode::Child *child = goodchildren[i];
+		if (child->isLeafPosition())
+		{
+			const GSSLeaf* next = (const GSSLeaf*) (leaves.begin()
+					+ child->position());
+			findTweeners(next, min, max, respos);
+		}
+		else
+		{
+			const GSSInternalNode* next =
+					(const GSSInternalNode*) (internalNodes.begin()
+							+ child->position());
+			findTweeners(next, min, max, respos, level+1);
+		}
+	}
+
 }
 
 //identify and trees in this leaf that fit

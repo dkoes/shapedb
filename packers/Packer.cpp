@@ -26,23 +26,19 @@ float Packer::clusterDistance(const DataViewer* D, const Cluster& a,
 		}
 	case CompleteLink:
 	{
-		//this is the maximum of the minimum distances between cluster members
-		//TODO: this is horribly inefficient due to distance recomputation
+		//this is the maximum o distance between any two cluster members
 		float max = 0;
 		for (unsigned i = 0, ni = a.size(); i < ni; i++)
 		{
-			float min = HUGE_VAL;
 			for (unsigned j = 0, nj = b.size(); j < nj; j++)
 			{
 				unsigned l = a[i];
 				unsigned r = b[j];
 				float dist = dcache.get(l,r);
 
-				if (dist < min)
-					min = dist;
+				if (dist > max)
+					max = dist;
 			}
-			if (min > max)
-				max = min;
 		}
 		return max;
 	}

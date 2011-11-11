@@ -49,6 +49,8 @@ void MatcherPacker::pack(const DataViewer* dv, vector<Cluster>& clusters) const
 
 		while (curSz < packSize && knnMergeClusters(dv, clusters, curSz, dcache))
 			curSz *= 2;
+
+		cout << "dcache " << dcache.cnt() << "\n";
 	}
 
 }
@@ -80,6 +82,11 @@ bool MatcherPacker::KNNSlice::update(const IndDist& item, unsigned k)
 	vector<IndDist>::iterator pos = lower_bound(neighbors.begin(),
 			neighbors.end(), item);
 
+	for(unsigned i = 0, n = neighbors.size(); i < n; i++)
+	{
+		if(neighbors[i].j == item.j && neighbors[i].dist != item.dist)
+			abort();
+	}
 	if (k > 0 && (pos - neighbors.begin()) >= k)
 		return false;
 
@@ -87,6 +94,8 @@ bool MatcherPacker::KNNSlice::update(const IndDist& item, unsigned k)
 	{
 		if(look->j == item.j)
 			return false; //already in here
+		if(look->dist == item.dist) //not actually better
+			return false;
 	}
 
 	neighbors.insert(pos, item);
@@ -257,6 +266,9 @@ void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 						{
 							float dist = clusterDistance(D, clusters[u1],
 									clusters[u2], dcache);
+							float dist2 = clusterDistance(D, clusters[u2],
+									clusters[u1], dcache);
+							assert(dist == dist2);
 							changed += B[u1].update(IndDist(u2, dist), K);
 							changed += B[u2].update(IndDist(u1, dist), K);
 						}
@@ -265,10 +277,15 @@ void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 					for (unsigned j = 0, m = oldn.size(); j < m; j++)
 					{
 						unsigned u2 = oldn[j];
-						float dist = clusterDistance(D, clusters[u1],
+						if(u2 != u1)
+						{
+							float dist = clusterDistance(D, clusters[u1],
 								clusters[u2], dcache);
-						changed += B[u1].update(IndDist(u2, dist), K);
-						changed += B[u2].update(IndDist(u1, dist), K);
+							if(B[u1].update(IndDist(u2, dist), K))
+								changed++;
+							if(B[u2].update(IndDist(u1, dist), K))
+								changed++;
+						}
 					}
 				}
 			}

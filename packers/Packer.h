@@ -79,6 +79,21 @@ protected:
 			}
 			return cache[i][j];
 		}
+
+		unsigned cnt() const
+		{
+			unsigned N = cache.size();
+			unsigned ret = 0;
+			for (unsigned i = 0; i < N; i++)
+			{
+				for (unsigned j = 0; j < i; j++)
+				{
+					if(cache[i][j] >= 0)
+						ret++;
+				}
+			}
+			return ret;
+		}
 	};
 
 	float clusterDistance(const DataViewer* D, const Cluster& a,
