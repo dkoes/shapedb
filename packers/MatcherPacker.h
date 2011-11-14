@@ -49,7 +49,7 @@ class MatcherPacker: public Packer
 	};
 
 	void initialKNNSample(const DataViewer *D,
-			vector<Cluster>& clusters, unsigned maxSz, DCache& dcache, vector< KNNSlice >& V) const;
+			vector<Cluster>& clusters, unsigned maxSz, DCache& dcache, vector< KNNSlice >& V, float& maxdist) const;
 
 	void makeKNNGraph(const DataViewer *D,
 			vector<Cluster>& clusters, unsigned maxSz, DCache& dcache, lemon::SmartGraph& G,

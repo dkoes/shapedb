@@ -125,7 +125,7 @@ void MatcherPacker::KNNSlice::getOldNew(vector<unsigned>& O,
 //create an initial knn graph quickly
 void MatcherPacker::initialKNNSample(const DataViewer *D,
 		vector<Cluster>& clusters, unsigned maxSz, DCache& dcache,
-		vector<KNNSlice>& V) const
+		vector<KNNSlice>& V, float& maxdist) const
 {
 	if (S == 0) //random sampling
 	{
@@ -157,6 +157,8 @@ void MatcherPacker::initialKNNSample(const DataViewer *D,
 
 				float dist = clusterDistance(D, clusters[i], clusters[neigh],
 						dcache);
+				if(dist > maxdist)
+					maxdist = dist;
 				V[i].neighbors.push_back(IndDist(neigh, dist));
 			}
 
@@ -230,6 +232,8 @@ void MatcherPacker::initialKNNSample(const DataViewer *D,
 					float dist = clusterDistance(D, clusters[i],
 							clusters[neigh], dcache);
 					V[i].neighbors.push_back(IndDist(nnIdx[j], dist));
+
+					if(dist > maxdist) maxdist = dist;
 				}
 			}
 		}
@@ -301,8 +305,9 @@ void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 	else //approximate knn
 	{
 		vector<KNNSlice> B(N);
+		float maxdist = 0;
 
-		initialKNNSample(D, clusters, maxsz, dcache, B);
+		initialKNNSample(D, clusters, maxsz, dcache, B, maxdist);
 
 		bool keepgoing = true;
 		while (keepgoing)
@@ -344,11 +349,11 @@ void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 						{
 							float dist = clusterDistance(D, clusters[u1],
 									clusters[u2], dcache);
-							float dist2 = clusterDistance(D, clusters[u2],
-									clusters[u1], dcache);
-							assert(dist == dist2);
+
 							changed += B[u1].update(IndDist(u2, dist), K);
 							changed += B[u2].update(IndDist(u1, dist), K);
+
+							if(dist > maxdist) maxdist = dist;
 						}
 					}
 
@@ -363,6 +368,8 @@ void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 								changed++;
 							if (B[u2].update(IndDist(u1, dist), K))
 								changed++;
+
+							if(dist > maxdist) maxdist = dist;
 						}
 					}
 				}
@@ -390,7 +397,7 @@ void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 				unsigned neigh = B[i].neighbors[j].j;
 				float dist = B[i].neighbors[j].dist;
 				SmartGraph::Edge e = G.addEdge(nodes[i], nodes[neigh]);
-				E[e] = 10 - dist; //compute max weighting
+				E[e] = maxdist - dist; //compute max weighting
 			}
 		}
 	}
