@@ -94,6 +94,9 @@ class GSSTreeCreator
 
 	GSSLevelCreator *leveler;
 
+	float dimension;
+	float resolution;
+
 	//some bookkeeping for analysis purposes
 	unsigned numNodes;
 	unsigned numLeaves;

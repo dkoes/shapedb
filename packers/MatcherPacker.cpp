@@ -377,7 +377,6 @@ void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 
 			if (changed > 0)
 				keepgoing = true;
-			cout << changed << "\n";
 		}
 
 		G.reserveNode(N);

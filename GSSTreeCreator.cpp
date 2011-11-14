@@ -21,6 +21,8 @@ static string nextString(filesystem::path p, const char *base, unsigned i)
 //return true if successfull
 bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr, float dim, float res)
 {
+	dimension = dim;
+	resolution = res;
 	WorkFile currenttrees;
 	WorkFile nexttrees;
 	//create directory

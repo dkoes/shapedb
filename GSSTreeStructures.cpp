@@ -141,4 +141,49 @@ void GSSInternalNode::setChildPos(unsigned i, file_index newpos, bool isLeaf, fi
 	child->leaves_end = lend;
 }
 
+//malloc a new node that has reduced sized trees
+GSSInternalNode* GSSInternalNode::createTruncated(float dimension, float resolution)
+{
+	unsigned nc = size();
+	MappableOctTree *MIVs[nc];
+	MappableOctTree *MSVs[nc];
+	unsigned positions[nc];
+
+	unsigned curoffset = nc*sizeof(unsigned); //skip of positions
+	for(unsigned c = 0; c < nc; c++)
+	{
+		const Child *child = getChild(c);
+		MIVs[c] = child->getMIV()->createTruncated(dimension, resolution*2, false);
+		MSVs[c] = child->getMSV()->createTruncated(dimension, resolution*2, true);
+
+		positions[c] = curoffset;
+
+		curoffset += sizeof(Child);
+		curoffset += MIVs[c]->bytes();
+		curoffset += MSVs[c]->bytes();
+	}
+
+	unsigned char* buffer = (unsigned char*)malloc(curoffset+sizeof(GSSInternalNode));
+
+	memcpy(buffer, this, sizeof(GSSInternalNode));
+	unsigned offset = sizeof(GSSInternalNode);
+	memcpy(buffer+offset, &positions, sizeof(unsigned)*nc);
+	offset += sizeof(unsigned)*nc;
+
+	for(unsigned c = 0; c < nc; c++)
+	{
+		Child child = *getChild(c);
+		child.MSVindex = MIVs[c]->bytes();
+
+		memcpy(buffer+offset, &child, sizeof(Child));
+		offset += sizeof(Child);
+		memcpy(buffer+offset, MIVs[c], MIVs[c]->bytes());
+		offset += MIVs[c]->bytes();
+		memcpy(buffer+offset, MSVs[c], MSVs[c]->bytes());
+		offset += MSVs[c]->bytes();
+	}
+
+	assert(offset == curoffset+sizeof(GSSInternalNode));
+	return (GSSInternalNode*)buffer;
+}
 

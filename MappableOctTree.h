@@ -130,12 +130,18 @@ class MappableOctTree
 	MappableOctTree(const MappableOctTree& rhs);
 
 	static MChildNode createFrom_r(unsigned N, MChildNode* nodes, const MappableOctTree** trees, vector<MOctNode>& newtree, bool isUnion);
+	MChildNode createTruncated_r(const MChildNode& node, float dim, float res, bool fillIn, vector<MOctNode>& newtree) const;
 
+	static MappableOctTree* newFromVector(const vector<MOctNode>& newtree, const MChildNode& newroot);
 public:
 
 	MappableOctTree* clone() const;
 
 	void invert(float dim);
+
+	//return a tree that is rounded to resolution res, if fillIn true,
+	//round up, otherwise down
+	MappableOctTree* createTruncated(float dim, float res, bool fillIn) const;
 
 	//return intersect of the n trees found in arr
 	static MappableOctTree* createFromIntersection(unsigned N, const MappableOctTree** in);

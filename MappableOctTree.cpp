@@ -134,6 +134,13 @@ void MappableOctTree::invert(float dim)
 	assert(root.volume() == expectedV);
 }
 
+MappableOctTree* MappableOctTree::newFromVector(const vector<MOctNode>& newtree, const MChildNode& newroot)
+{
+	unsigned sz = sizeof(MappableOctTree)+newtree.size()*sizeof(MOctNode);
+	void *mem = malloc(sz);
+	return new (mem) MappableOctTree(newroot, newtree);
+}
+
 //union
 MappableOctTree* MappableOctTree::createFromUnion(unsigned N, const MappableOctTree** in)
 {
@@ -145,9 +152,7 @@ MappableOctTree* MappableOctTree::createFromUnion(unsigned N, const MappableOctT
 	vector<MOctNode> newtree;
 	MChildNode newroot = createFrom_r(N, roots, in,  newtree, true);
 
-	unsigned sz = sizeof(MappableOctTree)+newtree.size()*sizeof(MOctNode);
-	void *mem = malloc(sz);
-	return new (mem) MappableOctTree(newroot, newtree);
+	return newFromVector(newtree, newroot);
 }
 
 MappableOctTree* MappableOctTree::createFromIntersection(unsigned N, const MappableOctTree** in)
@@ -160,9 +165,66 @@ MappableOctTree* MappableOctTree::createFromIntersection(unsigned N, const Mappa
 	vector<MOctNode> newtree;
 	MChildNode newroot = createFrom_r(N, roots, in,  newtree, false);
 
-	unsigned sz = sizeof(MappableOctTree)+newtree.size()*sizeof(MOctNode);
-	void *mem = malloc(sz);
-	return new (mem) MappableOctTree(newroot, newtree);
+	return newFromVector(newtree, newroot);
+}
+
+MChildNode MappableOctTree::createTruncated_r(const MChildNode& node, float dim, float res, bool fillIn, vector<MOctNode>& newtree) const
+{
+	if(node.isLeaf)
+	{
+		return node;
+	}
+	else if(dim <= res) //at level that needs to be truncated to a leaf
+	{
+		if(fillIn)
+		{
+			return MChildNode(true, 0xff, 8, dim*dim*dim);
+		}
+		else
+		{
+			return MChildNode(true, 0, 0, 0);
+		}
+	}
+	else //recursively descend
+	{
+		unsigned pos = newtree.size();
+		MChildNode ret(false, 0, pos, 0);
+		newtree.push_back(MOctNode());
+
+		unsigned numFullEmpty = 0;
+		unsigned newPattern = 0;
+		for (unsigned i = 0; i < 8; i++)
+		{
+			MChildNode nchild = createTruncated_r(tree[node.index].children[i] , dim/2, res, fillIn, newtree);
+			newtree[pos].children[i] = nchild;
+			if(nchild.isLeaf && (nchild.pattern == 0 || nchild.pattern == 0xff))
+			{
+				numFullEmpty++;
+				if(nchild.pattern == 0xff)
+					newPattern |= 1<<i;
+			}
+
+			ret.vol += nchild.volume();
+		}
+
+		if(numFullEmpty == 8)
+		{
+			newtree.pop_back();
+			ret.isLeaf = true;
+			ret.pattern = newPattern;
+			ret.index = __builtin_popcount(newPattern);
+			//volume is correct
+		}
+		return ret;
+	}
+}
+
+MappableOctTree* MappableOctTree::createTruncated(float dim, float res, bool fillIn) const
+{
+	vector<MOctNode> newtree;
+	MChildNode newroot = createTruncated_r(root, dim, res, fillIn, newtree);
+
+	return newFromVector(newtree, newroot);
 }
 
 
@@ -518,8 +580,6 @@ float MappableOctTree::hausdorffDistance(const MappableOctTree* B, float dim) co
 	root.collectVertices(Av, box, tree);
 	B->root.collectVertices(Bv, box, B->tree);
 
-	unsigned oldA = Av.size();
-	unsigned oldB = Bv.size();
 	uniqueRemove8ify(Av);
 	uniqueRemove8ify(Bv);
 
