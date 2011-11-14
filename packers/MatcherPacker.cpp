@@ -305,7 +305,6 @@ void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 		initialKNNSample(D, clusters, maxsz, dcache, B);
 
 		bool keepgoing = true;
-
 		while (keepgoing)
 		{
 			keepgoing = false;
