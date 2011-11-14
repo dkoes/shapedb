@@ -64,10 +64,10 @@ class MatcherPacker: public Packer
 			unsigned maxSz, DCache& dcache) const;
 
 	unsigned K; //for knn, if zero use full
-
+	unsigned S; //number of sentinals for knn building, if zero, do random
 public:
-	MatcherPacker(unsigned ps, unsigned k=0, ClusterDistance metric = AverageLink) :
-			Packer(ps, metric), K(k)
+	MatcherPacker(unsigned ps, unsigned k=0, unsigned s=0, ClusterDistance metric = AverageLink) :
+			Packer(ps, metric), K(k), S(s)
 	{
 	}
 	~MatcherPacker()

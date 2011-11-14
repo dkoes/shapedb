@@ -10,7 +10,7 @@
 #include <lemon/matching.h>
 #include <lemon/list_graph.h>
 #include <lemon/connectivity.h>
-
+#include <ANN/ANN.h>
 #include "Timer.h"
 using namespace lemon;
 
@@ -82,19 +82,20 @@ bool MatcherPacker::KNNSlice::update(const IndDist& item, unsigned k)
 	vector<IndDist>::iterator pos = lower_bound(neighbors.begin(),
 			neighbors.end(), item);
 
-	for(unsigned i = 0, n = neighbors.size(); i < n; i++)
+	for (unsigned i = 0, n = neighbors.size(); i < n; i++)
 	{
-		if(neighbors[i].j == item.j && neighbors[i].dist != item.dist)
+		if (neighbors[i].j == item.j && neighbors[i].dist != item.dist)
 			abort();
 	}
 	if (k > 0 && (pos - neighbors.begin()) >= k)
 		return false;
 
-	for(vector<IndDist>::iterator look = pos; look != neighbors.end() && look->dist == pos->dist; look++)
+	for (vector<IndDist>::iterator look = pos;
+			look != neighbors.end() && look->dist == pos->dist; look++)
 	{
-		if(look->j == item.j)
+		if (look->j == item.j)
 			return false; //already in here
-		if(look->dist == item.dist) //not actually better
+		if (look->dist == item.dist) //not actually better
 			return false;
 	}
 
@@ -111,7 +112,8 @@ void MatcherPacker::KNNSlice::getOldNew(vector<unsigned>& O,
 {
 	for (unsigned i = 0, n = neighbors.size(); i < n; i++)
 	{
-		if (neighbors[i].unprocessed) {
+		if (neighbors[i].unprocessed)
+		{
 			N.push_back(neighbors[i].j);
 			neighbors[i].unprocessed = false;
 		}
@@ -125,38 +127,115 @@ void MatcherPacker::initialKNNSample(const DataViewer *D,
 		vector<Cluster>& clusters, unsigned maxSz, DCache& dcache,
 		vector<KNNSlice>& V) const
 {
-	unsigned N = clusters.size();
-	V.resize(N);
-
-	vector<unsigned> indices(N);
-	for (unsigned i = 0; i < N; i++)
+	if (S == 0) //random sampling
 	{
-		indices[i] = i;
-	}
+		unsigned N = clusters.size();
+		V.resize(N);
 
-	random_shuffle(indices.begin(), indices.end());
-
-	unsigned pos = 0;
-	for (unsigned i = 0; i < N; i++)
-	{
-		V[i].neighbors.reserve(K);
-		for (unsigned j = 0; j < K; j++)
+		vector<unsigned> indices(N);
+		for (unsigned i = 0; i < N; i++)
 		{
-			//get random neighbor
-			unsigned neigh = indices[pos];
-			pos = (pos + 1) % N;
-			if (neigh == i)
-			{
-				neigh = indices[pos];
-				pos = (pos + 1) % N;
-			}
-
-			float dist = clusterDistance(D, clusters[i], clusters[neigh],
-					dcache);
-			V[i].neighbors.push_back(IndDist(neigh, dist));
+			indices[i] = i;
 		}
 
-		sort(V[i].neighbors.begin(), V[i].neighbors.end());
+		random_shuffle(indices.begin(), indices.end());
+
+		unsigned pos = 0;
+		for (unsigned i = 0; i < N; i++)
+		{
+			V[i].neighbors.reserve(K);
+			for (unsigned j = 0; j < K; j++)
+			{
+				//get random neighbor
+				unsigned neigh = indices[pos];
+				pos = (pos + 1) % N;
+				if (neigh == i)
+				{
+					neigh = indices[pos];
+					pos = (pos + 1) % N;
+				}
+
+				float dist = clusterDistance(D, clusters[i], clusters[neigh],
+						dcache);
+				V[i].neighbors.push_back(IndDist(neigh, dist));
+			}
+
+			sort(V[i].neighbors.begin(), V[i].neighbors.end());
+		}
+	}
+	else
+	{
+		//pick S sentinals
+		unsigned N = clusters.size();
+		V.resize(N);
+
+		ANNpointArray points = annAllocPts(N, S);
+
+		//farthest first, initialize point data as we go
+		vector<unsigned> indices;
+		indices.push_back(0);
+		for (unsigned s = 1; s < S; s++)
+		{
+			float max = 0;
+			unsigned besti = 0;
+			for (unsigned i = 0; i < N; i++)
+			{
+				float min = HUGE_VAL;
+				unsigned send = indices.size()-1; //all but last have distances already computed
+				for (unsigned j = 0; j < send; j++)
+				{
+					float dist = points[i][j];
+					if (dist < min)
+						min = dist;
+				}
+				float dist = 0;
+				if(i != indices.back())
+					dist = clusterDistance(D,clusters[i], clusters[indices.back()], dcache);
+				points[i][send] = dist;
+				if(dist < min)
+					min = dist;
+
+				if (min > max)
+				{
+					besti = i;
+					max = min;
+				}
+			}
+			indices.push_back(besti);
+		}
+		assert(indices.size() == S);
+		//get distances for last chosen sentinal
+		for(unsigned i = 0; i < N; i++)
+		{
+			float dist = 0;
+			if(i != indices.back())
+				dist = clusterDistance(D,clusters[i], clusters[indices.back()], dcache);
+			points[i][S-1] = dist;
+		}
+
+		ANNkd_tree searcher(points, N, S);
+
+		ANNdistArray dists = new ANNdist[K + 1];
+		vector<int> nnIdx(K + 1, 0);
+		for (unsigned i = 0; i < N; i++)
+		{
+			V[i].neighbors.reserve(K);
+			searcher.annkSearch(points[i], K + 1, &nnIdx[0], dists);
+
+			for (unsigned j = 0; j <= K; j++)
+			{
+				if (nnIdx[j] != (int) i && nnIdx[j] >= 0)
+				{
+					unsigned neigh = nnIdx[j];
+					float dist = clusterDistance(D, clusters[i],
+							clusters[neigh], dcache);
+					V[i].neighbors.push_back(IndDist(nnIdx[j], dist));
+				}
+			}
+		}
+
+		delete[] dists;
+		annDeallocPts(points);
 	}
 }
 
@@ -277,13 +356,13 @@ void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 					for (unsigned j = 0, m = oldn.size(); j < m; j++)
 					{
 						unsigned u2 = oldn[j];
-						if(u2 != u1)
+						if (u2 != u1)
 						{
 							float dist = clusterDistance(D, clusters[u1],
-								clusters[u2], dcache);
-							if(B[u1].update(IndDist(u2, dist), K))
+									clusters[u2], dcache);
+							if (B[u1].update(IndDist(u2, dist), K))
 								changed++;
-							if(B[u2].update(IndDist(u1, dist), K))
+							if (B[u2].update(IndDist(u1, dist), K))
 								changed++;
 						}
 					}

@@ -68,7 +68,7 @@ cl::opt<PackerEnum>
 				clEnumValEnd), cl::init(MatchPack) );
 
 cl::opt<unsigned> Knn("knn", cl::desc("K for knn graph creation"), cl::init(0));
-
+cl::opt<unsigned> Sentinals("sentinals",cl::desc("Number of sentinals for knn initialization (zero random)"), cl::init(0));
 cl::opt<SpectralPacker::SpectralAlgEnum>
 	SpectralAlg(cl::desc("Spectral packing sub-algorithm:"),
 			cl::values(clEnumValN(SpectralPacker::SortDense, "sort-dense", "Simple sort followed by dense packing"),
@@ -158,7 +158,7 @@ int main(int argc, char *argv[])
 			packer = PackerPtr(new FullMergePacker(Pack, ClusterDist));
 			break;
 		case MatchPack:
-			packer = PackerPtr(new MatcherPacker(Pack, Knn, ClusterDist));
+			packer = PackerPtr(new MatcherPacker(Pack, Knn, Sentinals, ClusterDist));
 			break;
 		case GreedyMerge:
 			packer = PackerPtr(new GreedyPacker(Pack, ClusterDist));

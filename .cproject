@@ -40,6 +40,7 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug.1035050897" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug">
 								<option id="gnu.cpp.link.option.libs.1769803431" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="oeszybki"/>
+									<listOptionValue builtIn="false" value="ann"/>
 									<listOptionValue builtIn="false" value="newmat"/>
 									<listOptionValue builtIn="false" value="boost_iostreams"/>
 									<listOptionValue builtIn="false" value="oebio"/>
@@ -66,6 +67,7 @@
 									<listOptionValue builtIn="false" value="z"/>
 									<listOptionValue builtIn="false" value="pthread"/>
 									<listOptionValue builtIn="false" value="m"/>
+									<listOptionValue builtIn="false" value="tcmalloc_minimal"/>
 								</option>
 								<option id="gnu.cpp.link.option.paths.1815957130" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
 									<listOptionValue builtIn="false" value="/usr0/local/openeye/toolkits/lib"/>
@@ -124,6 +126,7 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.release.1621250117" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.release">
 								<option id="gnu.cpp.link.option.libs.236000983" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="oeszybki"/>
+									<listOptionValue builtIn="false" value="ann"/>
 									<listOptionValue builtIn="false" value="newmat"/>
 									<listOptionValue builtIn="false" value="boost_iostreams"/>
 									<listOptionValue builtIn="false" value="oebio"/>
@@ -213,7 +216,7 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug.2061418021" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug">
 								<option id="gnu.cpp.link.option.libs.1267507203" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="oeszybki"/>
-									<listOptionValue builtIn="false" value="tcmalloc_minimal"/>
+									<listOptionValue builtIn="false" value="ann"/>
 									<listOptionValue builtIn="false" value="newmat"/>
 									<listOptionValue builtIn="false" value="boost_iostreams"/>
 									<listOptionValue builtIn="false" value="oebio"/>
@@ -240,6 +243,7 @@
 									<listOptionValue builtIn="false" value="z"/>
 									<listOptionValue builtIn="false" value="pthread"/>
 									<listOptionValue builtIn="false" value="m"/>
+									<listOptionValue builtIn="false" value="tcmalloc_minimal"/>
 								</option>
 								<option id="gnu.cpp.link.option.paths.581059665" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
 									<listOptionValue builtIn="false" value="/usr0/local/openeye/toolkits/lib"/>
