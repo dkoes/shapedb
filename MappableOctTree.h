@@ -88,6 +88,8 @@ struct MChildNode
 		return vol;
 	}
 
+	bool equals(const MOctNode* tree, const MChildNode& rhs, const MOctNode* rtree) const;
+
 	void collectVertices(vector<Vertex>& vertices, Cube box, const MOctNode* tree) const;
 
 }__attribute__((__packed__));
@@ -171,6 +173,8 @@ public:
 		return sizeof(MappableOctTree) + N*sizeof(MOctNode);
 	}
 
+	bool equals(const MappableOctTree* rhs) const;
+
 private:
 	template<class Object>
 	static MChildNode create_r(float res, const Cube& cube, const Object& obj,
@@ -188,7 +192,7 @@ private:
 			ret.index = 0;
 			ret.vol = 0;
 		}
-		else if (cube.getDimension() <= res) //consider it full
+		else if (cube.getDimension() <= res /* || obj.containedIn(cube) */) //consider it full - todo: contained in currently slows things down
 		{
 			ret.isLeaf = true;
 			ret.pattern = 0xff;

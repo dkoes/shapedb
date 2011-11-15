@@ -142,19 +142,59 @@ void GSSInternalNode::setChildPos(unsigned i, file_index newpos, bool isLeaf, fi
 }
 
 //malloc a new node that has reduced sized trees
-GSSInternalNode* GSSInternalNode::createTruncated(float dimension, float resolution)
+GSSInternalNode* GSSInternalNode::createTruncated(float dimension, float resolution) const
 {
 	unsigned nc = size();
 	MappableOctTree *MIVs[nc];
 	MappableOctTree *MSVs[nc];
 	unsigned positions[nc];
 
+	//reduce resolution to lowest discernable value
+	while(resolution < dimension)
+	{
+		resolution *= 2;
+
+		for (unsigned c = 0; c < nc; c++)
+		{
+			const Child *child = getChild(c);
+			MIVs[c] = child->getMIV()->createTruncated(dimension, resolution,
+					false);
+			MSVs[c] = child->getMSV()->createTruncated(dimension, resolution,
+					true);
+		}
+
+		bool hasExactMatch = false;
+		for(unsigned i = 0; i < nc && !hasExactMatch; i++)
+		{
+			for(unsigned j = 0; j < i && !hasExactMatch; j++)
+			{
+				if(MIVs[i]->equals(MIVs[j]))
+					hasExactMatch = true;
+				else if(MSVs[i]->equals(MSVs[j]))
+					hasExactMatch = true;
+			}
+		}
+
+		for (unsigned c = 0; c < nc; c++)
+		{
+			free(MIVs[c]);
+			free(MSVs[c]);
+		}
+
+		if(hasExactMatch)
+		{
+			resolution /= 2;
+			break;
+		}
+	}
+
 	unsigned curoffset = nc*sizeof(unsigned); //skip of positions
+
 	for(unsigned c = 0; c < nc; c++)
 	{
 		const Child *child = getChild(c);
-		MIVs[c] = child->getMIV()->createTruncated(dimension, resolution*2, false);
-		MSVs[c] = child->getMSV()->createTruncated(dimension, resolution*2, true);
+		MIVs[c] = child->getMIV()->createTruncated(dimension, resolution, false);
+		MSVs[c] = child->getMSV()->createTruncated(dimension, resolution, true);
 
 		positions[c] = curoffset;
 
@@ -181,6 +221,9 @@ GSSInternalNode* GSSInternalNode::createTruncated(float dimension, float resolut
 		offset += MIVs[c]->bytes();
 		memcpy(buffer+offset, MSVs[c], MSVs[c]->bytes());
 		offset += MSVs[c]->bytes();
+
+		free(MIVs[c]);
+		free(MSVs[c]);
 	}
 
 	assert(offset == curoffset+sizeof(GSSInternalNode));

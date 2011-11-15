@@ -606,3 +606,40 @@ float MappableOctTree::hausdorffDistance(const MappableOctTree* B, float dim) co
 //cout << Av.size() << " " << oldA << " " << Bv.size() << " " << oldB << " " << Amax << " " << Bmax << "\n";
 	return sqrt(std::max(Amax, Bmax));
 }
+
+bool MChildNode::equals(const MOctNode* tree, const MChildNode& rhs, const MOctNode* rtree) const
+{
+	if(isLeaf)
+	{
+		if(rhs.isLeaf)
+		{
+			if(rhs.pattern == pattern)
+				return true;
+			else
+				return false;
+		}
+		else
+			return false;
+	}
+	else if(rhs.isLeaf)
+	{
+		return false;
+	}
+	else
+	{
+		for (unsigned i = 0; i < 8; i++)
+		{
+			if(!tree[index].children[i].equals(tree,
+					rtree[rhs.index].children[i], rtree))
+				return false;
+		}
+		return true;
+	}
+	return true;
+}
+
+bool MappableOctTree::equals(const MappableOctTree* rhs) const
+{
+	return root.equals(tree, rhs->root, rhs->tree);
+}
+

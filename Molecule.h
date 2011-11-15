@@ -31,7 +31,10 @@ class MolIterator;
 //defines interator type, intersection, and file create/write
 class Molecule
 {
-	vector<MolSphere> spheres;
+	//a little icky, make mutable so intersect can bump intersecting spheres
+	//to the front of the list; this ends up being more efficient than filtering
+	//all the intersecting spheres
+	mutable vector<MolSphere> spheres;
 	OEMol mol;
 public:
 	typedef MolIterator iterator;
@@ -75,9 +78,42 @@ public:
 		for(unsigned i = 0, n = spheres.size(); i < n; i++)
 		{
 			if(spheres[i].intersectsCube(cube))
+			{
+				swap(spheres[i],spheres[0]); //locality optimization
 				return true;
+			}
 		}
 		return false;
+	}
+
+	bool containedIn(const Cube& cube) const
+	{
+		for(unsigned i = 0, n = spheres.size(); i < n; i++)
+		{
+			if(spheres[i].containedInCube(cube))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	//just return the parts of the molecule that intersect with the cube
+	Molecule spliceIntersection(const Cube& cube) const
+	{
+		Molecule ret;
+		for(unsigned i = 0, n = spheres.size(); i < n; i++)
+		{
+			if(spheres[i].intersectsCube(cube))
+				ret.spheres.push_back(spheres[i]);
+		}
+		return ret;
+	}
+
+	//return true if no shape
+	bool empty() const
+	{
+		return spheres.size() == 0;
 	}
 
 	void write(ostream& out) const

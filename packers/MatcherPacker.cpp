@@ -50,7 +50,7 @@ void MatcherPacker::pack(const DataViewer* dv, vector<Cluster>& clusters) const
 		while (curSz < packSize && knnMergeClusters(dv, clusters, curSz, dcache))
 			curSz *= 2;
 
-		cout << "dcache " << dcache.cnt() << "\n";
+		cout << "dcache " << dcache.cnt() << " " << dcache.size() << " " << dcache.cnt()/(double)dcache.size() << "\n";
 	}
 
 }

@@ -61,6 +61,39 @@ struct MolSphere
 		return dist > 0;
 	}
 
+	//this one I did think about
+	bool containedInCube(const Cube& cube) const
+	{
+		float x2 = cube.x + cube.dim;
+		float y2 = cube.y + cube.dim;
+		float z2 = cube.z + cube.dim;
+
+		if(x > cube.x && x < x2 &&
+				y > cube.y && y < y2 &&
+				z > cube.z && y < z2)
+		{
+			//center of sphere within cube
+			if(x-cube.x > r)
+				return false;
+			if(x2-x > r)
+				return false;
+
+			if(y-cube.y > r)
+				return false;
+			if(y2-y > r)
+				return false;
+
+			if(z-cube.z > r)
+				return false;
+			if(z2-z > r)
+				return false;
+
+			return true;
+		}
+
+		return false;
+	}
+
 };
 
 

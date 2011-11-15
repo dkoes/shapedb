@@ -8,6 +8,7 @@
 #include "GSSTreeCreator.h"
 #include "DataViewers.h"
 #include "TopDownPartitioner.h"
+#include "Timer.h"
 
 
 //convience function for creating an indexed path name
@@ -42,6 +43,7 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr, float d
 	string curtreesfile = filesystem::path(dbpath / "trees").string();
 	string nexttreesfile = filesystem::path(dbpath / "nexttrees").string();
 
+	Timer t;
 	//write out objects and trees
 	objects.set(objfile.string().c_str());
 	currenttrees.set(curtreesfile.c_str());
@@ -62,6 +64,8 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr, float d
 		cnt++;
 	}
 
+	cout << "Create/write trees\t" << t.elapsed() << "\n";
+	t.restart();
 	//partition leaves into bottom level
 	//setup level
 	nodes.push_back(WorkFile(nextString(dbpath, "level", nodes.size()).c_str()));
@@ -97,8 +101,12 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr, float d
 	currenttrees.remove();
 	nexttrees.remove();
 
+	cout << "Create/write index\t" << t.elapsed() << "\n";
+	t.restart();
+
 	optimizeLevels();
 
+	cout << "Optimized levels\t" << t.elapsed() << "\n";
 	//output general info
 	filesystem::path infoname = dbpath / "info";
 	ofstream info(infoname.string().c_str());
@@ -142,12 +150,9 @@ file_index GSSTreeCreator::optimizeLevelsR(ostream& outnodes, ostream& outleaves
 			nodeContentDistribution.resize(node->size()+1);
 		nodeContentDistribution[node->size()]++;
 
-		unsigned nodesz = node->bytes();
-		unsigned char*  nodebuff = (unsigned char*)malloc(nodesz*sizeof(unsigned char));
-		memcpy(nodebuff, (const char*)node, nodesz);
+		GSSInternalNode* newnode = node->createTruncated(dimension, resolution);
 
-		GSSInternalNode* newnode = (GSSInternalNode*)nodebuff;
-		outnodes.write((const char*)nodebuff, nodesz);
+		outnodes.write((const char*)newnode, newnode->bytes());
 		unsigned nextlevel = level-1;
 
 		lstart = ULONG_MAX;
@@ -164,9 +169,9 @@ file_index GSSTreeCreator::optimizeLevelsR(ostream& outnodes, ostream& outleaves
 		}
 
 		outnodes.seekp(ret, ios_base::beg);
-		outnodes.write((const char*)nodebuff, nodesz);
+		outnodes.write((const char*)newnode, newnode->bytes());
 		outnodes.seekp(0, ios_base::end);
-		free(nodebuff);
+		free(newnode);
 
 		return ret;
 	}

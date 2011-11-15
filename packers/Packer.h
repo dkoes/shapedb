@@ -94,6 +94,11 @@ protected:
 			}
 			return ret;
 		}
+
+		unsigned size() const
+		{
+			return cache.size()*cache.size();
+		}
 	};
 
 	float clusterDistance(const DataViewer* D, const Cluster& a,

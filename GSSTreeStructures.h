@@ -107,7 +107,7 @@ public:
 	unsigned bytes() const;
 
 	//truncates MIV/MSV of children, returns result in malloced memory
-	GSSInternalNode* createTruncated(float dimension, float resolution);
+	GSSInternalNode* createTruncated(float dimension, float resolution) const;
 	void setChildPos(unsigned i, file_index newpos, bool isLeaf, file_index lstart, file_index lend);
 } __attribute__((__packed__));
 
