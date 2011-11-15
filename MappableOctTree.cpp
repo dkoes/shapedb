@@ -155,6 +155,191 @@ MappableOctTree* MappableOctTree::createFromUnion(unsigned N, const MappableOctT
 	return newFromVector(newtree, newroot);
 }
 
+//mutually recurse the N trees, round up/down nodes iff doing so will not
+//change the local equality relationship between the N trees
+bool MappableOctTree::createRoundedSet_r(unsigned N, MChildNode* nodes, const MappableOctTree** trees, bool roundUp,
+			vector< vector<MOctNode> >& newtrees, vector<MChildNode>& newroots)
+{
+	unsigned numFilled = 0;
+	unsigned numFull = 0;
+	unsigned numEmpty = 0;
+	int lastPat = -1;
+	bool differentPats = false;
+	float bitvol = 0;
+	for(unsigned i = 0; i < N; i++)
+	{
+		if(nodes[i].isLeaf)
+		{
+			numFilled++;
+
+			if(nodes[i].pattern == 0xff)
+				numFull++;
+			else if(nodes[i].pattern == 0)
+				numEmpty++;
+			else if(lastPat == -1)
+			{
+				lastPat = nodes[i].pattern;
+				bitvol = nodes[i].vol/nodes[i].index;
+			}
+			else if(nodes[i].pattern != lastPat)
+				differentPats = true;
+		}
+	}
+
+	if (numFilled == N) //all leaves
+	{
+		if (roundUp)
+		{
+			//can only round up equivalent leaves if remaining leaves are empty
+			if (!differentPats && lastPat > 0 && numFull == 0)
+			{
+				for(unsigned i = 0; i < N; i++)
+				{
+					if(nodes[i].pattern == 0)
+						newroots[i] = nodes[i];
+					else
+						newroots[i] = MChildNode(true, 0xff, 8, bitvol*8);
+				}
+				return true;
+			}
+			else //just copy
+			{
+				for(unsigned i = 0; i < N; i++)
+				{
+					newroots[i] = nodes[i];
+				}
+				return false;
+			}
+		}
+		else //round down
+		{
+			//leaves must be equivalent or full
+			if(!differentPats && lastPat > 0 && numEmpty == 0)
+			{
+				for(unsigned i = 0; i < N; i++)
+				{
+					if(nodes[i].pattern == 0)
+						newroots[i] = nodes[i];
+					else
+						newroots[i] = MChildNode(true, 0, 0, 0);
+				}
+				return true;
+			}
+			else //just duplicate
+			{
+				for(unsigned i = 0; i < N; i++)
+				{
+					newroots[i] = nodes[i];
+				}
+				return false;
+			}
+		}
+	}
+	else //must descend non-leaf tree parts
+	{
+		//create new octnodes for all non-leaf trees
+		unsigned positions[N];
+		for(unsigned i = 0; i < N; i++)
+		{
+			if(nodes[i].isLeaf)
+			{
+				//stays a leaf
+				newroots[i] = nodes[i];
+			}
+			else
+			{
+				unsigned pos = newtrees[i].size();
+				positions[i] = pos;
+				newroots[i] = MChildNode(false, 0, pos, 0);
+				newtrees[i].push_back(MOctNode());
+			}
+		}
+
+		MChildNode subnodes[N];
+		bool changed = false;
+		unsigned leafCnts[N];
+		unsigned leafPatterns[N];
+		memset(leafCnts, 0, sizeof(leafCnts));
+		memset(leafPatterns, 0, sizeof(leafPatterns));
+
+		for(unsigned o = 0; o < 8; o++)
+		{
+			//setup subnodes, divide leaf nodes
+			for(unsigned i = 0; i < N; i++)
+			{
+				if(nodes[i].isLeaf)
+				{
+					if(nodes[i].pattern & (1<<o))
+						subnodes[i] = MChildNode(true, 0xff, 8, nodes[i].vol/nodes[i].index);
+					else
+						subnodes[i] = MChildNode(true, 0, 0, 0);
+				}
+				else
+				{
+					subnodes[i] = trees[i]->tree[nodes[i].index].children[o];
+				}
+			}
+
+			vector<MChildNode> newnodes(N);
+			changed |= createRoundedSet_r(N, subnodes, trees, roundUp, newtrees, newnodes);
+
+			for(unsigned i = 0; i < N; i++)
+			{
+				if(!nodes[i].isLeaf)
+				{
+					newtrees[i][positions[i]].children[o] = newnodes[i];
+					if(newnodes[i].isLeaf)
+					{
+						if(newnodes[i].pattern == 0xff)
+						{
+							leafCnts[i]++;
+							leafPatterns[i] |= (1<<o);
+						}
+						else if(newnodes[i].pattern == 0)
+							leafCnts[i]++;
+					}
+					newroots[i].vol += newnodes[i].vol;
+				}
+			}
+		}
+
+		//coalesce any all leaves
+		for(unsigned i = 0; i < N; i++)
+		{
+			if(leafCnts[i] == 8)
+			{
+				newtrees[i].pop_back();
+				newroots[i].isLeaf = true;
+				newroots[i].pattern = leafPatterns[i];
+				newroots[i].index = __builtin_popcount(leafPatterns[i]);
+				//volume is correct
+			}
+		}
+
+		return changed;
+	}
+}
+
+bool MappableOctTree::createRoundedSet(unsigned N, const MappableOctTree**in, bool roundUp, MappableOctTree** out)
+{
+	MChildNode roots[N];
+	for(unsigned i = 0; i < N; i++)
+	{
+		roots[i] = in[i]->root;
+	}
+	vector< vector<MOctNode> > newtrees(N);
+	vector<MChildNode>  newroots(N);
+	bool changed = createRoundedSet_r(N, roots, in,  roundUp, newtrees, newroots);
+
+	for(unsigned i = 0; i < N; i++)
+	{
+		out[i] = newFromVector(newtrees[i], newroots[i]);
+	}
+
+	return changed;
+}
+
+
 MappableOctTree* MappableOctTree::createFromIntersection(unsigned N, const MappableOctTree** in)
 {
 	MChildNode roots[N];
@@ -170,13 +355,9 @@ MappableOctTree* MappableOctTree::createFromIntersection(unsigned N, const Mappa
 
 MChildNode MappableOctTree::createTruncated_r(const MChildNode& node, float dim, float res, bool fillIn, vector<MOctNode>& newtree) const
 {
-	if(node.isLeaf)
+	if(dim <= res) //at level that needs to be truncated to a leaf
 	{
-		return node;
-	}
-	else if(dim <= res) //at level that needs to be truncated to a leaf
-	{
-		if(fillIn)
+		if(fillIn && volume() != 0)
 		{
 			return MChildNode(true, 0xff, 8, dim*dim*dim);
 		}
@@ -184,6 +365,10 @@ MChildNode MappableOctTree::createTruncated_r(const MChildNode& node, float dim,
 		{
 			return MChildNode(true, 0, 0, 0);
 		}
+	}
+	else if(node.isLeaf)
+	{
+		return node;
 	}
 	else //recursively descend
 	{
@@ -223,6 +408,66 @@ MappableOctTree* MappableOctTree::createTruncated(float dim, float res, bool fil
 {
 	vector<MOctNode> newtree;
 	MChildNode newroot = createTruncated_r(root, dim, res, fillIn, newtree);
+
+	return newFromVector(newtree, newroot);
+}
+
+MChildNode MappableOctTree::createRounded_r(const MChildNode& node, float dim, float volcutoff, bool fillIn, vector<MOctNode>& newtree) const
+{
+	float maxvol = dim*dim*dim;
+	float vol = node.volume();
+	float empty = maxvol-vol;
+
+	if(fillIn && empty < volcutoff)
+	{
+		return MChildNode(true, 0xff, 8, maxvol);
+	}
+	else if(!fillIn && vol < volcutoff)
+	{
+		return MChildNode(true, 0, 0, 0);
+	}
+	else if(node.isLeaf)
+	{
+		return node;
+	}
+	else //recursively descend
+	{
+		unsigned pos = newtree.size();
+		MChildNode ret(false, 0, pos, 0);
+		newtree.push_back(MOctNode());
+
+		unsigned numFullEmpty = 0;
+		unsigned newPattern = 0;
+		for (unsigned i = 0; i < 8; i++)
+		{
+			MChildNode nchild = createRounded_r(tree[node.index].children[i] , dim/2, volcutoff, fillIn, newtree);
+			newtree[pos].children[i] = nchild;
+			if(nchild.isLeaf && (nchild.pattern == 0 || nchild.pattern == 0xff))
+			{
+				numFullEmpty++;
+				if(nchild.pattern == 0xff)
+					newPattern |= 1<<i;
+			}
+
+			ret.vol += nchild.volume();
+		}
+
+		if(numFullEmpty == 8)
+		{
+			newtree.pop_back();
+			ret.isLeaf = true;
+			ret.pattern = newPattern;
+			ret.index = __builtin_popcount(newPattern);
+			//volume is correct
+		}
+		return ret;
+	}
+}
+
+MappableOctTree* MappableOctTree::createRounded(float dim, float vol, bool fillIn) const
+{
+	vector<MOctNode> newtree;
+	MChildNode newroot = createRounded_r(root, dim, vol, fillIn, newtree);
 
 	return newFromVector(newtree, newroot);
 }

@@ -27,7 +27,7 @@ void FullMergePacker::pack(const DataViewer* dv, vector<Cluster>& clusters) cons
 		clusters[i].setToSingleton(index, dv->getMIV(index), dv->getMSV(index));
 	}
 
-	DCache dcache(dv);
+	FullCache dcache(dv);
 	//combine everything as much as possible
 	while (fullMergeClusters(dv, clusters, dcache))
 		;

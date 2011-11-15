@@ -107,7 +107,7 @@ void GreedyPacker::pack(const DataViewer* dv, vector<Cluster>& finalclusters) co
 	//compute all intra cluster distances
 	vector<IntraClusterDist> distances; distances.reserve(N*N / 2);
 	boost::multi_array<float, 2> darray(boost::extents[N][N]);
-	DCache dcache(dv);
+	FullCache dcache(dv);
 
 	for (unsigned i = 0; i < N; i++)
 	{

@@ -133,6 +133,10 @@ class MappableOctTree
 
 	static MChildNode createFrom_r(unsigned N, MChildNode* nodes, const MappableOctTree** trees, vector<MOctNode>& newtree, bool isUnion);
 	MChildNode createTruncated_r(const MChildNode& node, float dim, float res, bool fillIn, vector<MOctNode>& newtree) const;
+	MChildNode createRounded_r(const MChildNode& node, float dim, float res, bool fillIn, vector<MOctNode>& newtree) const;
+
+	static bool createRoundedSet_r(unsigned N, MChildNode* nodes, const MappableOctTree** trees, bool roundUp,
+			vector< vector<MOctNode> >& newtrees, vector<MChildNode>& newroots);
 
 	static MappableOctTree* newFromVector(const vector<MOctNode>& newtree, const MChildNode& newroot);
 public:
@@ -144,11 +148,18 @@ public:
 	//return a tree that is rounded to resolution res, if fillIn true,
 	//round up, otherwise down
 	MappableOctTree* createTruncated(float dim, float res, bool fillIn) const;
+	//return a tree where nodes are rounded up/down to leaves if they contain/exclude
+	// <= the specified volume
+	MappableOctTree* createRounded(float dim, float vol, bool fillIn) const;
 
 	//return intersect of the n trees found in arr
 	static MappableOctTree* createFromIntersection(unsigned N, const MappableOctTree** in);
 	//union
 	static MappableOctTree* createFromUnion(unsigned N, const MappableOctTree** in);
+
+	//round trees in in as much as possible while maintaining local distiguishability
+	//and put the result in out
+	static bool createRoundedSet(unsigned N, const MappableOctTree**in, bool roundUp,  MappableOctTree** out);
 
 	//volume calculations that don't require creating a tmp tree
 	float intersectVolume(const MappableOctTree * rhs) const;

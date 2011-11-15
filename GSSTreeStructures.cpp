@@ -142,24 +142,28 @@ void GSSInternalNode::setChildPos(unsigned i, file_index newpos, bool isLeaf, fi
 }
 
 //malloc a new node that has reduced sized trees
-GSSInternalNode* GSSInternalNode::createTruncated(float dimension, float resolution) const
+GSSInternalNode* GSSInternalNode::createTruncated(float dimension, float res) const
 {
 	unsigned nc = size();
 	MappableOctTree *MIVs[nc];
 	MappableOctTree *MSVs[nc];
+	const MappableOctTree *oldMIVs[nc];
+	const MappableOctTree *oldMSVs[nc];
 	unsigned positions[nc];
 
 	//reduce resolution to lowest discernable value
-	while(resolution < dimension)
+	/*
+	float volcut = res*res*res/2.0;
+	while(volcut < dimension*dimension*dimension)
 	{
-		resolution *= 2;
+		volcut *= 2;
 
 		for (unsigned c = 0; c < nc; c++)
 		{
 			const Child *child = getChild(c);
-			MIVs[c] = child->getMIV()->createTruncated(dimension, resolution,
+			MIVs[c] = child->getMIV()->createRounded(dimension, volcut,
 					false);
-			MSVs[c] = child->getMSV()->createTruncated(dimension, resolution,
+			MSVs[c] = child->getMSV()->createRounded(dimension, volcut,
 					true);
 		}
 
@@ -183,19 +187,43 @@ GSSInternalNode* GSSInternalNode::createTruncated(float dimension, float resolut
 
 		if(hasExactMatch)
 		{
-			resolution /= 2;
+			volcut /= 2;
 			break;
 		}
 	}
-
+*/
 	unsigned curoffset = nc*sizeof(unsigned); //skip of positions
 
 	for(unsigned c = 0; c < nc; c++)
 	{
 		const Child *child = getChild(c);
-		MIVs[c] = child->getMIV()->createTruncated(dimension, resolution, false);
-		MSVs[c] = child->getMSV()->createTruncated(dimension, resolution, true);
+		oldMIVs[c] = child->getMIV();
+		oldMSVs[c] = child->getMSV();
+	}
 
+	bool changed = false;
+
+	changed |= MappableOctTree::createRoundedSet(nc, oldMIVs, false, MIVs);
+	changed |= MappableOctTree::createRoundedSet(nc, oldMSVs, true, MSVs);
+
+	while(changed)
+	{
+		changed = false;
+		memcpy(oldMIVs,MIVs, sizeof(MIVs));
+		memcpy(oldMSVs,MSVs, sizeof(MSVs));
+
+		changed |= MappableOctTree::createRoundedSet(nc, oldMIVs, false, MIVs);
+		changed |= MappableOctTree::createRoundedSet(nc, oldMSVs, true, MSVs);
+
+		for(unsigned c = 0; c < nc; c++)
+		{
+			free((void*)oldMIVs[c]);
+			free((void*)oldMSVs[c]);
+		}
+	}
+
+	for(unsigned c = 0; c < nc; c++)
+	{
 		positions[c] = curoffset;
 
 		curoffset += sizeof(Child);
