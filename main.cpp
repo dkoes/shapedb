@@ -67,8 +67,8 @@ cl::opt<PackerEnum>
 				clEnumValN(Spectral, "spectral", "Spectral packing"),
 				clEnumValEnd), cl::init(MatchPack) );
 
-cl::opt<unsigned> Knn("knn", cl::desc("K for knn graph creation"), cl::init(0));
-cl::opt<unsigned> Sentinals("sentinals",cl::desc("Number of sentinals for knn initialization (zero random)"), cl::init(0));
+cl::opt<unsigned> Knn("knn", cl::desc("K for knn graph creation"), cl::init(8));
+cl::opt<unsigned> Sentinals("sentinals",cl::desc("Number of sentinals for knn initialization (zero random)"), cl::init(16));
 cl::opt<SpectralPacker::SpectralAlgEnum>
 	SpectralAlg(cl::desc("Spectral packing sub-algorithm:"),
 			cl::values(clEnumValN(SpectralPacker::SortDense, "sort-dense", "Simple sort followed by dense packing"),
@@ -120,8 +120,12 @@ cl::opt<Packer::ClusterDistance>		ClusterDist(
 cl::opt<DistanceFunction> ShapeDist(cl::desc("Metric for distance between shapes:"),
 		cl::values(clEnumValN(RelativeVolume,"rel-volume","Relative volume difference"),
 				clEnumValN(AbsVolume,"abs-volume", "Absolute volume difference"),
-				clEnumValN(Hausdorff,"hausdorff", "Hausdorff distance"), clEnumValEnd),
+				clEnumValN(Hausdorff,"hausdorff", "Hausdorff distance"),
+				clEnumValN(RelativeTriple, "rel-triple", "Triple including selectivity"),
+				clEnumValN(AbsoluteTriple, "abs-triple", "Triple including selectivity (absolute)"), clEnumValEnd),
 				cl::init(RelativeVolume));
+
+cl::opt<unsigned> SuperNodeDepth("superdepth",cl::desc("Depth to descend to create aggregrated super root"), cl::init(0));
 
 
 static void spherizeMol(OEMol& mol, vector<MolSphere>& spheres)
@@ -172,7 +176,7 @@ int main(int argc, char *argv[])
 
 		GSSLevelCreator leveler(&topdown, packer.get(), NodePack, LeafPack);
 
-		GSSTreeCreator creator(&leveler);
+		GSSTreeCreator creator(&leveler, SuperNodeDepth);
 
 		filesystem::path dbpath(Database.c_str());
 		Molecule::iterator molitr(Input);

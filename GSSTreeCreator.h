@@ -33,7 +33,6 @@
 #ifndef GSSTREECREATOR_H_
 #define GSSTREECREATOR_H_
 
-
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -51,7 +50,6 @@ using namespace std;
 
 typedef Molecule Object; //eventually template this
 
-
 //class for creating levels, follows the CM-tree bulk loading algorithm,
 //but can be overridden to implement any arbitrary algorithm
 class GSSLevelCreator
@@ -64,7 +62,6 @@ protected:
 	unsigned nodePack;
 	unsigned leafPack;
 
-
 	//class vars used by nextlevelR
 	unsigned packingSize;
 	ostream *outNodes;
@@ -73,15 +70,24 @@ protected:
 	vector<file_index> *treeIndices;
 	virtual void createNextLevelR(TopDownPartitioner *P);
 public:
-	GSSLevelCreator(const TopDownPartitioner * part, const Packer *pack, unsigned np, unsigned lp):
-		partitioner(part), packer(pack), nodePack(np), leafPack(lp) {}
+	GSSLevelCreator(const TopDownPartitioner * part, const Packer *pack,
+			unsigned np, unsigned lp) :
+			partitioner(part), packer(pack), nodePack(np), leafPack(lp)
+	{
+	}
 
-	virtual ~GSSLevelCreator() {}
+	virtual ~GSSLevelCreator()
+	{
+	}
 
-	virtual void createNextLevel(DataViewer& data, ostream* nodefile, vector<file_index>& nodeindices,
-			ostream* treefile, vector<file_index>& treeindices);
+	virtual void createNextLevel(DataViewer& data, ostream* nodefile,
+			vector<file_index>& nodeindices, ostream* treefile,
+			vector<file_index>& treeindices);
 
-	unsigned getPack() const { return packer->getPack(); }
+	unsigned getPack() const
+	{
+		return packer->getPack();
+	}
 };
 
 class GSSTreeCreator
@@ -96,20 +102,32 @@ class GSSTreeCreator
 
 	float dimension;
 	float resolution;
-
+	unsigned superNodeDepth;
 	//some bookkeeping for analysis purposes
 	unsigned numNodes;
 	unsigned numLeaves;
 	vector<unsigned> nodeContentDistribution;
 	vector<unsigned> leafContentDistribution;
-	file_index optimizeLevelsR(ostream& outnodes, ostream& outleaves, const GSSNodeCommon *n, unsigned level, file_index& lstart, file_index& lend);
+	file_index optimizeLevelsR(ostream& outnodes, ostream& outleaves,
+			const GSSNodeCommon *n, unsigned level, file_index& lstart,
+			file_index& lend);
 	void optimizeLevels();
 
-public:
-	GSSTreeCreator(GSSLevelCreator *l):leveler(l) {}
-	~GSSTreeCreator() {}
+	void getNodesForSuperNode(const GSSInternalNode* root,
+			vector<GSSInternalNode*>& newroots, unsigned curlevel,
+			unsigned stoplevel);
 
-	bool create(filesystem::path dir, Object::iterator& itr, float dim, float res);
+public:
+	GSSTreeCreator(GSSLevelCreator *l, unsigned sdepth=3) :
+			leveler(l), dimension(0), resolution(0), superNodeDepth(sdepth)
+	{
+	}
+	~GSSTreeCreator()
+	{
+	}
+
+	bool create(filesystem::path dir, Object::iterator& itr, float dim,
+			float res);
 
 	void printStats(ostream& out) const;
 };

@@ -488,6 +488,13 @@ float MappableOctTree::unionVolume(const MappableOctTree *rhs) const
 	return uval;
 }
 
+void MappableOctTree::intersectUnionVolume(const MappableOctTree *rhs, float& ival, float& uval) const
+{
+	ival = 0;
+	uval = 0;
+	root.intersectUnionVolume(tree,  rhs->root, rhs->tree, ival, uval);
+}
+
 
 bool MappableOctTree::containedIn(const MappableOctTree *rhs) const
 {

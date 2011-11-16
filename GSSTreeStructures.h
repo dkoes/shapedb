@@ -102,6 +102,7 @@ private:
 
 public:
 	static void writeNode(const DataViewer *data, const Cluster& cluster, ostream& outNodes, ostream& outTrees);
+	static GSSInternalNode* createMergedNode(const vector<GSSInternalNode*>& nodes);
 	const Child* getChild(unsigned i) const { return (Child*)&data[child_positions[i]]; }
 	unsigned size() const { return info.N; }
 	unsigned bytes() const;

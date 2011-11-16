@@ -99,6 +99,56 @@ void GSSInternalNode::writeNode(const DataViewer *data, const Cluster& cluster, 
 
 }
 
+//create a single super node from nodes as a malloced node
+GSSInternalNode* GSSInternalNode::createMergedNode(const vector<GSSInternalNode*>& nodes)
+{
+	unsigned numChildren = 0;
+	vector<unsigned> positions;
+	unsigned curoffset = 0;
+	for(unsigned i = 0, n = nodes.size(); i < n; i++)
+	{
+		unsigned nc = nodes[i]->size();
+		numChildren += nc;
+
+		for(unsigned c = 0; c < nc; c++)
+		{
+			positions.push_back(curoffset);
+			curoffset += nodes[i]->getChild(c)->bytes();
+		}
+	}
+
+	//add in position offset
+	unsigned posoff = positions.size()*sizeof(unsigned);
+	for(unsigned i = 0, n = positions.size(); i < n; i++)
+	{
+		positions[i] += posoff;
+	}
+	GSSInternalNode *ret = (GSSInternalNode*)malloc(sizeof(GSSInternalNode)+curoffset+posoff);
+
+	ret->info.isLeaf = false;
+	ret->info.N = numChildren;
+	unsigned offset = 0;
+	memcpy(ret->data, &positions[0], posoff);
+	offset += posoff;
+
+	//copy in children
+	for(unsigned i = 0, n = nodes.size(); i < n; i++)
+	{
+		unsigned nc = nodes[i]->size();
+		for(unsigned c = 0; c < nc; c++)
+		{
+			const Child* ch = nodes[i]->getChild(c);
+			unsigned nb = ch->bytes();
+			memcpy(ret->data+offset, ch, nb);
+			offset += nb;
+		}
+	}
+	assert(offset == curoffset+posoff);
+
+	return ret;
+}
+
+
 unsigned GSSLeaf::bytes() const
 {
 	unsigned ret = sizeof(GSSLeaf);

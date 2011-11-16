@@ -164,6 +164,7 @@ public:
 	//volume calculations that don't require creating a tmp tree
 	float intersectVolume(const MappableOctTree * rhs) const;
 	float unionVolume(const MappableOctTree *rhs) const;
+	void intersectUnionVolume(const MappableOctTree *rhs, float& ival, float& uval) const;
 
 	bool containedIn(const MappableOctTree *rhs) const;
 
