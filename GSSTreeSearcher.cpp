@@ -103,7 +103,7 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
 				<< " full leaves\n";
 		for(unsigned i = 0, n = levelCnts.size(); i < n; i++)
 		{
-			cout << " level " << i <<": " << levelCnts[i] << " " << maxlevelCnts[i] << "\n";
+			cout << " level " << i <<": " << levelCnts[i] << " " << maxlevelCnts[i] << " " << usefulLevelCnts[i] << "\n";
 		}
 	}
 	delete smallTree;
@@ -172,6 +172,7 @@ void GSSTreeSearcher::findTweeners(const GSSInternalNode* node,
 	if(levelCnts.size() <= level)
 	{
 		levelCnts.resize(level+1,0);
+		usefulLevelCnts.resize(level+1,0);
 		maxlevelCnts.resize(level+2,0);
 	}
 	levelCnts[level]++;
@@ -189,6 +190,7 @@ void GSSTreeSearcher::findTweeners(const GSSInternalNode* node,
 	}
 
 	maxlevelCnts[level+1] += n;
+	unsigned oldres = respos.size();
 	for(unsigned i = 0, nc = goodchildren.size(); i < nc; i++)
 	{
 		const GSSInternalNode::Child *child = goodchildren[i];
@@ -206,6 +208,8 @@ void GSSTreeSearcher::findTweeners(const GSSInternalNode* node,
 			findTweeners(next, min, max, respos, level+1);
 		}
 	}
+	if(respos.size() > oldres)
+		usefulLevelCnts[level]++;
 
 }
 

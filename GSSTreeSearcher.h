@@ -39,6 +39,7 @@ class GSSTreeSearcher
 	unsigned fitsCheck;
 	unsigned nodesVisited;
 	vector<unsigned> levelCnts;
+	vector<unsigned> usefulLevelCnts;
 	vector<unsigned> maxlevelCnts;
 	unsigned leavesVisited;
 	unsigned fullLeaves;
