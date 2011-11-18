@@ -21,9 +21,7 @@
 #include <string>
 #include "GSSTypes.h"
 #include "boost/array.hpp"
-#include "openeye.h"
-#include "oechem.h"
-#include "oesystem.h"
+
 
 #include "CommandLine2/CommandLine.h"
 #include "GSSTreeCreator.h"
@@ -33,8 +31,6 @@
 #include "packers/Packers.h"
 #include <boost/shared_ptr.hpp>
 
-using namespace OEChem;
-using namespace OESystem;
 using namespace std;
 using namespace boost;
 
@@ -42,7 +38,7 @@ typedef shared_ptr<Packer> PackerPtr;
 
 enum CommandEnum
 {
-	Create, NNSearch, DCSearch
+	Create, NNSearch, DCSearch, MolGrid
 };
 
 cl::opt<CommandEnum>
@@ -52,6 +48,7 @@ cl::opt<CommandEnum>
 				cl::values(clEnumVal(Create, "Create a molecule shape index."),
 				clEnumVal(NNSearch, "Nearest neighbor search")						,
 				clEnumVal(DCSearch, "Distance constraint search"),
+				clEnumVal(MolGrid, "Generate molecule grid and debug output"),
 				clEnumValEnd) );
 
 enum PackerEnum
@@ -100,9 +97,9 @@ cl::opt<unsigned> KCenters("kcenters", cl::desc("number of centers for ksample-s
 cl::opt<unsigned> KSampleMult("ksamplex", cl::desc("multiplictive factor for ksampling"),cl::init(10));
 
 cl::opt<unsigned> LeafPack("leaf-pack",
-		cl::desc("Cutoff to trigger leaf packing"), cl::init(256));
+		cl::desc("Cutoff to trigger leaf packing"), cl::init(100000));
 cl::opt<unsigned> NodePack("node-pack",
-		cl::desc("Cutoff to trigger leaf packing"), cl::init(256));
+		cl::desc("Cutoff to trigger leaf packing"), cl::init(100000));
 
 cl::opt<unsigned> Pack("pack", cl::desc("Maximum quantities per a node"), cl::init(8));
 
@@ -128,17 +125,14 @@ cl::opt<DistanceFunction> ShapeDist(cl::desc("Metric for distance between shapes
 cl::opt<unsigned> SuperNodeDepth("superdepth",cl::desc("Depth to descend to create aggregrated super root"), cl::init(0));
 
 
-static void spherizeMol(OEMol& mol, vector<MolSphere>& spheres)
+static void spherizeMol(OBMol& mol, vector<MolSphere>& spheres)
 {
-	OEAssignBondiVdWRadii(mol);
 	spheres.clear();
 	spheres.reserve(mol.NumAtoms());
-	for (OEIter<OEAtomBase> atom = mol.GetAtoms(); atom; ++atom)
+	for (OBAtomIterator aitr = mol.BeginAtoms(); aitr != mol.EndAtoms(); ++aitr)
 	{
-		float xyz[3];
-		mol.GetCoords(atom, xyz);
-		spheres.push_back(
-				MolSphere(xyz[0], xyz[1], xyz[2], atom->GetRadius()));
+		OBAtom* atom = *aitr;
+		spheres.push_back(MolSphere(atom->x(), atom->y(), atom->z(), etab.GetVdwRad(atom->GetAtomicNum())));
 	}
 
 }
@@ -228,30 +222,26 @@ int main(int argc, char *argv[])
 		if(IncludeMol.size() > 0 || ExcludeMol.size() > 0)
 		{
 			//use explicit volumes
-			oemolistream inmol(IncludeMol);
-			oemolistream exmol(ExcludeMol);
-			if(!inmol && !exmol)
-			{
-				cerr << "Error reading inclusive/exclusive molecules\n";
-				exit(-1);
-			}
+			OBConversion inmol;
+			OBConversion exmol;
+			inmol.SetInFormat(inmol.FormatFromExt(IncludeMol));
+			exmol.SetInFormat(exmol.FormatFromExt(ExcludeMol));
+
 			vector<MolSphere> insphere, exsphere;
-			if(inmol)
+			OBMol imol;
+			if(inmol.ReadFile(&imol, IncludeMol))
 			{
-				OEMol mol;
-				OEReadMolecule(inmol, mol);
-				spherizeMol(mol, insphere);
+				spherizeMol(imol, insphere);
 				//adjust radii
 				for (unsigned i = 0, n = insphere.size(); i < n; i++)
 				{
 					insphere[i].incrementRadius(-LessDist);
 				}
 			}
-			if(exmol)
+			OBMol emol;
+			if(exmol.ReadFile(&emol, ExcludeMol))
 			{
-				OEMol mol;
-				OEReadMolecule(exmol, mol);
-				spherizeMol(mol, exsphere);
+				spherizeMol(emol, exsphere);
 				//adjust radii
 				for (unsigned i = 0, n = exsphere.size(); i < n; i++)
 				{
@@ -275,15 +265,23 @@ int main(int argc, char *argv[])
 				}
 			}
 
-			oemolostream out(Output.c_str());
+			OBConversion outconv;
+			outconv.SetOutFormat(outconv.FormatFromExt(Output.c_str()));
+			ofstream out(Output.c_str());
+			outconv.SetOutStream(&out);
+
 			for (unsigned i = 0, n = res.size(); i < n; i++)
-				res[i].writeMol(out);
+				outconv.Write(&res[i].getMol());
 		}
 		else // range from single molecules
 		{
-			oemolistream inmols(Input);
-			OEMol mol;
-			while (OEReadMolecule(inmols, mol))
+			OBConversion inconv;
+			inconv.SetInFormat(inconv.FormatFromExt(Input));
+			ifstream in(Input.c_str());
+			inconv.SetInStream(&in);
+
+			OBMol mol;
+			while (inconv.Read(&mol))
 			{
 				vector<MolSphere> littlespheres, bigspheres;
 				spherizeMol(mol, littlespheres);
@@ -311,13 +309,36 @@ int main(int argc, char *argv[])
 					}
 				}
 
-				oemolostream out(Output.c_str());
+				OBConversion outconv;
+				outconv.SetOutFormat(outconv.FormatFromExt(Output.c_str()));
+				ofstream out(Output.c_str());
+				outconv.SetOutStream(&out);
+
 				for (unsigned i = 0, n = res.size(); i < n; i++)
-					res[i].writeMol(out);
+					outconv.Write(&res[i].getMol());
 			}
 		}
 	}
 		break;
+	case MolGrid:
+	{
+		ofstream out(Output.c_str());
+		float adjust = -LessDist;
+		adjust += MoreDist;
+		for(MolIterator mitr(Input,adjust); mitr; ++mitr)
+		{
+			MappableOctTree *tree = MappableOctTree::create(MaxDimension, Resolution, *mitr);
+			cout << "Size of tree " << tree->bytes() << "\n";
+			cout << "Volume of tree " << tree->volume() << "\n";
+
+			if(out)
+			{
+				tree->dumpGrid(out, MaxDimension, Resolution);
+			}
+			free(tree);
+		}
+		break;
+	}
 	}
 	return 0;
 }

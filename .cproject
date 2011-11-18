@@ -27,6 +27,7 @@
 								<option id="gnu.cpp.compiler.exe.debug.option.debugging.level.1462956469" name="Debug Level" superClass="gnu.cpp.compiler.exe.debug.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.1797101193" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="/usr0/local/openeye/toolkits/include"/>
+									<listOptionValue builtIn="false" value="/usr/local/include/openbabel-2.0"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1812886179" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
@@ -40,6 +41,7 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug.1035050897" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug">
 								<option id="gnu.cpp.link.option.libs.1769803431" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="oeszybki"/>
+									<listOptionValue builtIn="false" value="openbabel"/>
 									<listOptionValue builtIn="false" value="ann"/>
 									<listOptionValue builtIn="false" value="newmat"/>
 									<listOptionValue builtIn="false" value="boost_iostreams"/>
@@ -113,6 +115,7 @@
 								<option id="gnu.cpp.compiler.exe.release.option.debugging.level.399790278" name="Debug Level" superClass="gnu.cpp.compiler.exe.release.option.debugging.level" value="gnu.cpp.compiler.debugging.level.none" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.1365754053" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="/usr0/local/openeye/toolkits/include"/>
+									<listOptionValue builtIn="false" value="/usr/local/include/openbabel-2.0"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.2027430973" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
@@ -126,6 +129,7 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.release.1621250117" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.release">
 								<option id="gnu.cpp.link.option.libs.236000983" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="oeszybki"/>
+									<listOptionValue builtIn="false" value="openbabel"/>
 									<listOptionValue builtIn="false" value="ann"/>
 									<listOptionValue builtIn="false" value="newmat"/>
 									<listOptionValue builtIn="false" value="boost_iostreams"/>
@@ -199,6 +203,7 @@
 								<option id="gnu.cpp.compiler.exe.debug.option.debugging.level.1589953070" name="Debug Level" superClass="gnu.cpp.compiler.exe.debug.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.743915848" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="/usr0/local/openeye/toolkits/include"/>
+									<listOptionValue builtIn="false" value="/usr/local/include/openbabel-2.0"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.debugging.prof.2067007342" name="Generate prof information (-p)" superClass="gnu.cpp.compiler.option.debugging.prof" value="true" valueType="boolean"/>
@@ -216,6 +221,7 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug.2061418021" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug">
 								<option id="gnu.cpp.link.option.libs.1267507203" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="oeszybki"/>
+									<listOptionValue builtIn="false" value="openbabel"/>
 									<listOptionValue builtIn="false" value="ann"/>
 									<listOptionValue builtIn="false" value="newmat"/>
 									<listOptionValue builtIn="false" value="boost_iostreams"/>

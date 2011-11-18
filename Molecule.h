@@ -15,14 +15,15 @@
 
 #include <iostream>
 #include <string>
-#include "openeye.h"
-#include "oechem.h"
-#include "oesystem.h"
+#include <openbabel/mol.h>
+#include <openbabel/obconversion.h>
+#include <openbabel/obiter.h>
+#include <openbabel/atom.h>
+
 #include "MolSphere.h"
 #include "Cube.h"
 
-using namespace OEChem;
-using namespace OESystem;
+using namespace OpenBabel;
 using namespace std;
 
 class MolIterator;
@@ -35,7 +36,7 @@ class Molecule
 	//to the front of the list; this ends up being more efficient than filtering
 	//all the intersecting spheres
 	mutable vector<MolSphere> spheres;
-	OEMol mol;
+	OBMol mol;
 public:
 	typedef MolIterator iterator;
 
@@ -46,31 +47,37 @@ public:
 
 	Molecule(const char *data)
 	{
-		oemolistream inm;
-		inm.SetFormat(OEFormat::OEB);
-		inm.Setgz(true);
+		OBConversion conv;
+		conv.SetInAndOutFormats("SDF","SDF");
+		conv.SetOptions("z",OBConversion::INOPTIONS);
+		conv.SetOptions("z",OBConversion::GENOPTIONS);
 
 		unsigned n = 0;
 		memcpy(&n, data, sizeof(unsigned));
-		const unsigned char* mdata = (const unsigned char*)data+sizeof(unsigned);
+		const char* mdata = (const char*)data+sizeof(unsigned);
 
-		inm.openstring(mdata, n);
-		OEReadMolecule(inm, mol);
+		string mstr(mdata, n);
+
+		conv.ReadString((OBBase*)&mol, mstr);
 
 		//don't bother with spheres
 	}
 
-	void set(const OEMol& m)
+	void set(const OBMol& m, float adjust=0)
 	{
 		mol = m;
 		spheres.clear();
 		spheres.reserve(mol.NumAtoms());
-		for(OEIter<OEAtomBase> atom = mol.GetAtoms(); atom; ++atom)
+		for(OBAtomIterator aitr = mol.BeginAtoms(); aitr != mol.EndAtoms(); ++aitr)
 		{
-			float xyz[3];
-			mol.GetCoords(atom, xyz);
-			spheres.push_back(MolSphere(xyz[0], xyz[1], xyz[2], atom->GetRadius()));
+			OBAtom* atom = *aitr;
+			spheres.push_back(MolSphere(atom->x(), atom->y(), atom->z(), etab.GetVdwRad(atom->GetAtomicNum())+adjust));
 		}
+	}
+
+	OBMol& getMol()
+	{
+		return mol;
 	}
 
 	bool intersects(const Cube& cube) const
@@ -118,52 +125,42 @@ public:
 
 	void write(ostream& out) const
 	{
-		oemolostream ostr;
-		ostr.openstring(true);
-		ostr.SetFormat(OEFormat::OEB);
-		OEWriteMolecule(ostr, mol);
-		const string& mstr = ostr.GetString();
+		OBConversion conv;
+		conv.SetInAndOutFormats("SDF","SDF");
+		conv.SetOptions("z",OBConversion::OUTOPTIONS);
+		conv.SetOptions("z",OBConversion::GENOPTIONS);
+
+		OBMol copy = mol; //because OB doesn't have a const version
+		string mstr = conv.WriteString(&copy);
+
 		unsigned n = mstr.length();
 		out.write((char*)&n, sizeof(unsigned));
 		out.write(mstr.c_str(), n);
 	}
 
-	void writeMol(oemolostream& out) const
-	{
-		OEWriteMolecule(out, mol);
-	}
+
 };
 
 // use openeye to read in from a file
 class MolIterator
 {
-	oemolistream inmols;
-	OEMol mol;
+	OBConversion inconv;
+	OBMol mol;
 	Molecule currmolecule;
 	bool valid;
-	OEIter<OEConfBase> conf;
+	float adjust; //chagne radii
 
 	void readOne()
 	{
-		if(!conf) //read next molecule
-		{
-			if(!OEReadMolecule(inmols, mol))
-			{
-				valid = false;
-				return;
-			}
-			OEAssignBondiVdWRadii(mol);
-			conf = mol.GetConfs();
-		}
-		//conf is now valid
-		currmolecule.set(*conf);
-		++conf;
+		valid = inconv.Read(&mol);
+		currmolecule.set(mol, adjust);
 	}
 public:
-	MolIterator(const string& fname): inmols(fname.c_str()), valid(true)
+	MolIterator(const string& fname, float adj=0): valid(true), adjust(adj)
 	{
-		oemolistream inmols(fname);
-		readOne();
+		inconv.SetInFormat(inconv.FormatFromExt(fname));
+		valid = inconv.ReadFile(&mol, fname);
+		currmolecule.set(mol, adjust);
 	}
 
 	//validity check

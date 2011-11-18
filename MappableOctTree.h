@@ -92,6 +92,7 @@ struct MChildNode
 
 	void collectVertices(vector<Vertex>& vertices, Cube box, const MOctNode* tree) const;
 
+	bool checkCoord(const MOctNode* tree, unsigned i, unsigned j, unsigned k, unsigned max) const;
 }__attribute__((__packed__));
 
 struct MOctNode
@@ -187,6 +188,7 @@ public:
 
 	bool equals(const MappableOctTree* rhs) const;
 
+	void dumpGrid(ostream& out, float dim, float res) const;
 private:
 	template<class Object>
 	static MChildNode create_r(float res, const Cube& cube, const Object& obj,

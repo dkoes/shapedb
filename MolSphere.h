@@ -9,6 +9,7 @@
 #define MOLSPHERE_H_
 
 #include "Cube.h"
+#include <cstdio>
 //a sphere
 struct MolSphere
 {

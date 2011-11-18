@@ -895,3 +895,67 @@ bool MappableOctTree::equals(const MappableOctTree* rhs) const
 	return root.equals(tree, rhs->root, rhs->tree);
 }
 
+//recurse down and see if i,j,k is set
+//max is the integral dimension of this node
+bool MChildNode::checkCoord(const MOctNode *tree, unsigned i, unsigned j, unsigned k, unsigned max) const
+{
+	//first compute the octant identified by i,j,k
+	unsigned half = max/2;
+	unsigned oct = 0;
+	if(i >= half)
+	{
+		oct |= 1;
+		i -= half;
+	}
+	if(j >= half)
+	{
+		oct |= 2;
+		j -= half;
+	}
+	if(k >= half)
+	{
+		oct |= 4;
+		k -= half;
+	}
+
+	if(isLeaf)
+	{
+		return pattern & (1 << oct);
+	}
+	else
+	{
+		return tree[index].children[oct].checkCoord(tree, i, j, k, half);
+	}
+}
+
+//dump an mmp formated grid
+void MappableOctTree::dumpGrid(ostream& out, float dim, float res) const
+{
+	//size
+	out << "header\n";
+	unsigned max = ceil(dim/res);
+	out << max << " " << max << " " << max << "\n";
+	//origin
+	out << -dim/2 << " " <<  -dim/2 << " " << -dim/2 << "\n";
+	//resolution
+	out << res << " " << res << " " << res << "\n";
+
+	//now coordinates
+	//definitely not the most efficient way
+	for(unsigned i = 0; i < max; i++)
+	{
+		for(unsigned j = 0; j < max; j++)
+		{
+			for(unsigned k = 0; k < max; k++)
+			{
+				if(root.checkCoord(tree, i,j,k,max))
+					out << "1 ";
+				else
+					out << "0 ";
+			}
+			out << "\n";
+		}
+		out << "\n";
+	}
+}
+
