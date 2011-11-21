@@ -62,6 +62,8 @@ public:
 	void dc_scan_search(const Object& smallObj, const Object& bigObj, bool invertBig,
 			vector<Object>& res);
 
+	float getDimension() const { return dimension; }
+	float getResolution() const { return resolution; }
 };
 
 #endif /* GSSTREESEARCHER_H_ */

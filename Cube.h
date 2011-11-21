@@ -52,6 +52,13 @@ public:
 		return dim*dim*dim;
 	}
 
+	void getCenter(float& cx, float& cy, float& cz) const
+	{
+		cx = x+dim/2;
+		cy = y+dim/2;
+		cz = z+dim/2;
+	}
+
 	//return i'th octant
 	Cube getOctant(unsigned i) const
 	{

@@ -19,12 +19,12 @@
 #include <openbabel/obconversion.h>
 #include <openbabel/obiter.h>
 #include <openbabel/atom.h>
-
 #include "MolSphere.h"
 #include "Cube.h"
-
+#include "MGrid.h"
 using namespace OpenBabel;
 using namespace std;
+
 
 class MolIterator;
 
@@ -37,13 +37,42 @@ class Molecule
 	//all the intersecting spheres
 	mutable vector<MolSphere> spheres;
 	OBMol mol;
+
+	vector<MGrid> grids;
+
+	//create a set of grids of different resolution from spheres
+	void createGrids(double dimension, double resolution)
+	{
+		grids.clear();
+		grids.reserve(1+ceil(log2(dimension/resolution)));
+		grids.push_back(MGrid(dimension,resolution));
+
+		for(unsigned i = 0, n = spheres.size(); i < n; i++)
+		{
+			const MolSphere& sphere = spheres[i];
+			grids[0].markXYZSphere(sphere.x, sphere.y, sphere.z, sphere.r);
+		}
+
+		double res = resolution*2;
+		while(res <= dimension)
+		{
+			unsigned pos = grids.size();
+			grids.push_back(MGrid(dimension, res));
+			grids[pos].copyFrom(grids[pos-1]); //downsample
+			res *= 2;
+		}
+	}
+
 public:
 	typedef MolIterator iterator;
 
 	Molecule() {}
 	~Molecule() {}
 
-	Molecule(const vector<MolSphere>& sph): spheres(sph) {}
+	Molecule(const vector<MolSphere>& sph, double dimension, double resolution): spheres(sph)
+	{
+		createGrids(dimension, resolution);
+	}
 
 	Molecule(const char *data)
 	{
@@ -63,16 +92,20 @@ public:
 		//don't bother with spheres
 	}
 
-	void set(const OBMol& m, float adjust=0)
+	void set(const OBMol& m, float resolution, float dimension, float adjust=0)
 	{
 		mol = m;
+
 		spheres.clear();
 		spheres.reserve(mol.NumAtoms());
 		for(OBAtomIterator aitr = mol.BeginAtoms(); aitr != mol.EndAtoms(); ++aitr)
 		{
 			OBAtom* atom = *aitr;
-			spheres.push_back(MolSphere(atom->x(), atom->y(), atom->z(), etab.GetVdwRad(atom->GetAtomicNum())+adjust));
+			double r = etab.GetVdwRad(atom->GetAtomicNum())+adjust;
+			spheres.push_back(MolSphere(atom->x(), atom->y(), atom->z(), r));
 		}
+
+		createGrids(dimension, resolution);
 	}
 
 	OBMol& getMol()
@@ -82,15 +115,36 @@ public:
 
 	bool intersects(const Cube& cube) const
 	{
+		for(unsigned i = 0, n = grids.size(); i < n; i++)
+		{
+			if(grids[i].getResolution() == cube.getDimension())
+			{
+				float x,y,z;
+				cube.getCenter(x,y,z);
+				if(grids[i].test(x,y,z))
+					return true;
+			}
+		}
+		return false;
+		/*
+		MolSphere isphere;
 		for(unsigned i = 0, n = spheres.size(); i < n; i++)
 		{
 			if(spheres[i].intersectsCube(cube))
 			{
 				swap(spheres[i],spheres[0]); //locality optimization
-				return true;
+				ret2 = true;
 			}
 		}
-		return false;
+
+		if(ret != ret2)
+		{
+			cerr << "Differ! " << ret << " " << ret2<<"\n";
+			cerr << cube.x <<","<<cube.y<<","<<cube.z<<" " << cube.dim << "\n";
+			cerr << spheres[0].x <<","<<spheres[0].y<<","<<spheres[0].z<<" " << spheres[0].r << "\n";
+		}
+		return ret;
+		*/
 	}
 
 	bool containedIn(const Cube& cube) const
@@ -148,19 +202,21 @@ class MolIterator
 	OBMol mol;
 	Molecule currmolecule;
 	bool valid;
+	float dimension;
+	float resolution;
 	float adjust; //chagne radii
 
 	void readOne()
 	{
 		valid = inconv.Read(&mol);
-		currmolecule.set(mol, adjust);
+		currmolecule.set(mol, resolution, dimension, adjust);
 	}
 public:
-	MolIterator(const string& fname, float adj=0): valid(true), adjust(adj)
+	MolIterator(const string& fname, float dim, float res, float adj=0): valid(true), dimension(dim), resolution(res), adjust(adj)
 	{
 		inconv.SetInFormat(inconv.FormatFromExt(fname));
 		valid = inconv.ReadFile(&mol, fname);
-		currmolecule.set(mol, adjust);
+		currmolecule.set(mol, resolution, dimension, adjust);
 	}
 
 	//validity check

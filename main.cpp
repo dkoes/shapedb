@@ -16,12 +16,10 @@
  coordinate system.  (But main will take in molecules).
  */
 
-
 #include <iostream>
 #include <string>
 #include "GSSTypes.h"
 #include "boost/array.hpp"
-
 
 #include "CommandLine2/CommandLine.h"
 #include "GSSTreeCreator.h"
@@ -41,89 +39,110 @@ enum CommandEnum
 	Create, NNSearch, DCSearch, MolGrid
 };
 
-cl::opt<CommandEnum>
-		Command(
-				cl::desc("Operation to perform:"),
-				cl::Required,
-				cl::values(clEnumVal(Create, "Create a molecule shape index."),
-				clEnumVal(NNSearch, "Nearest neighbor search")						,
+cl::opt<CommandEnum> Command(
+		cl::desc("Operation to perform:"),
+		cl::Required,
+		cl::values(clEnumVal(Create, "Create a molecule shape index."),
+				clEnumVal(NNSearch, "Nearest neighbor search"),
 				clEnumVal(DCSearch, "Distance constraint search"),
 				clEnumVal(MolGrid, "Generate molecule grid and debug output"),
-				clEnumValEnd) );
+				clEnumValEnd));
 
 enum PackerEnum
 {
-	FullMerge, Spectral,GreedyMerge,MatchPack
+	FullMerge, Spectral, GreedyMerge, MatchPack
 };
-cl::opt<PackerEnum>
-		PackerChoice(
-				cl::desc("Packing algorithm:"),
-				cl::values(clEnumValN(FullMerge,"full-merge", "Greedy full merge."),
-						clEnumValN(GreedyMerge,"greedy-merge", "Greedy iterative merge."),
-						clEnumValN(MatchPack,"match-merge", "Optimal matching merging."),
+cl::opt<PackerEnum> PackerChoice(
+		cl::desc("Packing algorithm:"),
+		cl::values(
+				clEnumValN(FullMerge,"full-merge", "Greedy full merge."),
+				clEnumValN(GreedyMerge,"greedy-merge", "Greedy iterative merge."),
+				clEnumValN(MatchPack,"match-merge", "Optimal matching merging."),
 				clEnumValN(Spectral, "spectral", "Spectral packing"),
-				clEnumValEnd), cl::init(MatchPack) );
+				clEnumValEnd), cl::init(MatchPack));
 
 cl::opt<unsigned> Knn("knn", cl::desc("K for knn graph creation"), cl::init(8));
-cl::opt<unsigned> Sentinals("sentinals",cl::desc("Number of sentinals for knn initialization (zero random)"), cl::init(16));
-cl::opt<SpectralPacker::SpectralAlgEnum>
-	SpectralAlg(cl::desc("Spectral packing sub-algorithm:"),
-			cl::values(clEnumValN(SpectralPacker::SortDense, "sort-dense", "Simple sort followed by dense packing"),
-					clEnumValN(SpectralPacker::SortPartition, "sort-partition", "Simple sort followed by largest separator partition packing"),
-					clEnumValN(SpectralPacker::ClusterFullEigen, "cluster-eigen", "Cluster eigen values using greedy packer"),
-					clEnumValN(SpectralPacker::RelaxationPacking, "relax", "Cluster form relaxation values"),
-					clEnumValEnd), cl::init(SpectralPacker::SortDense));
+cl::opt<unsigned> Sentinals("sentinals",
+		cl::desc("Number of sentinals for knn initialization (zero random)"),
+		cl::init(16));
+cl::opt<SpectralPacker::SpectralAlgEnum> SpectralAlg(
+		cl::desc("Spectral packing sub-algorithm:"),
+		cl::values(
+				clEnumValN(SpectralPacker::SortDense, "sort-dense", "Simple sort followed by dense packing"),
+				clEnumValN(SpectralPacker::SortPartition, "sort-partition", "Simple sort followed by largest separator partition packing"),
+				clEnumValN(SpectralPacker::ClusterFullEigen, "cluster-eigen", "Cluster eigen values using greedy packer"),
+				clEnumValN(SpectralPacker::RelaxationPacking, "relax", "Cluster form relaxation values"),
+				clEnumValEnd), cl::init(SpectralPacker::SortDense));
 
 cl::opt<bool> ScanCheck("scancheck",
 		cl::desc("Perform a full scan to check results"), cl::Hidden);
-cl::opt<bool> ScanOnly("scanonly",
-		cl::desc("Search using only a scan"), cl::Hidden);
+cl::opt<bool> ScanOnly("scanonly", cl::desc("Search using only a scan"),
+		cl::Hidden);
 
 cl::opt<string> Input("in", cl::desc("Input file"));
 cl::opt<string> Output("out", cl::desc("Output file"));
 cl::opt<string> Database("db", cl::desc("Database file"));
 
-cl::opt<double> LessDist("less",
-		cl::desc("Distance to reduce query mol by for constraint search (default 1A)."), cl::init(1.0));
-cl::opt<double> MoreDist("more",
-		cl::desc("Distance to increase query mol by for constraint search (default 1A)."), cl::init(1.0));
-cl::opt<double> MaxDimension("max-dim", cl::desc("Maximum dimension."),cl::init(64));
-cl::opt<double> Resolution("resolution", cl::desc("Best resolution for shape database creation."),cl::init(.5));
+cl::opt<double> LessDist(
+		"less",
+		cl::desc(
+				"Distance to reduce query mol by for constraint search (default 1A)."),
+		cl::init(1.0));
+cl::opt<double> MoreDist(
+		"more",
+		cl::desc(
+				"Distance to increase query mol by for constraint search (default 1A)."),
+		cl::init(1.0));
+cl::opt<double> MaxDimension("max-dim", cl::desc("Maximum dimension."),
+		cl::init(64));
+cl::opt<double> Resolution("resolution",
+		cl::desc("Best resolution for shape database creation."), cl::init(.5));
 
-cl::opt<string> IncludeMol("incmol", cl::desc("Molecule to use for minimum included volume"));
-cl::opt<string> ExcludeMol("exmol", cl::desc("Molecule to use for excluded volume"));
+cl::opt<string> IncludeMol("incmol",
+		cl::desc("Molecule to use for minimum included volume"));
+cl::opt<string> ExcludeMol("exmol",
+		cl::desc("Molecule to use for excluded volume"));
 
-cl::opt<unsigned> KCenters("kcenters", cl::desc("number of centers for ksample-split"), cl::init(8));
-cl::opt<unsigned> KSampleMult("ksamplex", cl::desc("multiplictive factor for ksampling"),cl::init(10));
+cl::opt<unsigned> KCenters("kcenters",
+		cl::desc("number of centers for ksample-split"), cl::init(8));
+cl::opt<unsigned> KSampleMult("ksamplex",
+		cl::desc("multiplictive factor for ksampling"), cl::init(10));
 
 cl::opt<unsigned> LeafPack("leaf-pack",
 		cl::desc("Cutoff to trigger leaf packing"), cl::init(100000));
 cl::opt<unsigned> NodePack("node-pack",
 		cl::desc("Cutoff to trigger leaf packing"), cl::init(100000));
 
-cl::opt<unsigned> Pack("pack", cl::desc("Maximum quantities per a node"), cl::init(8));
+cl::opt<unsigned> Pack("pack", cl::desc("Maximum quantities per a node"),
+		cl::init(8));
 
 cl::opt<bool> Verbose("v", cl::desc("Verbose output"));
-cl::opt<bool> UseUnnorm("use-unnorm", cl::desc("Use unnormalized laplacian in spectral packing"), cl::init(false));
+cl::opt<bool> UseUnnorm("use-unnorm",
+		cl::desc("Use unnormalized laplacian in spectral packing"),
+		cl::init(false));
 
-cl::opt<Packer::ClusterDistance>		ClusterDist(
-				cl::desc("Metric for cluster packing distance:"),
-				cl::values(clEnumValN(Packer::AverageLink, "ave-dist", "Use 'average' metric between MIV/MSV representations of clusters"),
-						clEnumValN(Packer::CompleteLink, "complete-dist", "Use complete linkage value between cluster members"),
-						clEnumValN(Packer::SingleLink, "single-dist", "Use single linkage value between cluster members"),
-						clEnumValN(Packer::TotalLink, "total-dist", "Use total (sum) linkage value between cluster members"),
-				clEnumValEnd),cl::init(Packer::AverageLink) );
+cl::opt<Packer::ClusterDistance> ClusterDist(
+		cl::desc("Metric for cluster packing distance:"),
+		cl::values(
+				clEnumValN(Packer::AverageLink, "ave-dist", "Use 'average' metric between MIV/MSV representations of clusters"),
+				clEnumValN(Packer::CompleteLink, "complete-dist", "Use complete linkage value between cluster members"),
+				clEnumValN(Packer::SingleLink, "single-dist", "Use single linkage value between cluster members"),
+				clEnumValN(Packer::TotalLink, "total-dist", "Use total (sum) linkage value between cluster members"),
+				clEnumValEnd), cl::init(Packer::AverageLink));
 
-cl::opt<DistanceFunction> ShapeDist(cl::desc("Metric for distance between shapes:"),
-		cl::values(clEnumValN(RelativeVolume,"rel-volume","Relative volume difference"),
+cl::opt<DistanceFunction> ShapeDist(
+		cl::desc("Metric for distance between shapes:"),
+		cl::values(
+				clEnumValN(RelativeVolume,"rel-volume","Relative volume difference"),
 				clEnumValN(AbsVolume,"abs-volume", "Absolute volume difference"),
 				clEnumValN(Hausdorff,"hausdorff", "Hausdorff distance"),
 				clEnumValN(RelativeTriple, "rel-triple", "Triple including selectivity"),
-				clEnumValN(AbsoluteTriple, "abs-triple", "Triple including selectivity (absolute)"), clEnumValEnd),
-				cl::init(RelativeVolume));
+				clEnumValN(AbsoluteTriple, "abs-triple", "Triple including selectivity (absolute)"),
+				clEnumValEnd), cl::init(RelativeVolume));
 
-cl::opt<unsigned> SuperNodeDepth("superdepth",cl::desc("Depth to descend to create aggregrated super root"), cl::init(0));
-
+cl::opt<unsigned> SuperNodeDepth("superdepth",
+		cl::desc("Depth to descend to create aggregrated super root"),
+		cl::init(0));
 
 static void spherizeMol(OBMol& mol, vector<MolSphere>& spheres)
 {
@@ -132,11 +151,12 @@ static void spherizeMol(OBMol& mol, vector<MolSphere>& spheres)
 	for (OBAtomIterator aitr = mol.BeginAtoms(); aitr != mol.EndAtoms(); ++aitr)
 	{
 		OBAtom* atom = *aitr;
-		spheres.push_back(MolSphere(atom->x(), atom->y(), atom->z(), etab.GetVdwRad(atom->GetAtomicNum())));
+		spheres.push_back(
+				MolSphere(atom->x(), atom->y(), atom->z(),
+						etab.GetVdwRad(atom->GetAtomicNum())));
 	}
 
 }
-
 
 int main(int argc, char *argv[])
 {
@@ -150,19 +170,21 @@ int main(int argc, char *argv[])
 		KSamplePartitioner topdown(KCenters, KSampleMult);
 
 		PackerPtr packer;
-		switch(PackerChoice)
+		switch (PackerChoice)
 		{
 		case FullMerge:
 			packer = PackerPtr(new FullMergePacker(Pack, ClusterDist));
 			break;
 		case MatchPack:
-			packer = PackerPtr(new MatcherPacker(Pack, Knn, Sentinals, ClusterDist));
+			packer = PackerPtr(
+					new MatcherPacker(Pack, Knn, Sentinals, ClusterDist));
 			break;
 		case GreedyMerge:
 			packer = PackerPtr(new GreedyPacker(Pack, ClusterDist));
 			break;
 		case Spectral:
-			packer = PackerPtr(new SpectralPacker(Pack, SpectralAlg, !UseUnnorm));
+			packer = PackerPtr(
+					new SpectralPacker(Pack, SpectralAlg, !UseUnnorm));
 			break;
 		}
 
@@ -173,14 +195,14 @@ int main(int argc, char *argv[])
 		GSSTreeCreator creator(&leveler, SuperNodeDepth);
 
 		filesystem::path dbpath(Database.c_str());
-		Molecule::iterator molitr(Input);
-		if(!creator.create(dbpath, molitr, MaxDimension, Resolution))
+		Molecule::iterator molitr(Input, MaxDimension, Resolution);
+		if (!creator.create(dbpath, molitr, MaxDimension, Resolution))
 		{
 			cerr << "Error creating database\n";
 			exit(1);
 		}
 
-		if(Verbose)
+		if (Verbose)
 			creator.printStats(cout);
 
 	}
@@ -189,7 +211,7 @@ int main(int argc, char *argv[])
 	{
 		//read in database
 		ifstream dbfile(Database.c_str());
-		if(!dbfile)
+		if (!dbfile)
 		{
 			cerr << "Could not read database " << Database << "\n";
 			exit(-1);
@@ -197,29 +219,29 @@ int main(int argc, char *argv[])
 		//TODO: load db
 		abort();
 		//read query molecule(s)
-		for(Molecule::iterator molitr(Input); molitr; ++molitr)
+		//for(Molecule::iterator molitr(Input, ); molitr; ++molitr)
 		{
 
 		}
 
-
 	}
-	break;
+		break;
 	case DCSearch:
 	{
 		//read in database
 		filesystem::path dbfile(Database.c_str());
 		GSSTreeSearcher gss(Verbose);
 
-		if(!gss.load(dbfile))
+		if (!gss.load(dbfile))
 		{
 			cerr << "Could not read database " << Database << "\n";
 			exit(-1);
 		}
 
-
+		double dimension = gss.getDimension();
+		double resolution = gss.getResolution();
 		//read query molecule(s)
-		if(IncludeMol.size() > 0 || ExcludeMol.size() > 0)
+		if (IncludeMol.size() > 0 || ExcludeMol.size() > 0)
 		{
 			//use explicit volumes
 			OBConversion inmol;
@@ -229,7 +251,7 @@ int main(int argc, char *argv[])
 
 			vector<MolSphere> insphere, exsphere;
 			OBMol imol;
-			if(inmol.ReadFile(&imol, IncludeMol))
+			if (inmol.ReadFile(&imol, IncludeMol))
 			{
 				spherizeMol(imol, insphere);
 				//adjust radii
@@ -239,7 +261,7 @@ int main(int argc, char *argv[])
 				}
 			}
 			OBMol emol;
-			if(exmol.ReadFile(&emol, ExcludeMol))
+			if (exmol.ReadFile(&emol, ExcludeMol))
 			{
 				spherizeMol(emol, exsphere);
 				//adjust radii
@@ -252,14 +274,16 @@ int main(int argc, char *argv[])
 			vector<Molecule> res;
 
 			//search
-			if(!ScanOnly)
-				gss.dc_search(Molecule(insphere), Molecule(exsphere), true, res);
+			if (!ScanOnly)
+				gss.dc_search(Molecule(insphere, dimension, resolution),
+						Molecule(exsphere, dimension, resolution), true, res);
 
-			if(ScanCheck || ScanOnly)
+			if (ScanCheck || ScanOnly)
 			{
 				vector<Molecule> res2;
-				gss.dc_scan_search(Molecule(insphere), Molecule(exsphere), true, res2);
-				if(res2.size() != res.size())
+				gss.dc_scan_search(Molecule(insphere, dimension, resolution),
+						Molecule(exsphere, dimension, resolution), true, res2);
+				if (res2.size() != res.size())
 				{
 					cerr << "Scanning found different number\n";
 				}
@@ -294,16 +318,22 @@ int main(int argc, char *argv[])
 					bigspheres[i].incrementRadius(MoreDist);
 				}
 
-				vector<Molecule > res;
+				vector<Molecule> res;
 				//search
-				if(!ScanOnly)
-					gss.dc_search(Molecule(littlespheres), Molecule(bigspheres), false, res);
+				if (!ScanOnly)
+					gss.dc_search(
+							Molecule(littlespheres, dimension, resolution),
+							Molecule(bigspheres, dimension, resolution), false,
+							res);
 
-				if(ScanCheck || ScanOnly)
+				if (ScanCheck || ScanOnly)
 				{
 					vector<Molecule> res2;
-					gss.dc_scan_search(Molecule(littlespheres), Molecule(bigspheres), false, res2);
-					if(res2.size() != res.size())
+					gss.dc_scan_search(
+							Molecule(littlespheres, dimension, resolution),
+							Molecule(bigspheres, dimension, resolution), false,
+							res2);
+					if (res2.size() != res.size())
 					{
 						cerr << "Scanning found different number\n";
 					}
@@ -326,20 +356,21 @@ int main(int argc, char *argv[])
 		float adjust = -LessDist;
 		adjust += MoreDist;
 
-		cout << sizeof(MChildNode) << "," << sizeof(MOctNode) << "\n";
-		for(MolIterator mitr(Input,adjust); mitr; ++mitr)
+		for (MolIterator mitr(Input, MaxDimension, Resolution, adjust); mitr;
+				++mitr)
 		{
-			MappableOctTree *tree = MappableOctTree::create(MaxDimension, Resolution, *mitr);
+			MappableOctTree *tree = MappableOctTree::create(MaxDimension,
+					Resolution, *mitr);
 			cout << "Size of tree " << tree->bytes() << "\n";
 			cout << "Volume of tree " << tree->volume() << "\n";
 			cout << "Nodes of tree " << tree->nodes() << "\n";
 			vector<unsigned> cnts;
 			tree->countLeavesAtDepths(cnts);
-			for(unsigned i = 0, n = cnts.size(); i < n; i++)
+			for (unsigned i = 0, n = cnts.size(); i < n; i++)
 			{
 				cout << i << " : " << cnts[i] << "\n";
 			}
-			if(out)
+			if (out)
 			{
 				tree->dumpGrid(out, Resolution);
 			}
