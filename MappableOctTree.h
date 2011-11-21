@@ -50,22 +50,46 @@ struct Vertex
 	}
 };
 
+#define MINDEX_BITS 15
 struct MOctNode;
 struct MChildNode
 {
-	bool isLeaf :1;
-	unsigned pattern: 8; //leaf pattern
-	unsigned index :23; //ptr to next node, or bit cnt if leaf
+	union
+	{
+		//you would think there would be a more portably way to get this bit-packed alignment,
+		//but I couldn't figure one out - isLeafs should overlap
+		bool isLeaf:1;
+		struct {
+			bool isLeaf:1;
+			unsigned pattern:8;
+			unsigned numbits:4;
+		}  __attribute__((__packed__)) leaf;
+
+		struct
+		{
+			bool isLeaf: 1;
+			unsigned index: MINDEX_BITS;
+		}  __attribute__((__packed__)) node;
+	} __attribute__((__packed__));
 
 	MChildNode() :
-			isLeaf(true), pattern(0), index(0)
+			isLeaf(true)
 	{
+		node.index = 0;
 	}
 
-
-	MChildNode(bool leaf, unsigned pat, unsigned i) :
-			isLeaf(leaf), pattern(pat), index(i)
+	//use to create node
+	MChildNode(unsigned i): isLeaf(false)
 	{
+		node.index = i;
+	}
+
+	//use to create leaf
+	MChildNode(unsigned pat, unsigned i) :
+			isLeaf(true)
+	{
+		leaf.pattern = pat;
+		leaf.numbits = i;
 	}
 	void intersectUnionVolume(const MOctNode* tree, const MChildNode& rhs, const MOctNode* rtree, float cubeVol,
 			 float& intersectval,
@@ -203,14 +227,14 @@ private:
 		{
 			//no overlap, all done
 			ret.isLeaf = true;
-			ret.pattern = 0;
-			ret.index = 0;
+			ret.leaf.pattern = 0;
+			ret.leaf.numbits = 0;
 		}
 		else if (cube.getDimension() <= res /* || obj.containedIn(cube) */) //consider it full - todo: contained in currently slows things down
 		{
 			ret.isLeaf = true;
-			ret.pattern = 0xff;
-			ret.index = 8;
+			ret.leaf.pattern = 0xff;
+			ret.leaf.numbits = 8;
 		}
 		else //subdivide into children
 		{
@@ -221,7 +245,13 @@ private:
 			unsigned bitcnt = 0;
 			//allocate space
 			unsigned pos = tree.size();
-			ret.index = tree.size();
+			ret.node.index = tree.size();
+
+			if(tree.size() >= (1<<MINDEX_BITS))
+			{
+				cerr << "Too many nodes for MINDEX_BITS. Must recompile to support larger octtress.\n";
+				abort();
+			}
 			tree.push_back(MOctNode());
 			tree[pos].vol = 0;
 			for (unsigned i = 0; i < 8; i++)
@@ -231,9 +261,9 @@ private:
 				tree[pos].children[i] = child;
 				if (child.isLeaf)
 				{
-					if(child.pattern == 0)
+					if(child.leaf.pattern == 0)
 						filledcnt++;
-					else if(child.pattern == 0xff)
+					else if(child.leaf.pattern == 0xff)
 					{
 						filledcnt++;
 						pat |= (1<<i);
@@ -242,15 +272,13 @@ private:
 				}
 				tree[pos].vol += child.volume(tree,newc.volume());
 			}
-
 			//are all the children full or empty? then can represent as a pattern
 			if (filledcnt == 8)
 			{
 				tree.pop_back();
 				ret.isLeaf = true;
-				ret.pattern = pat;
-				//volume is correct
-				ret.index = bitcnt;
+				ret.leaf.pattern = pat;
+				ret.leaf.numbits = bitcnt;
 			}
 		}
 		return ret;

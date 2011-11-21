@@ -325,6 +325,8 @@ int main(int argc, char *argv[])
 		ofstream out(Output.c_str());
 		float adjust = -LessDist;
 		adjust += MoreDist;
+
+		cout << sizeof(MChildNode) << "," << sizeof(MOctNode) << "\n";
 		for(MolIterator mitr(Input,adjust); mitr; ++mitr)
 		{
 			MappableOctTree *tree = MappableOctTree::create(MaxDimension, Resolution, *mitr);

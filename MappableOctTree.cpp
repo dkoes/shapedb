@@ -25,16 +25,11 @@ float MChildNode::volume(const MOctNode* tree, float dim3) const
 {
 	if(isLeaf)
 	{
-		return index*dim3/8;
+		return leaf.numbits*dim3/8;
 	}
 	else
 	{
-		float ret = 0;
-		for(unsigned i = 0; i < 8; i++)
-		{
-			ret += tree[index].vol;
-		}
-		return ret;
+		return tree[node.index].vol;
 	}
 }
 
@@ -43,11 +38,11 @@ float MChildNode::volume(const vector<MOctNode>& tree, float dim3) const
 {
 	if(isLeaf)
 	{
-		return index*dim3/8;
+		return leaf.numbits*dim3/8;
 	}
 	else
 	{
-		return tree[index].vol;
+		return tree[node.index].vol;
 	}
 }
 
@@ -61,27 +56,27 @@ MChildNode MappableOctTree::createFrom_r(unsigned N, MChildNode* nodes, const Ma
 		if(nodes[i].isLeaf)
 		{
 			numFilled++;
-			andpat &= nodes[i].pattern;
-			orpat |= nodes[i].pattern;
+			andpat &= nodes[i].leaf.pattern;
+			orpat |= nodes[i].leaf.pattern;
 		}
 	}
 
 	if(isUnion && (numFilled == N || orpat == 0xff)) //just return a patterned node
 	{
 		unsigned nb = __builtin_popcount(orpat);
-		MChildNode ret(true, orpat,nb);
+		MChildNode ret(orpat,nb);
 		return ret;
 	}
 	else if(!isUnion && (numFilled == N || andpat == 0))
 	{
 		unsigned nb = __builtin_popcount(andpat);
-		MChildNode ret(true, andpat,nb);
+		MChildNode ret(andpat,nb);
 		return ret;
 	}
 	else //need to look at non-leaf children
 	{
 		unsigned pos = newtree.size();
-		MChildNode ret(false, 0, pos);
+		MChildNode ret(pos);
 		newtree.push_back(MOctNode());
 
 		unsigned numFullEmpty = 0;
@@ -109,7 +104,7 @@ MChildNode MappableOctTree::createFrom_r(unsigned N, MChildNode* nodes, const Ma
 			{
 				if(!nodes[j].isLeaf)
 				{
-					nextnodes[cnt] = trees[j]->tree[nodes[j].index].children[i];
+					nextnodes[cnt] = trees[j]->tree[nodes[j].node.index].children[i];
 					cnt++;
 				}
 			}
@@ -121,7 +116,7 @@ MChildNode MappableOctTree::createFrom_r(unsigned N, MChildNode* nodes, const Ma
 					pat = 0xff;
 				else
 					pat = 0;
-				nextnodes[cnt] = MChildNode(true, pat, pat ? 8 : 0);
+				nextnodes[cnt] = MChildNode(pat, pat ? 8 : 0);
 				cnt++;
 			}
 			assert(cnt == n);
@@ -129,10 +124,10 @@ MChildNode MappableOctTree::createFrom_r(unsigned N, MChildNode* nodes, const Ma
 			MChildNode nchild = createFrom_r(n, nextnodes, nexttrees, newtree, isUnion,bitvol);
 			newtree[pos].children[i] = nchild;
 
-			if(nchild.isLeaf && (nchild.pattern == 0 || nchild.pattern == 0xff))
+			if(nchild.isLeaf && (nchild.leaf.pattern == 0 || nchild.leaf.pattern == 0xff))
 			{
 				numFullEmpty++;
-				if(nchild.pattern == 0xff)
+				if(nchild.leaf.pattern == 0xff)
 					newPattern |= 1<<i;
 			}
 
@@ -143,8 +138,8 @@ MChildNode MappableOctTree::createFrom_r(unsigned N, MChildNode* nodes, const Ma
 		{
 			newtree.pop_back();
 			ret.isLeaf = true;
-			ret.pattern = newPattern;
-			ret.index = __builtin_popcount(newPattern);
+			ret.leaf.pattern = newPattern;
+			ret.leaf.numbits = __builtin_popcount(newPattern);
 			//volume is correct
 		}
 		return ret;
@@ -203,15 +198,15 @@ bool MappableOctTree::createRoundedSet_r(unsigned N, MChildNode* nodes, const Ma
 		{
 			numFilled++;
 
-			if(nodes[i].pattern == 0xff)
+			if(nodes[i].leaf.pattern == 0xff)
 				numFull++;
-			else if(nodes[i].pattern == 0)
+			else if(nodes[i].leaf.pattern == 0)
 				numEmpty++;
 			else if(lastPat == -1)
 			{
-				lastPat = nodes[i].pattern;
+				lastPat = nodes[i].leaf.pattern;
 			}
-			else if(nodes[i].pattern != lastPat)
+			else if(nodes[i].leaf.pattern != lastPat)
 				differentPats = true;
 		}
 	}
@@ -225,10 +220,10 @@ bool MappableOctTree::createRoundedSet_r(unsigned N, MChildNode* nodes, const Ma
 			{
 				for(unsigned i = 0; i < N; i++)
 				{
-					if(nodes[i].pattern == 0)
+					if(nodes[i].leaf.pattern == 0)
 						newroots[i] = nodes[i];
 					else
-						newroots[i] = MChildNode(true, 0xff, 8);
+						newroots[i] = MChildNode(0xff, 8);
 				}
 				return true;
 			}
@@ -248,10 +243,10 @@ bool MappableOctTree::createRoundedSet_r(unsigned N, MChildNode* nodes, const Ma
 			{
 				for(unsigned i = 0; i < N; i++)
 				{
-					if(nodes[i].pattern == 0)
+					if(nodes[i].leaf.pattern == 0)
 						newroots[i] = nodes[i];
 					else
-						newroots[i] = MChildNode(true, 0, 0);
+						newroots[i] = MChildNode(0, 0);
 				}
 				return true;
 			}
@@ -280,7 +275,7 @@ bool MappableOctTree::createRoundedSet_r(unsigned N, MChildNode* nodes, const Ma
 			{
 				unsigned pos = newtrees[i].size();
 				positions[i] = pos;
-				newroots[i] = MChildNode(false, 0, pos);
+				newroots[i] = MChildNode(pos);
 				newtrees[i].push_back(MOctNode());
 			}
 		}
@@ -299,14 +294,14 @@ bool MappableOctTree::createRoundedSet_r(unsigned N, MChildNode* nodes, const Ma
 			{
 				if(nodes[i].isLeaf)
 				{
-					if(nodes[i].pattern & (1<<o))
-						subnodes[i] = MChildNode(true, 0xff, 8);
+					if(nodes[i].leaf.pattern & (1<<o))
+						subnodes[i] = MChildNode(0xff, 8);
 					else
-						subnodes[i] = MChildNode(true, 0, 0);
+						subnodes[i] = MChildNode(0, 0);
 				}
 				else
 				{
-					subnodes[i] = trees[i]->tree[nodes[i].index].children[o];
+					subnodes[i] = trees[i]->tree[nodes[i].node.index].children[o];
 				}
 			}
 
@@ -320,12 +315,12 @@ bool MappableOctTree::createRoundedSet_r(unsigned N, MChildNode* nodes, const Ma
 					newtrees[i][positions[i]].children[o] = newnodes[i];
 					if(newnodes[i].isLeaf)
 					{
-						if(newnodes[i].pattern == 0xff)
+						if(newnodes[i].leaf.pattern == 0xff)
 						{
 							leafCnts[i]++;
 							leafPatterns[i] |= (1<<o);
 						}
-						else if(newnodes[i].pattern == 0)
+						else if(newnodes[i].leaf.pattern == 0)
 							leafCnts[i]++;
 					}
 					newtrees[i][positions[i]].vol += newnodes[i].volume(newtrees[i],bitvol);
@@ -340,8 +335,8 @@ bool MappableOctTree::createRoundedSet_r(unsigned N, MChildNode* nodes, const Ma
 			{
 				newtrees[i].pop_back();
 				newroots[i].isLeaf = true;
-				newroots[i].pattern = leafPatterns[i];
-				newroots[i].index = __builtin_popcount(leafPatterns[i]);
+				newroots[i].leaf.pattern = leafPatterns[i];
+				newroots[i].leaf.numbits = __builtin_popcount(leafPatterns[i]);
 				//volume is correct
 			}
 		}
@@ -399,11 +394,11 @@ MChildNode MappableOctTree::createTruncated_r(const MChildNode& node, float res,
 	{
 		if(fillIn && node.volume(tree,cubeVol) != 0)
 		{
-			return MChildNode(true, 0xff, 8);
+			return MChildNode(0xff, 8);
 		}
 		else
 		{
-			return MChildNode(true, 0, 0);
+			return MChildNode(0, 0);
 		}
 	}
 	else if(node.isLeaf)
@@ -413,19 +408,19 @@ MChildNode MappableOctTree::createTruncated_r(const MChildNode& node, float res,
 	else //recursively descend
 	{
 		unsigned pos = newtree.size();
-		MChildNode ret(false, 0, pos);
+		MChildNode ret(pos);
 		newtree.push_back(MOctNode());
 
 		unsigned numFullEmpty = 0;
 		unsigned newPattern = 0;
 		for (unsigned i = 0; i < 8; i++)
 		{
-			MChildNode nchild = createTruncated_r(tree[node.index].children[i],  res, fillIn, newtree,cubeVol/8);
+			MChildNode nchild = createTruncated_r(tree[node.node.index].children[i],  res, fillIn, newtree,cubeVol/8);
 			newtree[pos].children[i] = nchild;
-			if(nchild.isLeaf && (nchild.pattern == 0 || nchild.pattern == 0xff))
+			if(nchild.isLeaf && (nchild.leaf.pattern == 0 || nchild.leaf.pattern == 0xff))
 			{
 				numFullEmpty++;
-				if(nchild.pattern == 0xff)
+				if(nchild.leaf.pattern == 0xff)
 					newPattern |= 1<<i;
 			}
 
@@ -436,8 +431,8 @@ MChildNode MappableOctTree::createTruncated_r(const MChildNode& node, float res,
 		{
 			newtree.pop_back();
 			ret.isLeaf = true;
-			ret.pattern = newPattern;
-			ret.index = __builtin_popcount(newPattern);
+			ret.leaf.pattern = newPattern;
+			ret.leaf.numbits = __builtin_popcount(newPattern);
 		}
 		return ret;
 	}
@@ -458,11 +453,11 @@ MChildNode MappableOctTree::createRounded_r(const MChildNode& node, float volcut
 
 	if(fillIn && empty < volcutoff)
 	{
-		return MChildNode(true, 0xff, 8);
+		return MChildNode(0xff, 8);
 	}
 	else if(!fillIn && vol < volcutoff)
 	{
-		return MChildNode(true, 0, 0);
+		return MChildNode(0, 0);
 	}
 	else if(node.isLeaf)
 	{
@@ -471,19 +466,19 @@ MChildNode MappableOctTree::createRounded_r(const MChildNode& node, float volcut
 	else //recursively descend
 	{
 		unsigned pos = newtree.size();
-		MChildNode ret(false, 0, pos);
+		MChildNode ret(pos);
 		newtree.push_back(MOctNode());
 
 		unsigned numFullEmpty = 0;
 		unsigned newPattern = 0;
 		for (unsigned i = 0; i < 8; i++)
 		{
-			MChildNode nchild = createRounded_r(tree[node.index].children[i], volcutoff, fillIn, newtree, maxvol/8);
+			MChildNode nchild = createRounded_r(tree[node.node.index].children[i], volcutoff, fillIn, newtree, maxvol/8);
 			newtree[pos].children[i] = nchild;
-			if(nchild.isLeaf && (nchild.pattern == 0 || nchild.pattern == 0xff))
+			if(nchild.isLeaf && (nchild.leaf.pattern == 0 || nchild.leaf.pattern == 0xff))
 			{
 				numFullEmpty++;
-				if(nchild.pattern == 0xff)
+				if(nchild.leaf.pattern == 0xff)
 					newPattern |= 1<<i;
 			}
 
@@ -494,8 +489,8 @@ MChildNode MappableOctTree::createRounded_r(const MChildNode& node, float volcut
 		{
 			newtree.pop_back();
 			ret.isLeaf = true;
-			ret.pattern = newPattern;
-			ret.index = __builtin_popcount(newPattern);
+			ret.leaf.pattern = newPattern;
+			ret.leaf.numbits= __builtin_popcount(newPattern);
 			//volume is correct
 		}
 		return ret;
@@ -597,16 +592,16 @@ void MChildNode::invert(MOctNode* tree, float maxvol)
 {
 	if(isLeaf)
 	{
-		pattern = ~pattern;
-		index = 8 - index;
+		leaf.pattern = ~leaf.pattern;
+		leaf.numbits = 8 - leaf.numbits;
 	}
 	else
 	{
-		tree[index].vol = 0;
+		tree[node.index].vol = 0;
 		for (unsigned i = 0; i < 8; i++)
 		{
-			tree[index].children[i].invert(tree, maxvol/8);
-			tree[index].vol += tree[index].children[i].volume(tree,maxvol/8);
+			tree[node.index].children[i].invert(tree, maxvol/8);
+			tree[node.index].vol += tree[node.index].children[i].volume(tree,maxvol/8);
 		}
 	}
 }
@@ -619,39 +614,39 @@ void MChildNode::intersectUnionVolume(
 	float bitv = cubeVol/8;
 	if(rhs.isLeaf && isLeaf)
 	{
-		if(pattern == 0 || rhs.pattern == 0)
+		if(leaf.pattern == 0 || rhs.leaf.pattern == 0)
 			intersectval += 0; //no intersect val
 		else
 		{
-			unsigned intpat = pattern & rhs.pattern;
+			unsigned intpat = leaf.pattern & rhs.leaf.pattern;
 			intersectval += __builtin_popcount(intpat)*bitv;
 		}
-		if(pattern == 0)
+		if(leaf.pattern == 0)
 			unionval += rhs.volume(rtree,cubeVol);
-		else if(rhs.pattern == 0)
+		else if(rhs.leaf.pattern == 0)
 			unionval += volume(tree,cubeVol);
 		else
 		{
-			unsigned orpat = pattern | rhs.pattern;
+			unsigned orpat = leaf.pattern | rhs.leaf.pattern;
 			unionval += __builtin_popcount(orpat)*bitv;
 		}
 	}
-	else if(isLeaf && pattern == 0xff)
+	else if(isLeaf && leaf.pattern == 0xff)
 	{
 		unionval += volume(tree,cubeVol);
 		intersectval += rhs.volume(rtree,cubeVol);
 	}
-	else if (rhs.isLeaf && rhs.pattern == 0xff)
+	else if (rhs.isLeaf && rhs.leaf.pattern == 0xff)
 	{
 		unionval += rhs.volume(rtree,cubeVol);
 		intersectval += volume(tree,cubeVol);
 	}
-	else if (rhs.isLeaf && rhs.pattern == 0)
+	else if (rhs.isLeaf && rhs.leaf.pattern == 0)
 	{
 		//vol of this tree
 		unionval += volume(tree,cubeVol);
 	}
-	else if (isLeaf && pattern == 0)
+	else if (isLeaf && leaf.pattern == 0)
 	{
 		// from rhs
 		unionval += rhs.volume(rtree,cubeVol);
@@ -659,12 +654,12 @@ void MChildNode::intersectUnionVolume(
 	else if(isLeaf)
 	{
 		assert(!rhs.isLeaf);
-		assert(index > 0);
+		assert(leaf.numbits > 0);
 		//rhs has children, have to compare bit by bit
 		for(unsigned i = 0; i < 8; i++)
 		{
-			MChildNode rchild = rtree[rhs.index].children[i];
-			if(pattern & (1<<i))
+			MChildNode rchild = rtree[rhs.node.index].children[i];
+			if(leaf.pattern & (1<<i))
 			{
 				unionval += bitv;
 				intersectval += rchild.volume(rtree,bitv);
@@ -678,12 +673,12 @@ void MChildNode::intersectUnionVolume(
 	else if(rhs.isLeaf)
 	{
 		assert(!isLeaf);
-		assert(rhs.index > 0);
+		assert(rhs.leaf.numbits > 0);
 		//rhs has children, have to compare bit by bit
 		for(unsigned i = 0; i < 8; i++)
 		{
-			MChildNode child = tree[index].children[i];
-			if(rhs.pattern & (1<<i))
+			MChildNode child = tree[node.index].children[i];
+			if(rhs.leaf.pattern & (1<<i))
 			{
 				unionval += bitv;
 				intersectval += child.volume(tree,bitv);
@@ -698,8 +693,8 @@ void MChildNode::intersectUnionVolume(
 	{
 		for (unsigned i = 0; i < 8; i++)
 		{
-			tree[index].children[i].intersectUnionVolume(tree,
-					rtree[rhs.index].children[i], rtree, bitv, intersectval,unionval);
+			tree[node.index].children[i].intersectUnionVolume(tree,
+					rtree[rhs.node.index].children[i], rtree, bitv, intersectval,unionval);
 		}
 	}
 }
@@ -710,36 +705,36 @@ bool MChildNode::containedIn(
 {
 	if(rhs.isLeaf && isLeaf)
 	{
-		return (pattern & rhs.pattern) == pattern;
+		return (leaf.pattern & rhs.leaf.pattern) == leaf.pattern;
 	}
-	else if(isLeaf && pattern == 0)
+	else if(isLeaf && leaf.pattern == 0)
 	{
 		return true;
 	}
-	else if (rhs.isLeaf && rhs.pattern == 0)
+	else if (rhs.isLeaf && rhs.leaf.pattern == 0)
 	{
 		return false; //somthing not in nothing (nothing handled above)
 	}
-	else if (rhs.isLeaf && rhs.pattern == 0xff)
+	else if (rhs.isLeaf && rhs.leaf.pattern == 0xff)
 	{
 		return true;
 	}
-	else if (isLeaf && pattern == 0xff)
+	else if (isLeaf && leaf.pattern == 0xff)
 	{
 		return false;
 	}
 	else if(isLeaf)
 	{
 		assert(!rhs.isLeaf);
-		assert(index > 0);
+		assert(leaf.numbits > 0);
 		//rhs has children, have to compare bit by bit
 		for(unsigned i = 0; i < 8; i++)
 		{
-			if(pattern & (1<<i))
+			if(leaf.pattern & (1<<i))
 			{
-				MChildNode rchild = rtree[rhs.index].children[i];
+				MChildNode rchild = rtree[rhs.node.index].children[i];
 				//rchild must be a leaf and full
-				if(!rchild.isLeaf || rchild.pattern != 0xff)
+				if(!rchild.isLeaf || rchild.leaf.pattern != 0xff)
 					return false;
 			}
 		}
@@ -748,15 +743,15 @@ bool MChildNode::containedIn(
 	else if(rhs.isLeaf)
 	{
 		assert(!isLeaf);
-		assert(rhs.index > 0);
+		assert(rhs.leaf.numbits > 0);
 		//rhs has children, have to compare bit by bit
 		for(unsigned i = 0; i < 8; i++)
 		{
-			if(!(rhs.pattern & (1<<i)))
+			if(!(rhs.leaf.pattern & (1<<i)))
 			{
-				MChildNode child = tree[index].children[i];
+				MChildNode child = tree[node.index].children[i];
 				//if rhs's bit is empty, then our child must be empty
-				if(!child.isLeaf || child.pattern != 0)
+				if(!child.isLeaf || child.leaf.pattern != 0)
 					return false;
 			}
 		}
@@ -766,8 +761,8 @@ bool MChildNode::containedIn(
 	{
 		for (unsigned i = 0; i < 8; i++)
 		{
-			if(!tree[index].children[i].containedIn(tree,
-					rtree[rhs.index].children[i], rtree))
+			if(!tree[node.index].children[i].containedIn(tree,
+					rtree[rhs.node.index].children[i], rtree))
 				return false;
 		}
 		return true;;
@@ -799,9 +794,9 @@ void MChildNode::collectVertices(vector<Vertex>& vertices, Cube box, const MOctN
 {
 	if(isLeaf)
 	{
-		if(pattern == 0)
+		if(leaf.pattern == 0)
 			return; //empty, no vertices
-		else if(pattern == 0xff) //full, add this box's vertices
+		else if(leaf.pattern == 0xff) //full, add this box's vertices
 		{
 			addVertices(vertices, box);
 		}
@@ -809,7 +804,7 @@ void MChildNode::collectVertices(vector<Vertex>& vertices, Cube box, const MOctN
 		{
 			for(unsigned i = 0; i < 8; i++)
 			{
-				if(pattern&(1<<i))
+				if(leaf.pattern&(1<<i))
 				{
 					addVertices(vertices, box.getOctant(i));
 				}
@@ -820,7 +815,7 @@ void MChildNode::collectVertices(vector<Vertex>& vertices, Cube box, const MOctN
 	{
 		for (unsigned i = 0; i < 8; i++)
 		{
-			tree[index].children[i].collectVertices(vertices, box.getOctant(i), tree);
+			tree[node.index].children[i].collectVertices(vertices, box.getOctant(i), tree);
 		}
 	}
 }
@@ -904,7 +899,7 @@ bool MChildNode::equals(const MOctNode* tree, const MChildNode& rhs, const MOctN
 	{
 		if(rhs.isLeaf)
 		{
-			if(rhs.pattern == pattern)
+			if(rhs.leaf.pattern == leaf.pattern)
 				return true;
 			else
 				return false;
@@ -920,8 +915,8 @@ bool MChildNode::equals(const MOctNode* tree, const MChildNode& rhs, const MOctN
 	{
 		for (unsigned i = 0; i < 8; i++)
 		{
-			if(!tree[index].children[i].equals(tree,
-					rtree[rhs.index].children[i], rtree))
+			if(!tree[node.index].children[i].equals(tree,
+					rtree[rhs.node.index].children[i], rtree))
 				return false;
 		}
 		return true;
@@ -959,11 +954,11 @@ bool MChildNode::checkCoord(const MOctNode *tree, unsigned i, unsigned j, unsign
 
 	if(isLeaf)
 	{
-		return pattern & (1 << oct);
+		return leaf.pattern & (1 << oct);
 	}
 	else
 	{
-		return tree[index].children[oct].checkCoord(tree, i, j, k, half);
+		return tree[node.index].children[oct].checkCoord(tree, i, j, k, half);
 	}
 }
 
@@ -1013,7 +1008,7 @@ void MChildNode::countLeavesAtDepths(const MOctNode* tree, unsigned depth, vecto
 	{
 		for(unsigned i = 0; i < 8; i++)
 		{
-			tree[index].children[i].countLeavesAtDepths(tree,depth+1,counts);
+			tree[node.index].children[i].countLeavesAtDepths(tree,depth+1,counts);
 		}
 	}
 }
