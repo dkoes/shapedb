@@ -330,10 +330,16 @@ int main(int argc, char *argv[])
 			MappableOctTree *tree = MappableOctTree::create(MaxDimension, Resolution, *mitr);
 			cout << "Size of tree " << tree->bytes() << "\n";
 			cout << "Volume of tree " << tree->volume() << "\n";
-
+			cout << "Nodes of tree " << tree->nodes() << "\n";
+			vector<unsigned> cnts;
+			tree->countLeavesAtDepths(cnts);
+			for(unsigned i = 0, n = cnts.size(); i < n; i++)
+			{
+				cout << i << " : " << cnts[i] << "\n";
+			}
 			if(out)
 			{
-				tree->dumpGrid(out, MaxDimension, Resolution);
+				tree->dumpGrid(out, Resolution);
 			}
 			free(tree);
 		}

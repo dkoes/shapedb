@@ -66,7 +66,7 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
 			bigObj);
 
 	if (invertBig)
-		bigTree->invert(dimension);
+		bigTree->invert();
 
 	Timer t;
 	vector<file_index> respos;
@@ -136,7 +136,7 @@ void GSSTreeSearcher::dc_scan_search(const Object& smallObj,
 	MappableOctTree *bigTree = MappableOctTree::create(dimension, resolution,
 			bigObj);
 	if (invertBig)
-		bigTree->invert(dimension);
+		bigTree->invert();
 	const GSSLeaf* leaf = (GSSLeaf*) leaves.begin();
 	const GSSLeaf* end = (GSSLeaf*) leaves.end();
 

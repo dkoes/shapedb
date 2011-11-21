@@ -56,19 +56,18 @@ struct MChildNode
 	bool isLeaf :1;
 	unsigned pattern: 8; //leaf pattern
 	unsigned index :23; //ptr to next node, or bit cnt if leaf
-	float vol; //this doubles the size of the tree, but makes similarity computation much faster, is the trade off worth it?
 
 	MChildNode() :
-			isLeaf(true), pattern(0), index(0), vol(-1)
+			isLeaf(true), pattern(0), index(0)
 	{
 	}
 
 
-	MChildNode(bool leaf, unsigned pat, unsigned i, float v) :
-			isLeaf(leaf), pattern(pat), index(i), vol(v)
+	MChildNode(bool leaf, unsigned pat, unsigned i) :
+			isLeaf(leaf), pattern(pat), index(i)
 	{
 	}
-	void intersectUnionVolume(const MOctNode* tree, const MChildNode& rhs, const MOctNode* rtree,
+	void intersectUnionVolume(const MOctNode* tree, const MChildNode& rhs, const MOctNode* rtree, float cubeVol,
 			 float& intersectval,
 			float& unionval) const;
 
@@ -83,35 +82,32 @@ struct MChildNode
 
 	bool containedIn(const MOctNode* tree, const MChildNode& rhs, const MOctNode* rtree) const;
 
-	float volume() const
-	{
-		return vol;
-	}
+	float volume(const MOctNode* tree, float dim3) const; //pass volume of full node
+	float volume(const vector<MOctNode>& tree, float dim3) const;
 
 	bool equals(const MOctNode* tree, const MChildNode& rhs, const MOctNode* rtree) const;
 
 	void collectVertices(vector<Vertex>& vertices, Cube box, const MOctNode* tree) const;
 
 	bool checkCoord(const MOctNode* tree, unsigned i, unsigned j, unsigned k, unsigned max) const;
+	void countLeavesAtDepths(const MOctNode* tree, unsigned depth, vector<unsigned>& counts) const;
 }__attribute__((__packed__));
 
 struct MOctNode
 {
+	float vol; //cache the volume of this subtree to speed things up
 	MChildNode children[8];
 
-	MOctNode()
+	MOctNode(): vol(0)
 	{
 	}
 
-	MOctNode(const MChildNode& init)
-	{
-		std::fill_n(children, 8, init);
-	}
 }__attribute__((__packed__));
 
 class MappableOctTree
 {
 	MChildNode root;
+	float dimension;
 	unsigned N; //number of octnodes
 	MOctNode tree[]; //must memalloc beyond
 
@@ -121,8 +117,8 @@ class MappableOctTree
 	}
 
 	//assume memory is allocate to tree
-	MappableOctTree(const MChildNode& r, const vector<MOctNode>& nodes) :
-			root(r), N(nodes.size())
+	MappableOctTree(float dim, const MChildNode& r, const vector<MOctNode>& nodes) :
+			 root(r),dimension(dim), N(nodes.size())
 	{
 		for (unsigned i = 0, n = nodes.size(); i < n; i++)
 		{
@@ -132,26 +128,26 @@ class MappableOctTree
 
 	MappableOctTree(const MappableOctTree& rhs);
 
-	static MChildNode createFrom_r(unsigned N, MChildNode* nodes, const MappableOctTree** trees, vector<MOctNode>& newtree, bool isUnion);
-	MChildNode createTruncated_r(const MChildNode& node, float dim, float res, bool fillIn, vector<MOctNode>& newtree) const;
-	MChildNode createRounded_r(const MChildNode& node, float dim, float res, bool fillIn, vector<MOctNode>& newtree) const;
+	static MChildNode createFrom_r(unsigned N, MChildNode* nodes, const MappableOctTree** trees, vector<MOctNode>& newtree, bool isUnion, float cubeVol);
+	MChildNode createTruncated_r(const MChildNode& node, float res, bool fillIn, vector<MOctNode>& newtree, float cubeVol) const;
+	MChildNode createRounded_r(const MChildNode& node, float res, bool fillIn, vector<MOctNode>& newtree, float cubeVol) const;
 
 	static bool createRoundedSet_r(unsigned N, MChildNode* nodes, const MappableOctTree** trees, bool roundUp,
-			vector< vector<MOctNode> >& newtrees, vector<MChildNode>& newroots);
+			vector< vector<MOctNode> >& newtrees, vector<MChildNode>& newroots, float cubeVol);
 
-	static MappableOctTree* newFromVector(const vector<MOctNode>& newtree, const MChildNode& newroot);
+	static MappableOctTree* newFromVector(const vector<MOctNode>& newtree, const MChildNode& newroot, float dim);
 public:
 
 	MappableOctTree* clone() const;
 
-	void invert(float dim);
+	void invert();
 
 	//return a tree that is rounded to resolution res, if fillIn true,
 	//round up, otherwise down
-	MappableOctTree* createTruncated(float dim, float res, bool fillIn) const;
+	MappableOctTree* createTruncated(float res, bool fillIn) const;
 	//return a tree where nodes are rounded up/down to leaves if they contain/exclude
 	// <= the specified volume
-	MappableOctTree* createRounded(float dim, float vol, bool fillIn) const;
+	MappableOctTree* createRounded(float vol, bool fillIn) const;
 
 	//return intersect of the n trees found in arr
 	static MappableOctTree* createFromIntersection(unsigned N, const MappableOctTree** in);
@@ -186,9 +182,15 @@ public:
 		return sizeof(MappableOctTree) + N*sizeof(MOctNode);
 	}
 
+	unsigned nodes() const
+	{
+		return N;
+	}
+
 	bool equals(const MappableOctTree* rhs) const;
 
-	void dumpGrid(ostream& out, float dim, float res) const;
+	void dumpGrid(ostream& out, float res) const;
+	void countLeavesAtDepths(vector<unsigned>& counts) const;
 private:
 	template<class Object>
 	static MChildNode create_r(float res, const Cube& cube, const Object& obj,
@@ -196,7 +198,6 @@ private:
 	{
 		//does the object overlap with this cube?
 		bool intersects = obj.intersects(cube);
-
 		MChildNode ret;
 		if (!intersects)
 		{
@@ -204,14 +205,12 @@ private:
 			ret.isLeaf = true;
 			ret.pattern = 0;
 			ret.index = 0;
-			ret.vol = 0;
 		}
 		else if (cube.getDimension() <= res /* || obj.containedIn(cube) */) //consider it full - todo: contained in currently slows things down
 		{
 			ret.isLeaf = true;
 			ret.pattern = 0xff;
 			ret.index = 8;
-			ret.vol = cube.volume();
 		}
 		else //subdivide into children
 		{
@@ -224,7 +223,7 @@ private:
 			unsigned pos = tree.size();
 			ret.index = tree.size();
 			tree.push_back(MOctNode());
-			ret.vol = 0;
+			tree[pos].vol = 0;
 			for (unsigned i = 0; i < 8; i++)
 			{
 				Cube newc = cube.getOctant(i);
@@ -241,7 +240,7 @@ private:
 						bitcnt++;
 					}
 				}
-				ret.vol += child.volume();
+				tree[pos].vol += child.volume(tree,newc.volume());
 			}
 
 			//are all the children full or empty? then can represent as a pattern
@@ -269,7 +268,7 @@ public:
 		unsigned N = nodes.size();
 		void *mem = malloc(sizeof(MappableOctTree) + N * sizeof(MOctNode));
 
-		MappableOctTree *ret = new (mem) MappableOctTree(root, nodes);
+		MappableOctTree *ret = new (mem) MappableOctTree(dim, root, nodes);
 
 		return ret;
 	}
