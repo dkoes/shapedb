@@ -40,6 +40,10 @@ public:
 	{
 		return grid.test(pointToGrid(x,y,z));
 	}
+
+	void makeSurface(const MGrid& sagrid, double probe);
+
+	bool isInteriorPoint(float x, float y, float z) const;
 };
 
 #endif /* MGRID_H_ */

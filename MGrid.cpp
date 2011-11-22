@@ -127,3 +127,49 @@ void MGrid::copyFrom(const MGrid& from)
 	}
 }
 
+//given the solvent accessibly surface, make an approximation to the
+//solvent excluded molecular surface by drawing spheres from the boundary
+//of the sa and noting where they don't intersect
+void MGrid::makeSurface(const MGrid& sagrid, double probe)
+{
+	bvect::enumerator en = sagrid.grid.first();
+	bvect::enumerator en_end = sagrid.grid.end();
+
+	MGrid reachable(dimension,resolution);
+	while (en < en_end)
+	{
+		unsigned g = *en;
+		double x,y,z;
+		sagrid.gridToPoint(g, x,y,z);
+		if(!sagrid.isInteriorPoint(x,y,z))
+		{
+			reachable.markXYZSphere(x,y,z,probe);
+		}
+		++en;
+	}
+
+	grid |= sagrid.grid - reachable.grid;
+}
+
+//return true if all neighbors are set
+bool MGrid::isInteriorPoint(float x, float y, float z) const
+{
+	//all neighbors must be set
+	for(int xm = -1; xm <= 1; xm++)
+	{
+		float xc = x+resolution*xm;
+		for(int ym = -1; ym <=1; ym++)
+		{
+			float yc = y+resolution*ym;
+			for(int zm = -1; zm <= 1; zm++)
+			{
+				float zc = z+resolution*zm;
+				if(!test(xc,yc,zc))
+					return false;
+			}
+		}
+	}
+	return true;
+}
+
+

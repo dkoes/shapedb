@@ -93,6 +93,9 @@ cl::opt<double> MoreDist(
 		cl::desc(
 				"Distance to increase query mol by for constraint search (default 1A)."),
 		cl::init(1.0));
+
+cl::opt<double> ProbeRadius("probe-radius", cl::desc("Radius of water probe for SA calculations"),cl::init(1.4));
+
 cl::opt<double> MaxDimension("max-dim", cl::desc("Maximum dimension."),
 		cl::init(64));
 cl::opt<double> Resolution("resolution",
@@ -195,7 +198,7 @@ int main(int argc, char *argv[])
 		GSSTreeCreator creator(&leveler, SuperNodeDepth);
 
 		filesystem::path dbpath(Database.c_str());
-		Molecule::iterator molitr(Input, MaxDimension, Resolution);
+		Molecule::iterator molitr(Input, MaxDimension, Resolution,ProbeRadius);
 		if (!creator.create(dbpath, molitr, MaxDimension, Resolution))
 		{
 			cerr << "Error creating database\n";
@@ -356,7 +359,7 @@ int main(int argc, char *argv[])
 		float adjust = -LessDist;
 		adjust += MoreDist;
 
-		for (MolIterator mitr(Input, MaxDimension, Resolution, adjust); mitr;
+		for (MolIterator mitr(Input, MaxDimension, Resolution, ProbeRadius, adjust); mitr;
 				++mitr)
 		{
 			MappableOctTree *tree = MappableOctTree::create(MaxDimension,
@@ -372,7 +375,12 @@ int main(int argc, char *argv[])
 			}
 			if (out)
 			{
-				tree->dumpGrid(out, Resolution);
+				if(filesystem::extension(Output.c_str()) == ".raw")
+					tree->dumpRawGrid(out, Resolution);
+				else if(filesystem::extension(Output.c_str()) == ".mira")
+					tree->dumpMiraGrid(out,Resolution);
+				else
+					tree->dumpGrid(out, Resolution);
 			}
 			free(tree);
 		}

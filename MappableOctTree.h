@@ -214,6 +214,8 @@ public:
 	bool equals(const MappableOctTree* rhs) const;
 
 	void dumpGrid(ostream& out, float res) const;
+	void dumpRawGrid(ostream& out, float res) const;
+	void dumpMiraGrid(ostream& out, float res) const;
 	void countLeavesAtDepths(vector<unsigned>& counts) const;
 private:
 	template<class Object>
