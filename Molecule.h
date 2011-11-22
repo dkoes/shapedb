@@ -45,15 +45,22 @@ class Molecule
 		grids.push_back(MGrid(dimension, resolution));
 
 		MGrid sagrid(dimension, resolution);
+		MGrid lesssagrid(dimension, resolution);
 		for (unsigned i = 0, n = spheres.size(); i < n; i++)
 		{
 			const MolSphere& sphere = spheres[i];
 			grids[0].markXYZSphere(sphere.x, sphere.y, sphere.z, sphere.r);
-			sagrid.markXYZSphere(sphere.x, sphere.y, sphere.z,
-					sphere.r + probeRadius);
+			if (probeRadius > 0)
+			{
+				sagrid.markXYZSphere(sphere.x, sphere.y, sphere.z,
+						sphere.r + probeRadius);
+				lesssagrid.markXYZSphere(sphere.x, sphere.y, sphere.z,
+						sphere.r + probeRadius - resolution);
+			}
 		}
 
-		grids[0].makeSurface(sagrid, probeRadius);
+		if (probeRadius > 0)
+			grids[0].makeSurface(sagrid, lesssagrid, probeRadius);
 		double res = resolution * 2;
 		while (res <= dimension)
 		{
@@ -135,25 +142,6 @@ public:
 			}
 		}
 		return false;
-		/*
-		 MolSphere isphere;
-		 for(unsigned i = 0, n = spheres.size(); i < n; i++)
-		 {
-		 if(spheres[i].intersectsCube(cube))
-		 {
-		 swap(spheres[i],spheres[0]); //locality optimization
-		 ret2 = true;
-		 }
-		 }
-
-		 if(ret != ret2)
-		 {
-		 cerr << "Differ! " << ret << " " << ret2<<"\n";
-		 cerr << cube.x <<","<<cube.y<<","<<cube.z<<" " << cube.dim << "\n";
-		 cerr << spheres[0].x <<","<<spheres[0].y<<","<<spheres[0].z<<" " << spheres[0].r << "\n";
-		 }
-		 return ret;
-		 */
 	}
 
 	bool containedIn(const Cube& cube) const

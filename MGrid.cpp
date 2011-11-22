@@ -130,10 +130,11 @@ void MGrid::copyFrom(const MGrid& from)
 //given the solvent accessibly surface, make an approximation to the
 //solvent excluded molecular surface by drawing spheres from the boundary
 //of the sa and noting where they don't intersect
-void MGrid::makeSurface(const MGrid& sagrid, double probe)
+void MGrid::makeSurface(const MGrid& sagrid, const MGrid& lesssagrid, double probe)
 {
-	bvect::enumerator en = sagrid.grid.first();
-	bvect::enumerator en_end = sagrid.grid.end();
+	bvect shell = sagrid.grid - lesssagrid.grid;
+	bvect::enumerator en = shell.first();
+	bvect::enumerator en_end = shell.end();
 
 	MGrid reachable(dimension,resolution);
 	while (en < en_end)

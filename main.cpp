@@ -94,7 +94,7 @@ cl::opt<double> MoreDist(
 				"Distance to increase query mol by for constraint search (default 1A)."),
 		cl::init(1.0));
 
-cl::opt<double> ProbeRadius("probe-radius", cl::desc("Radius of water probe for SA calculations"),cl::init(1.4));
+cl::opt<double> ProbeRadius("probe-radius", cl::desc("Radius of water probe for SA calculations"),cl::init(0));
 
 cl::opt<double> MaxDimension("max-dim", cl::desc("Maximum dimension."),
 		cl::init(64));
