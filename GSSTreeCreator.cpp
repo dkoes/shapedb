@@ -255,7 +255,7 @@ void GSSTreeCreator::optimizeLevels()
 		vector<GSSInternalNode*> superroots;
 		getNodesForSuperNode((const GSSInternalNode*)root, superroots, nodes.size()-1, stopLevel);
 		GSSInternalNode* newnode = GSSInternalNode::createMergedNode(superroots);
-		cout << "Supernode children " << newnode->size() << "\n";
+		//cout << "Supernode children " << newnode->size() << "\n";
 		for(unsigned i = 0, n = superroots.size(); i < n; i++)
 		{
 			free(superroots[i]);
