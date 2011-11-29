@@ -36,6 +36,42 @@ class GSSTreeSearcher
 	void findTweeners(const GSSInternalNode* node,  const MappableOctTree* min, const MappableOctTree* max, vector<file_index>& res,unsigned level);
 	void findTweeners(const GSSLeaf* node, const MappableOctTree* min, const MappableOctTree* max, vector<file_index>& res);
 
+	struct ObjDist
+	{
+		file_index objpos;
+		double dist;
+
+		bool operator<(const ObjDist& rhs) const
+		{
+			return dist < rhs.dist;
+		}
+	};
+
+	//maintain K best objects found
+	class TopKObj
+	{
+		unsigned k;
+		vector<ObjDist> objs;
+	public:
+		TopKObj(unsigned K): k(K)
+		{
+			objs.reserve(K+1);
+		}
+
+		void add(file_index pos, double dist);
+		double worst() const
+		{
+			if(objs.size() == 0) return HUGE_VAL;
+			else return objs.back().dist;
+		}
+
+		unsigned size() const { return objs.size(); }
+		const ObjDist& operator[](unsigned i) const { return objs[i]; }
+	};
+
+	void findNearest(const GSSInternalNode* node,  const MappableOctTree* obj, TopKObj& res,unsigned level);
+	void findNearest(const GSSLeaf* node, const MappableOctTree* obj, TopKObj& res);
+
 	unsigned fitsCheck;
 	unsigned nodesVisited;
 	vector<unsigned> levelCnts;
@@ -61,6 +97,9 @@ public:
 	//linear scan
 	void dc_scan_search(const Object& smallObj, const Object& bigObj, bool invertBig,
 			vector<Object>& res);
+
+	//return k objects closest to obj
+	void nn_search(const Object& obj, unsigned k, vector<Object>& res);
 
 	float getDimension() const { return dimension; }
 	float getResolution() const { return resolution; }

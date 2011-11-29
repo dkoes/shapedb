@@ -113,3 +113,22 @@ void setDistance(DistanceFunction df, float dim)
 	}
 }
 
+//return a "distance" between obj and MIV/MSV; the lower the distance
+//the higher the more likely a node should be searched
+//min and max should bookend the ultimate leaf volume distances
+float searchVolumeDist(const MappableOctTree* obj, const MappableOctTree* MIV,
+		const MappableOctTree* MSV, float& min, float& max)
+{
+	min = 1 - obj->intersectVolume(MSV)/obj->unionVolume(MIV); //percent of shape already covered
+	max = 1 - obj->intersectVolume(MIV)/obj->unionVolume(MSV); //difference if MIV/MSV after merge
+
+	//selectivity?
+	return min + max;
+}
+
+//a nearest neighbors distance, should match up with bounds of searchVolumeDist
+float volumeDist(const MappableOctTree* x, const MappableOctTree* y)
+{
+	return 1 - x->intersectVolume(y)/x->unionVolume(y);
+}
+

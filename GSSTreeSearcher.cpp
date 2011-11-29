@@ -10,6 +10,7 @@
 #include <sys/mman.h>
 #include "MappableOctTree.h"
 #include "Timer.h"
+#include "ShapeDistance.h"
 
 //load a gsstree database by mmapping files, return true if successfull
 bool GSSTreeSearcher::load(const filesystem::path& dbpath)
@@ -108,6 +109,154 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
 	}
 	delete smallTree;
 	delete bigTree;
+}
+
+void GSSTreeSearcher::TopKObj::add(file_index pos, double dist)
+{
+	ObjDist x = {pos, dist};
+	objs.insert(lower_bound(objs.begin(), objs.end(), x), x);
+
+	objs.resize(k);
+}
+
+struct ScoredChild
+{
+	const GSSInternalNode::Child * child;
+	double score;
+	double min;
+
+	ScoredChild(): child(NULL), score(HUGE_VAL) {}
+	ScoredChild(const GSSInternalNode::Child *ch, double s, double m): child(ch), score(s), min(m) {}
+
+	bool operator<(const ScoredChild& rhs) const
+	{
+		return score < rhs.score;
+	}
+};
+
+//explore children to find closest value
+void GSSTreeSearcher::findNearest(const GSSInternalNode* node,  const MappableOctTree* obj, TopKObj& res,unsigned level)
+{
+	nodesVisited++;
+	if(levelCnts.size() <= level)
+	{
+		levelCnts.resize(level+1,0);
+		usefulLevelCnts.resize(level+1,0);
+		maxlevelCnts.resize(level+2,0);
+	}
+	levelCnts[level]++;
+
+	unsigned n = node->size();
+	vector<ScoredChild> children; children.reserve(n);
+	for (unsigned i = 0; i < n; i++)
+	{
+		const GSSInternalNode::Child *child = node->getChild(i);
+		float min = 0, max = 0;
+		float score = searchVolumeDist(obj, child->getMIV(), child->getMSV(), min, max);
+
+		if(min < res.worst())
+		{
+			//there's hope of finding something
+			children.push_back(ScoredChild(child, score, min));
+
+		}
+	}
+
+	maxlevelCnts[level+1] += n;
+
+	double oldworst = res.worst();
+
+	sort(children.begin(), children.end());
+	for(unsigned i = 0, nc = children.size(); i < nc; i++)
+	{
+		if(children[i].min < res.worst())
+		{
+			const GSSInternalNode::Child *child = children[i].child;
+			if (child->isLeafPosition())
+			{
+				const GSSLeaf* next = (const GSSLeaf*) (leaves.begin()
+						+ child->position());
+				findNearest(next, obj, res);
+			}
+			else
+			{
+				const GSSInternalNode* next =
+						(const GSSInternalNode*) (internalNodes.begin()
+								+ child->position());
+				findNearest(next, obj, res, level+1);
+			}
+		}
+
+	}
+	if(res.worst() < oldworst)
+		usefulLevelCnts[level]++;
+}
+
+//add nearest neighbors to res if appropriate
+void GSSTreeSearcher::findNearest(const GSSLeaf* node, const MappableOctTree* obj, TopKObj& res)
+{
+	leavesVisited++;
+	unsigned cnt = 0;
+	for (unsigned i = 0, n = node->size(); i < n; i++)
+	{
+		const GSSLeaf::Child *child = node->getChild(i);
+		double dist = volumeDist(obj, &child->tree);
+		if (dist < res.worst())
+		{
+			res.add(child->object_pos, dist);
+			cnt++;
+		}
+	}
+	if (cnt == node->size())
+		fullLeaves++;
+}
+
+
+void GSSTreeSearcher::nn_search(const Object& obj, unsigned k, vector<Object>& res)
+{
+	res.clear();
+	const MappableOctTree *objTree = MappableOctTree::create(dimension,
+			resolution, obj);
+
+	TopKObj ret(k);
+	Timer t;
+	vector<file_index> respos;
+	fitsCheck = 0;
+	fullLeaves = 0;
+	nodesVisited = 0;
+	leavesVisited = 0;
+	levelCnts.clear();
+	if (internalNodes.size() > 0)
+	{
+		const GSSInternalNode* root = (GSSInternalNode*) internalNodes.begin();
+		findNearest(root, objTree, ret,0);
+	}
+	else
+	{
+		//very small tree with just a leaf
+		const GSSLeaf* leaf = (GSSLeaf*) leaves.begin();
+		findNearest(leaf, objTree, ret);
+	}
+
+	//extract objects in distance order
+	for (unsigned i = 0, n = ret.size(); i < n; i++)
+	{
+		const char * addr = objects.begin() + ret[i].objpos;
+		res.push_back(Object(addr));
+	}
+
+	if (verbose)
+	{
+		cout << "Found " << res.size() << " objects out of " << total << " in "
+				<< t.elapsed() << "s with " << fitsCheck << " checks "
+				<< nodesVisited << " nodes " << leavesVisited << " leaves " << fullLeaves
+				<< " full leaves\n";
+		for(unsigned i = 0, n = levelCnts.size(); i < n; i++)
+		{
+			cout << " level " << i <<": " << levelCnts[i] << " " << maxlevelCnts[i] << " " << usefulLevelCnts[i] << "\n";
+		}
+	}
+	delete objTree;
 }
 
 //return true if the object(s) represented by MIV/MSV might fit in between min and max
