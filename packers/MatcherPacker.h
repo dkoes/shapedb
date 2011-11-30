@@ -14,6 +14,98 @@
 #include "Packer.h"
 #include <lemon/smart_graph.h>
 
+//caches intercluster distances
+class ClusterCache
+{
+	struct JDist
+	{
+		unsigned j;
+		float dist;
+
+		JDist() :
+				j(0), dist(0)
+		{
+		}
+		JDist(unsigned J, float D) :
+				j(J), dist(D)
+		{
+		}
+
+		bool operator<(const JDist& rhs) const
+		{
+			return j < rhs.j;
+		}
+
+		bool operator==(const JDist& rhs) const
+		{
+			return j == rhs.j;
+		}
+	};
+
+	vector<vector<JDist> > cache;
+
+public:
+	//indices are assumed to be consecutive and sorted
+	ClusterCache(unsigned n) :
+			cache(n)
+	{
+
+	}
+
+	bool isCached(unsigned i, unsigned j, float& ret)
+	{
+		if (j > i) //normalize order - store only once
+			swap(i, j);
+		else if (i == j)
+		{
+			ret = 0;
+			return true;
+		}
+
+		if (i >= cache.size())
+			return false;
+
+		vector<JDist>& row = cache[i];
+		JDist val(j, 0);
+		vector<JDist>::iterator pos = lower_bound(row.begin(), row.end(), val);
+
+		if (pos != row.end() && pos->j == j)
+		{
+			//already exists
+			ret = pos->dist;
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+	void set(unsigned i, unsigned j, float v)
+	{
+		if (j > i) //normalize order - store only once
+			swap(i, j);
+		else if (i == j)
+			return;
+
+		if (i >= cache.size())
+			cache.resize(i + 1);
+
+		vector<JDist>& row = cache[i];
+		JDist val(j, v);
+		vector<JDist>::iterator pos = lower_bound(row.begin(), row.end(), val);
+
+		if (pos != row.end() && pos->j == j)
+		{
+			//already exists
+			pos->dist = v;
+		}
+		else
+		{
+			row.insert(pos, val);
+		}
+	}
+};
 
 class MatcherPacker: public Packer
 {
@@ -45,15 +137,17 @@ class MatcherPacker: public Packer
 		bool update(const IndDist& item, unsigned k); //insert in sorted order, make K items, no limit if 0
 		void getOldNew(vector<unsigned>& o, vector<unsigned>& n); //processed and unprocessed; once extracted becomes processed
 
-		void getCommonNeighbors(const vector<unsigned>& rev, vector<unsigned>& neighs) const;
+		void getCommonNeighbors(const vector<unsigned>& rev,
+				vector<unsigned>& neighs) const;
 	};
 
-	void initialKNNSample(const DataViewer *D,
-			vector<Cluster>& clusters, unsigned maxSz, DCache& dcache, vector< KNNSlice >& V, float& maxdist) const;
+	void initialKNNSample(const DataViewer *D, vector<Cluster>& clusters,
+			unsigned maxSz, DCache& dcache, ClusterCache& ccache,
+			vector<KNNSlice>& V, float& maxdist) const;
 
-	void makeKNNGraph(const DataViewer *D,
-			vector<Cluster>& clusters, unsigned maxSz, DCache& dcache, lemon::SmartGraph& G,
-			lemon::SmartGraph::EdgeMap<double>& E,
+	void makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
+			unsigned maxSz, DCache& dcache, ClusterCache& ccache,
+			lemon::SmartGraph& G, lemon::SmartGraph::EdgeMap<double>& E,
 			lemon::SmartGraph::NodeMap<unsigned>& Sindex,
 			vector<lemon::SmartGraph::Node>& nodes) const;
 
@@ -66,7 +160,8 @@ class MatcherPacker: public Packer
 	unsigned K; //for knn, if zero use full
 	unsigned S; //number of sentinals for knn building, if zero, do random
 public:
-	MatcherPacker(unsigned ps, unsigned k=0, unsigned s=0, ClusterDistance metric = AverageLink) :
+	MatcherPacker(unsigned ps, unsigned k = 0, unsigned s = 0,
+			ClusterDistance metric = AverageLink) :
 			Packer(ps, metric), K(k), S(s)
 	{
 	}

@@ -125,6 +125,7 @@ void MatcherPacker::KNNSlice::getOldNew(vector<unsigned>& O,
 //create an initial knn graph quickly
 void MatcherPacker::initialKNNSample(const DataViewer *D,
 		vector<Cluster>& clusters, unsigned maxSz, DCache& dcache,
+		ClusterCache& ccache,
 		vector<KNNSlice>& V, float& maxdist) const
 {
 	if (S == 0) //random sampling
@@ -155,8 +156,14 @@ void MatcherPacker::initialKNNSample(const DataViewer *D,
 					pos = (pos + 1) % N;
 				}
 
-				float dist = clusterDistance(D, clusters[i], clusters[neigh],
+				float dist = 0;
+				if(!ccache.isCached(i, neigh, dist))
+				{
+					dist = clusterDistance(D, clusters[i], clusters[neigh],
 						dcache);
+					ccache.set(i,neigh,dist);
+				}
+
 				if(dist > maxdist)
 					maxdist = dist;
 				V[i].neighbors.push_back(IndDist(neigh, dist));
@@ -192,7 +199,14 @@ void MatcherPacker::initialKNNSample(const DataViewer *D,
 				}
 				float dist = 0;
 				if(i != indices.back())
-					dist = clusterDistance(D,clusters[i], clusters[indices.back()], dcache);
+				{
+					if(!ccache.isCached(i, indices.back(), dist))
+					{
+						dist = clusterDistance(D, clusters[i], clusters[indices.back()],
+							dcache);
+						ccache.set(i,indices.back(),dist);
+					}
+				}
 				points[i][send] = dist;
 				if(dist < min)
 					min = dist;
@@ -211,7 +225,14 @@ void MatcherPacker::initialKNNSample(const DataViewer *D,
 		{
 			float dist = 0;
 			if(i != indices.back())
-				dist = clusterDistance(D,clusters[i], clusters[indices.back()], dcache);
+			{
+				if(!ccache.isCached(i, indices.back(), dist))
+				{
+					dist = clusterDistance(D, clusters[i], clusters[indices.back()],
+						dcache);
+					ccache.set(i,indices.back(),dist);
+				}
+			}
 			points[i][S-1] = dist;
 		}
 
@@ -229,8 +250,14 @@ void MatcherPacker::initialKNNSample(const DataViewer *D,
 				if (nnIdx[j] != (int) i && nnIdx[j] >= 0)
 				{
 					unsigned neigh = nnIdx[j];
-					float dist = clusterDistance(D, clusters[i],
-							clusters[neigh], dcache);
+					float dist = 0;
+					if(!ccache.isCached(i, neigh, dist))
+					{
+						dist = clusterDistance(D, clusters[i], clusters[neigh],
+							dcache);
+						ccache.set(i,neigh,dist);
+					}
+
 					V[i].neighbors.push_back(IndDist(nnIdx[j], dist));
 
 					if(dist > maxdist) maxdist = dist;
@@ -245,7 +272,7 @@ void MatcherPacker::initialKNNSample(const DataViewer *D,
 
 //create a knn graph
 void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
-		unsigned maxsz, DCache& dcache, SmartGraph& G,
+		unsigned maxsz, DCache& dcache, ClusterCache& ccache, SmartGraph& G,
 		SmartGraph::EdgeMap<double>& E, SmartGraph::NodeMap<unsigned>& Sindex,
 		vector<SmartGraph::Node>& nodes) const
 {
@@ -260,8 +287,14 @@ void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 		{
 			for (unsigned j = 0; j < i; j++)
 			{
-				float dist = clusterDistance(D, clusters[i], clusters[j],
+				float dist = 0;
+
+				if(!ccache.isCached(i, j, dist))
+				{
+					dist = clusterDistance(D, clusters[i], clusters[j],
 						dcache);
+					ccache.set(i,j,dist);
+				}
 				unsigned minsz = min(clusters[i].size(), clusters[j].size());
 				while (minsz < maxsz)
 				{
@@ -307,7 +340,7 @@ void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 		vector<KNNSlice> B(N);
 		float maxdist = 0;
 
-		initialKNNSample(D, clusters, maxsz, dcache, B, maxdist);
+		initialKNNSample(D, clusters, maxsz, dcache, ccache, B, maxdist);
 
 		bool keepgoing = true;
 		while (keepgoing)
@@ -347,8 +380,13 @@ void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 						unsigned u2 = newn[j];
 						if (u1 < u2)
 						{
-							float dist = clusterDistance(D, clusters[u1],
-									clusters[u2], dcache);
+							float dist = 0;
+							if(!ccache.isCached(u1, u2, dist))
+							{
+								dist = clusterDistance(D, clusters[u1], clusters[u2],
+									dcache);
+								ccache.set(u1,u2,dist);
+							}
 
 							changed += B[u1].update(IndDist(u2, dist), K);
 							changed += B[u2].update(IndDist(u1, dist), K);
@@ -362,8 +400,14 @@ void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 						unsigned u2 = oldn[j];
 						if (u2 != u1)
 						{
-							float dist = clusterDistance(D, clusters[u1],
-									clusters[u2], dcache);
+							float dist = 0;
+							if(!ccache.isCached(u1, u2, dist))
+							{
+								dist = clusterDistance(D, clusters[u1], clusters[u2],
+									dcache);
+								ccache.set(u1,u2,dist);
+							}
+
 							if (B[u1].update(IndDist(u2, dist), K))
 								changed++;
 							if (B[u2].update(IndDist(u1, dist), K))
@@ -414,7 +458,9 @@ bool MatcherPacker::knnMergeClusters(const DataViewer *D,
 	SmartGraph::EdgeMap<double> Sweights(SG);
 	SmartGraph::NodeMap<unsigned> Sindex(SG);
 	vector<SmartGraph::Node> Snodes;
-	makeKNNGraph(D, clusters, maxSz, dcache, SG, Sweights, Sindex, Snodes);
+
+	ClusterCache ccache(clusters.size());
+	makeKNNGraph(D, clusters, maxSz, dcache, ccache, SG, Sweights, Sindex, Snodes);
 
 	Timer t;
 	MaxWeightedMatching<SmartGraph, SmartGraph::EdgeMap<double> > matcher(SG,

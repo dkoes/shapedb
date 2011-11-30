@@ -65,7 +65,7 @@ cl::opt<unsigned> K("k", cl::desc("k nearest neighbors to find for NNSearch"), c
 cl::opt<unsigned> Knn("knn", cl::desc("K for knn graph creation"), cl::init(8));
 cl::opt<unsigned> Sentinals("sentinals",
 		cl::desc("Number of sentinals for knn initialization (zero random)"),
-		cl::init(16));
+		cl::init(32));
 cl::opt<SpectralPacker::SpectralAlgEnum> SpectralAlg(
 		cl::desc("Spectral packing sub-algorithm:"),
 		cl::values(
@@ -286,11 +286,10 @@ int main(int argc, char *argv[])
 			if (ScanCheck || ScanOnly)
 			{
 				vector<Molecule> res2;
-				gss.dc_scan_search(Molecule(insphere, dimension, resolution),
-						Molecule(exsphere, dimension, resolution), true, res2);
+				gss.dc_scan_search(inMol, exMol, true, res2);
 				if (res2.size() != res.size())
 				{
-					cerr << "Scanning found different number\n";
+					cerr << "Scanning found different number: " << res2.size() << "\n";
 				}
 			}
 

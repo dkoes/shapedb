@@ -88,6 +88,7 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
 		findTweeners(leaf, smallTree, bigTree, respos);
 	}
 
+	Timer objload;
 	//extract objects in sequential order
 	sort(respos.begin(), respos.end());
 	for (unsigned i = 0, n = respos.size(); i < n; i++)
@@ -99,7 +100,7 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
 	if (verbose)
 	{
 		cout << "Found " << res.size() << " objects out of " << total << " in "
-				<< t.elapsed() << "s with " << fitsCheck << " checks "
+				<< t.elapsed() << "s (" << objload.elapsed() << " objload) with " << fitsCheck << " checks "
 				<< nodesVisited << " nodes " << leavesVisited << " leaves " << fullLeaves
 				<< " full leaves\n";
 		for(unsigned i = 0, n = levelCnts.size(); i < n; i++)
@@ -239,9 +240,14 @@ void GSSTreeSearcher::nn_search(const Object& obj, unsigned k, vector<Object>& r
 		findNearest(leaf, objTree, ret);
 	}
 
+	Timer objload;
 	//extract objects in distance order
 	for (unsigned i = 0, n = ret.size(); i < n; i++)
 	{
+		if(verbose)
+		{
+			cout << i << " " << ret[i].dist << "\n";
+		}
 		const char * addr = objects.begin() + ret[i].objpos;
 		res.push_back(Object(addr));
 	}
@@ -249,7 +255,7 @@ void GSSTreeSearcher::nn_search(const Object& obj, unsigned k, vector<Object>& r
 	if (verbose)
 	{
 		cout << "Found " << res.size() << " objects out of " << total << " in "
-				<< t.elapsed() << "s with " << fitsCheck << " checks "
+				<< t.elapsed() << "s (" << objload.elapsed() << " objload) with " << fitsCheck << " checks "
 				<< nodesVisited << " nodes " << leavesVisited << " leaves " << fullLeaves
 				<< " full leaves\n";
 		for(unsigned i = 0, n = levelCnts.size(); i < n; i++)
@@ -297,6 +303,7 @@ void GSSTreeSearcher::dc_scan_search(const Object& smallObj,
 		findTweeners(leaf, smallTree, bigTree, respos);
 	}
 
+	Timer objload;
 	//extract objects in sequential order
 	sort(respos.begin(), respos.end());
 	for (unsigned i = 0, n = respos.size(); i < n; i++)
@@ -308,7 +315,7 @@ void GSSTreeSearcher::dc_scan_search(const Object& smallObj,
 	if (verbose)
 	{
 		cout << "Scanned " << res.size() << " objects out of " << total
-				<< " in " << t.elapsed() << "s\n";
+				<< " in " << t.elapsed() << "s (" << objload.elapsed() << " objload)\n";
 	}
 	delete smallTree;
 	delete bigTree;
