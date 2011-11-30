@@ -61,7 +61,7 @@ class GSSTreeSearcher
 		void add(file_index pos, double dist);
 		double worst() const
 		{
-			if(objs.size() == 0) return HUGE_VAL;
+			if(objs.size() < k) return HUGE_VAL;
 			else return objs.back().dist;
 		}
 

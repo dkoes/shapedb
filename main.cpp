@@ -61,6 +61,7 @@ cl::opt<PackerEnum> PackerChoice(
 				clEnumValN(Spectral, "spectral", "Spectral packing"),
 				clEnumValEnd), cl::init(MatchPack));
 
+cl::opt<unsigned> K("k", cl::desc("k nearest neighbors to find for NNSearch"), cl::init(1));
 cl::opt<unsigned> Knn("knn", cl::desc("K for knn graph creation"), cl::init(8));
 cl::opt<unsigned> Sentinals("sentinals",
 		cl::desc("Number of sentinals for knn initialization (zero random)"),
@@ -213,20 +214,30 @@ int main(int argc, char *argv[])
 	case NNSearch:
 	{
 		//read in database
-		ifstream dbfile(Database.c_str());
-		if (!dbfile)
+		filesystem::path dbfile(Database.c_str());
+		GSSTreeSearcher gss(Verbose);
+		if (!gss.load(dbfile))
 		{
 			cerr << "Could not read database " << Database << "\n";
 			exit(-1);
 		}
-		//TODO: load db
-		abort();
-		//read query molecule(s)
-		//for(Molecule::iterator molitr(Input, ); molitr; ++molitr)
-		{
 
+		//read query molecule(s)
+		vector<Molecule> res;
+		Molecule::iterator molitr(Input, gss.getDimension(), gss.getResolution(),ProbeRadius);
+		for( ;molitr ; ++molitr)
+		{
+			const Molecule& mol = *molitr;
+			gss.nn_search(mol, K, res);
 		}
 
+		OBConversion outconv;
+		outconv.SetOutFormat(outconv.FormatFromExt(Output.c_str()));
+		ofstream out(Output.c_str());
+		outconv.SetOutStream(&out);
+
+		for (unsigned i = 0, n = res.size(); i < n; i++)
+			outconv.Write(&res[i].getMol());
 	}
 		break;
 	case DCSearch:
@@ -254,32 +265,23 @@ int main(int argc, char *argv[])
 
 			vector<MolSphere> insphere, exsphere;
 			OBMol imol;
-			if (inmol.ReadFile(&imol, IncludeMol))
+			Molecule inMol;
+			if (IncludeMol.size() > 0 && inmol.ReadFile(&imol, IncludeMol))
 			{
-				spherizeMol(imol, insphere);
-				//adjust radii
-				for (unsigned i = 0, n = insphere.size(); i < n; i++)
-				{
-					insphere[i].incrementRadius(-LessDist);
-				}
+				inMol.set(imol, resolution, dimension, ProbeRadius, LessDist);
 			}
 			OBMol emol;
-			if (exmol.ReadFile(&emol, ExcludeMol))
+			Molecule exMol;
+			if (ExcludeMol.size() > 0 && exmol.ReadFile(&emol, ExcludeMol))
 			{
-				spherizeMol(emol, exsphere);
-				//adjust radii
-				for (unsigned i = 0, n = exsphere.size(); i < n; i++)
-				{
-					exsphere[i].incrementRadius(-MoreDist);
-				}
+				exMol.set(emol, resolution,dimension, ProbeRadius, MoreDist);
 			}
 
 			vector<Molecule> res;
 
 			//search
 			if (!ScanOnly)
-				gss.dc_search(Molecule(insphere, dimension, resolution),
-						Molecule(exsphere, dimension, resolution), true, res);
+				gss.dc_search(inMol, exMol, true, res);
 
 			if (ScanCheck || ScanOnly)
 			{
@@ -356,8 +358,7 @@ int main(int argc, char *argv[])
 	case MolGrid:
 	{
 		ofstream out(Output.c_str());
-		float adjust = -LessDist;
-		adjust += MoreDist;
+		float adjust = LessDist;
 
 		for (MolIterator mitr(Input, MaxDimension, Resolution, ProbeRadius, adjust); mitr;
 				++mitr)

@@ -38,7 +38,7 @@ class Molecule
 	vector<MGrid> grids;
 
 	//create a set of grids of different resolution from spheres
-	void createGrids(double dimension, double resolution, double probeRadius)
+	void createGrids(double dimension, double resolution, double probeRadius, double adjust)
 	{
 		grids.clear();
 		grids.reserve(1 + ceil(log2(dimension / resolution)));
@@ -49,18 +49,19 @@ class Molecule
 		for (unsigned i = 0, n = spheres.size(); i < n; i++)
 		{
 			const MolSphere& sphere = spheres[i];
-			grids[0].markXYZSphere(sphere.x, sphere.y, sphere.z, sphere.r);
+			grids[0].markXYZSphere(sphere.x, sphere.y, sphere.z, sphere.r-adjust);
 			if (probeRadius > 0)
 			{
 				sagrid.markXYZSphere(sphere.x, sphere.y, sphere.z,
-						sphere.r + probeRadius);
+						sphere.r-adjust + probeRadius);
 				lesssagrid.markXYZSphere(sphere.x, sphere.y, sphere.z,
-						sphere.r + probeRadius - resolution);
+						sphere.r-adjust + probeRadius - resolution);
 			}
 		}
 
 		if (probeRadius > 0)
 			grids[0].makeSurface(sagrid, lesssagrid, probeRadius);
+
 		double res = resolution * 2;
 		while (res <= dimension)
 		{
@@ -85,7 +86,7 @@ public:
 			double probe = 1.4) :
 			spheres(sph)
 	{
-		createGrids(dimension, resolution, probe);
+		createGrids(dimension, resolution, probe, 0);
 	}
 
 	Molecule(const char *data)
@@ -117,11 +118,11 @@ public:
 				++aitr)
 		{
 			OBAtom* atom = *aitr;
-			double r = etab.GetVdwRad(atom->GetAtomicNum()) + adjust;
+			double r = etab.GetVdwRad(atom->GetAtomicNum());
 			spheres.push_back(MolSphere(atom->x(), atom->y(), atom->z(), r));
 		}
 
-		createGrids(dimension, resolution, probe);
+		createGrids(dimension, resolution, probe, adjust);
 	}
 
 	OBMol& getMol()

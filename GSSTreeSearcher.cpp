@@ -116,7 +116,8 @@ void GSSTreeSearcher::TopKObj::add(file_index pos, double dist)
 	ObjDist x = {pos, dist};
 	objs.insert(lower_bound(objs.begin(), objs.end(), x), x);
 
-	objs.resize(k);
+	if(objs.size() > k)
+		objs.resize(k);
 }
 
 struct ScoredChild
@@ -153,7 +154,7 @@ void GSSTreeSearcher::findNearest(const GSSInternalNode* node,  const MappableOc
 		const GSSInternalNode::Child *child = node->getChild(i);
 		float min = 0, max = 0;
 		float score = searchVolumeDist(obj, child->getMIV(), child->getMSV(), min, max);
-
+		fitsCheck++;
 		if(min < res.worst())
 		{
 			//there's hope of finding something
@@ -201,6 +202,7 @@ void GSSTreeSearcher::findNearest(const GSSLeaf* node, const MappableOctTree* ob
 	{
 		const GSSLeaf::Child *child = node->getChild(i);
 		double dist = volumeDist(obj, &child->tree);
+		fitsCheck++;
 		if (dist < res.worst())
 		{
 			res.add(child->object_pos, dist);
@@ -214,7 +216,6 @@ void GSSTreeSearcher::findNearest(const GSSLeaf* node, const MappableOctTree* ob
 
 void GSSTreeSearcher::nn_search(const Object& obj, unsigned k, vector<Object>& res)
 {
-	res.clear();
 	const MappableOctTree *objTree = MappableOctTree::create(dimension,
 			resolution, obj);
 

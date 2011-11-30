@@ -20,7 +20,7 @@ class MGrid
 	int pointToGrid(double x, double y, double z) const;
 	void markZChord(double x, double y, double z, double r);
 	void markYZCircle(double x, double y, double z, double r);
-
+	void shrinkByOne();
 
 	double dimension;
 	double resolution;
@@ -44,6 +44,10 @@ public:
 	void makeSurface(const MGrid& sagrid, const MGrid& lesssagrid, double probe);
 
 	bool isInteriorPoint(float x, float y, float z) const;
+	bool isExposedPoint(float x, float y, float z) const;
+
+	void shrink(double amount);
+
 };
 
 #endif /* MGRID_H_ */

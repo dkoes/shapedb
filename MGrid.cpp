@@ -173,4 +173,47 @@ bool MGrid::isInteriorPoint(float x, float y, float z) const
 	return true;
 }
 
+//a point that doesn't have neighbors on all its faces
+//(ignoring edge/corner neighbors)
+bool MGrid::isExposedPoint(float x, float y, float z) const
+{
+	if(test(x+resolution,y,z) && test(x-resolution,y,z) &&
+			test(x,y+resolution,z) && test(x,y-resolution,z) &&
+			test(x,y,z+resolution) && test(x,y,z-resolution))
+		return false;
+	return true;
+}
+
+
+//remove all gridpoints that are exposed points
+void MGrid::shrinkByOne()
+{
+	bvect::enumerator en = grid.first();
+	bvect::enumerator en_end = grid.end();
+
+	bvect toRemove;
+	while (en < en_end)
+	{
+		unsigned g = *en;
+		double x,y,z;
+		gridToPoint(g, x,y,z);
+		if(isExposedPoint(x,y,z))
+		{
+			toRemove.set(g);
+		}
+		++en;
+	}
+	grid -= toRemove;
+}
+
+//reduce the size of the object by the specified amount
+void MGrid::shrink(double amount)
+{
+	unsigned num = ceil(amount/resolution);
+	for(unsigned i = 0; i < num; i++)
+	{
+		shrinkByOne();
+	}
+
+}
 
