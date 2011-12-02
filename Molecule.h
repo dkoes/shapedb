@@ -49,18 +49,21 @@ class Molecule
 		for (unsigned i = 0, n = spheres.size(); i < n; i++)
 		{
 			const MolSphere& sphere = spheres[i];
-			grids[0].markXYZSphere(sphere.x, sphere.y, sphere.z, sphere.r-adjust);
+			grids[0].markXYZSphere(sphere.x, sphere.y, sphere.z, sphere.r);
 			if (probeRadius > 0)
 			{
 				sagrid.markXYZSphere(sphere.x, sphere.y, sphere.z,
-						sphere.r-adjust + probeRadius);
+						sphere.r + probeRadius);
 				lesssagrid.markXYZSphere(sphere.x, sphere.y, sphere.z,
-						sphere.r-adjust + probeRadius - resolution);
+						sphere.r + probeRadius - resolution);
 			}
 		}
 
 		if (probeRadius > 0)
 			grids[0].makeSurface(sagrid, lesssagrid, probeRadius);
+
+		if(adjust > 0)
+			grids[0].shrink(adjust);
 
 		double res = resolution * 2;
 		while (res <= dimension)
