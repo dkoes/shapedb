@@ -228,7 +228,7 @@ int main(int argc, char *argv[])
 		for( ;molitr ; ++molitr)
 		{
 			const Molecule& mol = *molitr;
-			gss.nn_search(mol, K, res);
+			gss.nn_search(mol, K, Output.size() > 1, res);
 		}
 
 		OBConversion outconv;
@@ -281,12 +281,12 @@ int main(int argc, char *argv[])
 
 			//search
 			if (!ScanOnly)
-				gss.dc_search(inMol, exMol, true, res);
+				gss.dc_search(inMol, exMol, true, Output.size() > 1, res);
 
 			if (ScanCheck || ScanOnly)
 			{
 				vector<Molecule> res2;
-				gss.dc_scan_search(inMol, exMol, true, res2);
+				gss.dc_scan_search(inMol, exMol, true, Output.size() > 1, res2);
 				if (res2.size() != res.size())
 				{
 					cerr << "Scanning found different number: " << res2.size() << "\n";
@@ -328,7 +328,7 @@ int main(int argc, char *argv[])
 					gss.dc_search(
 							Molecule(littlespheres, dimension, resolution),
 							Molecule(bigspheres, dimension, resolution), false,
-							res);
+							Output.size() > 1, res);
 
 				if (ScanCheck || ScanOnly)
 				{
@@ -336,7 +336,7 @@ int main(int argc, char *argv[])
 					gss.dc_scan_search(
 							Molecule(littlespheres, dimension, resolution),
 							Molecule(bigspheres, dimension, resolution), false,
-							res2);
+							Output.size() > 1, res2);
 					if (res2.size() != res.size())
 					{
 						cerr << "Scanning found different number\n";

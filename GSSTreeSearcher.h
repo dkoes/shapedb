@@ -91,15 +91,15 @@ public:
 	unsigned size() const { return total; }
 
 	//return everything with a shape between smallObj and bigObj
-	void dc_search(const Object& smallObj, const Object& bigObj, bool invertBig,
+	void dc_search(const Object& smallObj, const Object& bigObj, bool invertBig, bool loadObjs,
 			vector<Object>& res);
 
 	//linear scan
-	void dc_scan_search(const Object& smallObj, const Object& bigObj, bool invertBig,
+	void dc_scan_search(const Object& smallObj, const Object& bigObj, bool invertBig, bool loadObjs,
 			vector<Object>& res);
 
 	//return k objects closest to obj
-	void nn_search(const Object& obj, unsigned k, vector<Object>& res);
+	void nn_search(const Object& obj, unsigned k, bool loadObjs, vector<Object>& res);
 
 	float getDimension() const { return dimension; }
 	float getResolution() const { return resolution; }

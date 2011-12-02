@@ -58,7 +58,7 @@ GSSTreeSearcher::~GSSTreeSearcher()
 //find all the shapes in the database that lie bewtween smallObj and bigObj
 //if invertBig is set, than treat as an excluded volume
 void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
-		bool invertBig, vector<Object>& res)
+		bool invertBig, bool loadObjs, vector<Object>& res)
 {
 	res.clear();
 	const MappableOctTree *smallTree = MappableOctTree::create(dimension,
@@ -89,17 +89,20 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
 	}
 
 	Timer objload;
-	//extract objects in sequential order
-	sort(respos.begin(), respos.end());
-	for (unsigned i = 0, n = respos.size(); i < n; i++)
+	if (loadObjs)
 	{
-		const char * addr = objects.begin() + respos[i];
-		res.push_back(Object(addr));
+		//extract objects in sequential order
+		sort(respos.begin(), respos.end());
+		for (unsigned i = 0, n = respos.size(); i < n; i++)
+		{
+			const char * addr = objects.begin() + respos[i];
+			res.push_back(Object(addr));
+		}
 	}
 
 	if (verbose)
 	{
-		cout << "Found " << res.size() << " objects out of " << total << " in "
+		cout << "Found " << respos.size() << " objects out of " << total << " in "
 				<< t.elapsed() << "s (" << objload.elapsed() << " objload) with " << fitsCheck << " checks "
 				<< nodesVisited << " nodes " << leavesVisited << " leaves " << fullLeaves
 				<< " full leaves\n";
@@ -215,7 +218,7 @@ void GSSTreeSearcher::findNearest(const GSSLeaf* node, const MappableOctTree* ob
 }
 
 
-void GSSTreeSearcher::nn_search(const Object& obj, unsigned k, vector<Object>& res)
+void GSSTreeSearcher::nn_search(const Object& obj, unsigned k, bool loadObjs, vector<Object>& res)
 {
 	const MappableOctTree *objTree = MappableOctTree::create(dimension,
 			resolution, obj);
@@ -241,20 +244,24 @@ void GSSTreeSearcher::nn_search(const Object& obj, unsigned k, vector<Object>& r
 	}
 
 	Timer objload;
-	//extract objects in distance order
-	for (unsigned i = 0, n = ret.size(); i < n; i++)
+
+	if (loadObjs)
 	{
-		if(verbose)
+		//extract objects in distance order
+		for (unsigned i = 0, n = ret.size(); i < n; i++)
 		{
-			cout << i << " " << ret[i].dist << "\n";
+			if (verbose)
+			{
+				cout << i << " " << ret[i].dist << "\n";
+			}
+			const char * addr = objects.begin() + ret[i].objpos;
+			res.push_back(Object(addr));
 		}
-		const char * addr = objects.begin() + ret[i].objpos;
-		res.push_back(Object(addr));
 	}
 
 	if (verbose)
 	{
-		cout << "Found " << res.size() << " objects out of " << total << " in "
+		cout << "Found " << respos.size() << " objects out of " << total << " in "
 				<< t.elapsed() << "s (" << objload.elapsed() << " objload) with " << fitsCheck << " checks "
 				<< nodesVisited << " nodes " << leavesVisited << " leaves " << fullLeaves
 				<< " full leaves\n";
@@ -284,7 +291,7 @@ bool GSSTreeSearcher::fitsInbetween(const MappableOctTree *MIV,
 
 //find everyting between small and big using linear scan
 void GSSTreeSearcher::dc_scan_search(const Object& smallObj,
-		const Object& bigObj, bool invertBig, vector<Object>& res)
+		const Object& bigObj, bool invertBig, bool loadObjs, vector<Object>& res)
 {
 	res.clear();
 	const MappableOctTree *smallTree = MappableOctTree::create(dimension,
@@ -304,17 +311,21 @@ void GSSTreeSearcher::dc_scan_search(const Object& smallObj,
 	}
 
 	Timer objload;
-	//extract objects in sequential order
-	sort(respos.begin(), respos.end());
-	for (unsigned i = 0, n = respos.size(); i < n; i++)
+
+	if (loadObjs)
 	{
-		const char * addr = objects.begin() + respos[i];
-		res.push_back(Object(addr));
+		//extract objects in sequential order
+		sort(respos.begin(), respos.end());
+		for (unsigned i = 0, n = respos.size(); i < n; i++)
+		{
+			const char * addr = objects.begin() + respos[i];
+			res.push_back(Object(addr));
+		}
 	}
 
 	if (verbose)
 	{
-		cout << "Scanned " << res.size() << " objects out of " << total
+		cout << "Scanned " << respos.size() << " objects out of " << total
 				<< " in " << t.elapsed() << "s (" << objload.elapsed() << " objload)\n";
 	}
 	delete smallTree;
