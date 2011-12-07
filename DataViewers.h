@@ -100,6 +100,33 @@ struct Cluster
 		b.clear();
 	}
 
+	//invalidates a,b,c,d
+	void mergeInto(Cluster& a, Cluster& b, Cluster& c, Cluster& d)
+	{
+		indices.reserve(a.indices.size() + b.indices.size() + c.indices.size() + d.indices.size());
+		copy(a.indices.begin(), a.indices.end(),
+				inserter(indices, indices.end()));
+		copy(b.indices.begin(), b.indices.end(),
+				inserter(indices, indices.end()));
+		copy(c.indices.begin(), c.indices.end(),
+				inserter(indices, indices.end()));
+		copy(d.indices.begin(), d.indices.end(),
+				inserter(indices, indices.end()));
+
+		const MappableOctTree *itrees[4] =
+		{ a.MIV, b.MIV, c.MIV, d.MIV };
+		MIV = MappableOctTree::createFromIntersection(4, itrees);
+
+		const MappableOctTree *utrees[4] =
+		{ a.MSV, b.MSV, c.MSV, d.MSV };
+		MSV = MappableOctTree::createFromUnion(4, utrees);
+
+		a.clear();
+		b.clear();
+		c.clear();
+		d.clear();
+	}
+
 	void addInto(Cluster& a)
 	{
 		copy(a.indices.begin(), a.indices.end(),

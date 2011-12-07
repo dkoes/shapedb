@@ -157,12 +157,20 @@ class MatcherPacker: public Packer
 	bool knnMergeClusters(const DataViewer* D, vector<Cluster>& clusters,
 			unsigned maxSz, DCache& dcache) const;
 
+	double quadCost(unsigned a, unsigned b, unsigned c, unsigned d,
+			const vector<Cluster>& clusters, const DataViewer* D,
+			ClusterCache& cache, DCache& dcache) const;
+
+	bool knnQuadMergeClusters(const DataViewer* D, vector<Cluster>& clusters,
+			unsigned maxSz, DCache& dcache) const;
+
 	unsigned K; //for knn, if zero use full
 	unsigned S; //number of sentinals for knn building, if zero, do random
+	bool doQuadPack; //if true combine quads
 public:
 	MatcherPacker(unsigned ps, unsigned k = 0, unsigned s = 0,
-			ClusterDistance metric = AverageLink) :
-			Packer(ps, metric), K(k), S(s)
+			ClusterDistance metric = AverageLink, bool doQ = false) :
+			Packer(ps, metric), K(k), S(s), doQuadPack(doQ)
 	{
 	}
 	~MatcherPacker()

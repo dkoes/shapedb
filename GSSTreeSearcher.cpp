@@ -225,7 +225,6 @@ void GSSTreeSearcher::nn_search(const Object& obj, unsigned k, bool loadObjs, ve
 
 	TopKObj ret(k);
 	Timer t;
-	vector<file_index> respos;
 	fitsCheck = 0;
 	fullLeaves = 0;
 	nodesVisited = 0;
@@ -261,7 +260,7 @@ void GSSTreeSearcher::nn_search(const Object& obj, unsigned k, bool loadObjs, ve
 
 	if (verbose)
 	{
-		cout << "Found " << respos.size() << " objects out of " << total << " in "
+		cout << "Found " << ret.size() << " objects out of " << total << " in "
 				<< t.elapsed() << "s (" << objload.elapsed() << " objload) with " << fitsCheck << " checks "
 				<< nodesVisited << " nodes " << leavesVisited << " leaves " << fullLeaves
 				<< " full leaves\n";

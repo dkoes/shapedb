@@ -28,6 +28,7 @@
 #include "KSamplePartitioner.h"
 #include "packers/Packers.h"
 #include <boost/shared_ptr.hpp>
+#include "Timer.h"
 
 using namespace std;
 using namespace boost;
@@ -36,7 +37,7 @@ typedef shared_ptr<Packer> PackerPtr;
 
 enum CommandEnum
 {
-	Create, NNSearch, DCSearch, MolGrid
+	Create, NNSearch, DCSearch, MolGrid, BatchSearch, BatchDB
 };
 
 cl::opt<CommandEnum> Command(
@@ -46,6 +47,8 @@ cl::opt<CommandEnum> Command(
 				clEnumVal(NNSearch, "Nearest neighbor search"),
 				clEnumVal(DCSearch, "Distance constraint search"),
 				clEnumVal(MolGrid, "Generate molecule grid and debug output"),
+				clEnumVal(BatchSearch, "Read in a jobs file for batch processing"),
+				clEnumVal(BatchDB, "Read in a jobs file for batch processing of a list of directories"),
 				clEnumValEnd));
 
 enum PackerEnum
@@ -61,7 +64,9 @@ cl::opt<PackerEnum> PackerChoice(
 				clEnumValN(Spectral, "spectral", "Spectral packing"),
 				clEnumValEnd), cl::init(MatchPack));
 
-cl::opt<unsigned> K("k", cl::desc("k nearest neighbors to find for NNSearch"), cl::init(1));
+cl::opt<bool> QuadPack("quad-pack", cl::desc("Use quad packing"), cl::init(false));
+cl::opt<unsigned> K("k", cl::desc("k nearest neighbors to find for NNSearch"),
+		cl::init(1));
 cl::opt<unsigned> Knn("knn", cl::desc("K for knn graph creation"), cl::init(8));
 cl::opt<unsigned> Sentinals("sentinals",
 		cl::desc("Number of sentinals for knn initialization (zero random)"),
@@ -95,7 +100,8 @@ cl::opt<double> MoreDist(
 				"Distance to increase query mol by for constraint search (default 1A)."),
 		cl::init(1.0));
 
-cl::opt<double> ProbeRadius("probe-radius", cl::desc("Radius of water probe for SA calculations"),cl::init(0));
+cl::opt<double> ProbeRadius("probe-radius",
+		cl::desc("Radius of water probe for SA calculations"), cl::init(0));
 
 cl::opt<double> MaxDimension("max-dim", cl::desc("Maximum dimension."),
 		cl::init(64));
@@ -162,6 +168,96 @@ static void spherizeMol(OBMol& mol, vector<MolSphere>& spheres)
 
 }
 
+//do search between include and exclude
+static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
+		const string& excludeMol, const string& output, double less, double more)
+{
+	double dimension = gss.getDimension();
+	double resolution = gss.getResolution();
+	//read query molecule(s)
+
+	//use explicit volumes
+	OBConversion inmol;
+	OBConversion exmol;
+	inmol.SetInFormat(inmol.FormatFromExt(includeMol));
+	exmol.SetInFormat(exmol.FormatFromExt(excludeMol));
+
+	OBMol imol;
+	Molecule inMol;
+	if (includeMol.size() > 0 && inmol.ReadFile(&imol, includeMol))
+	{
+		inMol.set(imol, resolution, dimension, ProbeRadius, less);
+	}
+	OBMol emol;
+	Molecule exMol;
+	if (excludeMol.size() > 0 && exmol.ReadFile(&emol, excludeMol))
+	{
+		exMol.set(emol, resolution, dimension, ProbeRadius, more);
+	}
+
+	vector<Molecule> res;
+
+	//search
+	if (!ScanOnly)
+		gss.dc_search(inMol, exMol, true, output.size() > 0, res);
+
+	if (ScanCheck || ScanOnly)
+	{
+		vector<Molecule> res2;
+		gss.dc_scan_search(inMol, exMol, true, output.size() > 0, res2);
+		if (res2.size() != res.size())
+		{
+			cerr << "Scanning found different number: " << res2.size() << "\n";
+		}
+	}
+
+	OBConversion outconv;
+	outconv.SetOutFormat(outconv.FormatFromExt(output.c_str()));
+	ofstream out(output.c_str());
+	outconv.SetOutStream(&out);
+
+	for (unsigned i = 0, n = res.size(); i < n; i++)
+		outconv.Write(&res[i].getMol());
+
+}
+
+void do_nnsearch(GSSTreeSearcher& gss, const string& input, const string& output, unsigned k)
+{
+	//read query molecule(s)
+	vector<Molecule> res;
+	Molecule::iterator molitr(input, gss.getDimension(),
+			gss.getResolution(), ProbeRadius);
+	for (; molitr; ++molitr)
+	{
+		const Molecule& mol = *molitr;
+		gss.nn_search(mol, k, output.size() > 0, res);
+	}
+
+	OBConversion outconv;
+	outconv.SetOutFormat(outconv.FormatFromExt(output.c_str()));
+	ofstream out(output.c_str());
+	outconv.SetOutStream(&out);
+
+	for (unsigned i = 0, n = res.size(); i < n; i++)
+		outconv.Write(&res[i].getMol());
+}
+
+struct QInfo
+{
+	string str;
+	CommandEnum cmd;
+	Molecule in;
+	Molecule ex;
+	unsigned k;
+	double less;
+	double more;
+
+	QInfo(): cmd(Create), k(1), less(0), more(0) {}
+
+	QInfo(const string& s, const Molecule& i, const Molecule& e, double l, double m): str(s), cmd(DCSearch), in(i), ex(e), less(l), more(m) {}
+	QInfo(const string& s, const Molecule& i, unsigned _k): str(s), cmd(NNSearch), in(i), k(_k) {}
+};
+
 int main(int argc, char *argv[])
 {
 	cl::ParseCommandLineOptions(argc, argv);
@@ -181,7 +277,7 @@ int main(int argc, char *argv[])
 			break;
 		case MatchPack:
 			packer = PackerPtr(
-					new MatcherPacker(Pack, Knn, Sentinals, ClusterDist));
+					new MatcherPacker(Pack, Knn, Sentinals, ClusterDist, QuadPack));
 			break;
 		case GreedyMerge:
 			packer = PackerPtr(new GreedyPacker(Pack, ClusterDist));
@@ -199,7 +295,7 @@ int main(int argc, char *argv[])
 		GSSTreeCreator creator(&leveler, SuperNodeDepth);
 
 		filesystem::path dbpath(Database.c_str());
-		Molecule::iterator molitr(Input, MaxDimension, Resolution,ProbeRadius);
+		Molecule::iterator molitr(Input, MaxDimension, Resolution, ProbeRadius);
 		if (!creator.create(dbpath, molitr, MaxDimension, Resolution))
 		{
 			cerr << "Error creating database\n";
@@ -222,22 +318,7 @@ int main(int argc, char *argv[])
 			exit(-1);
 		}
 
-		//read query molecule(s)
-		vector<Molecule> res;
-		Molecule::iterator molitr(Input, gss.getDimension(), gss.getResolution(),ProbeRadius);
-		for( ;molitr ; ++molitr)
-		{
-			const Molecule& mol = *molitr;
-			gss.nn_search(mol, K, Output.size() > 1, res);
-		}
-
-		OBConversion outconv;
-		outconv.SetOutFormat(outconv.FormatFromExt(Output.c_str()));
-		ofstream out(Output.c_str());
-		outconv.SetOutStream(&out);
-
-		for (unsigned i = 0, n = res.size(); i < n; i++)
-			outconv.Write(&res[i].getMol());
+		do_nnsearch(gss, Input, Output, K);
 	}
 		break;
 	case DCSearch:
@@ -257,49 +338,7 @@ int main(int argc, char *argv[])
 		//read query molecule(s)
 		if (IncludeMol.size() > 0 || ExcludeMol.size() > 0)
 		{
-			//use explicit volumes
-			OBConversion inmol;
-			OBConversion exmol;
-			inmol.SetInFormat(inmol.FormatFromExt(IncludeMol));
-			exmol.SetInFormat(exmol.FormatFromExt(ExcludeMol));
-
-			vector<MolSphere> insphere, exsphere;
-			OBMol imol;
-			Molecule inMol;
-			if (IncludeMol.size() > 0 && inmol.ReadFile(&imol, IncludeMol))
-			{
-				inMol.set(imol, resolution, dimension, ProbeRadius, LessDist);
-			}
-			OBMol emol;
-			Molecule exMol;
-			if (ExcludeMol.size() > 0 && exmol.ReadFile(&emol, ExcludeMol))
-			{
-				exMol.set(emol, resolution,dimension, ProbeRadius, MoreDist);
-			}
-
-			vector<Molecule> res;
-
-			//search
-			if (!ScanOnly)
-				gss.dc_search(inMol, exMol, true, Output.size() > 1, res);
-
-			if (ScanCheck || ScanOnly)
-			{
-				vector<Molecule> res2;
-				gss.dc_scan_search(inMol, exMol, true, Output.size() > 1, res2);
-				if (res2.size() != res.size())
-				{
-					cerr << "Scanning found different number: " << res2.size() << "\n";
-				}
-			}
-
-			OBConversion outconv;
-			outconv.SetOutFormat(outconv.FormatFromExt(Output.c_str()));
-			ofstream out(Output.c_str());
-			outconv.SetOutStream(&out);
-
-			for (unsigned i = 0, n = res.size(); i < n; i++)
-				outconv.Write(&res[i].getMol());
+			do_dcsearch(gss, IncludeMol, ExcludeMol, Output, LessDist, MoreDist);
 		}
 		else // range from single molecules
 		{
@@ -359,8 +398,8 @@ int main(int argc, char *argv[])
 		ofstream out(Output.c_str());
 		float adjust = LessDist;
 
-		for (MolIterator mitr(Input, MaxDimension, Resolution, ProbeRadius, adjust); mitr;
-				++mitr)
+		for (MolIterator mitr(Input, MaxDimension, Resolution, ProbeRadius,
+				adjust); mitr; ++mitr)
 		{
 			MappableOctTree *tree = MappableOctTree::create(MaxDimension,
 					Resolution, *mitr);
@@ -375,10 +414,10 @@ int main(int argc, char *argv[])
 			}
 			if (out)
 			{
-				if(filesystem::extension(Output.c_str()) == ".raw")
+				if (filesystem::extension(Output.c_str()) == ".raw")
 					tree->dumpRawGrid(out, Resolution);
-				else if(filesystem::extension(Output.c_str()) == ".mira")
-					tree->dumpMiraGrid(out,Resolution);
+				else if (filesystem::extension(Output.c_str()) == ".mira")
+					tree->dumpMiraGrid(out, Resolution);
 				else
 					tree->dumpGrid(out, Resolution);
 			}
@@ -386,6 +425,185 @@ int main(int argc, char *argv[])
 		}
 		break;
 	}
+	case BatchSearch:
+	{
+		//read in database
+		filesystem::path dbfile(Database.c_str());
+		GSSTreeSearcher gss(Verbose);
+
+		if (!gss.load(dbfile))
+		{
+			cerr << "Could not read database " << Database << "\n";
+			exit(-1);
+		}
+
+		//read in each line of the batch file which should be
+		//cmd in_ligand in_receptor(for DC Search)
+		ifstream batch(Input.c_str());
+		if (!batch)
+		{
+			cerr << "Could not read batch file " << Input << "\n";
+			exit(-1);
+		}
+
+		string line;
+		while (getline(batch, line))
+		{
+			Timer t;
+			stringstream toks(line);
+			string cmd, ligand, receptor, output; //output always empty for batch
+			toks >> cmd;
+
+			if (!toks)
+				break;
+			if (cmd == "DCSearch")
+			{
+				double less = 0, more = 0;
+				toks >> ligand;
+				toks >> receptor;
+				toks >> less;
+				toks >> more;
+				do_dcsearch(gss, ligand, receptor, output, less, more);
+			}
+			else if (cmd == "NNSearch")
+			{
+				unsigned k = 1;
+				toks >> ligand;
+				toks >> k;
+
+				do_nnsearch(gss, ligand, output, k);
+			}
+			else
+			{
+				cerr << "Illegal command " << cmd << " in batch file.\n";
+				exit(-1);
+			}
+
+			cout << "Batch " << line << " " << t.elapsed() << "\n";
+		}
+	}
+		break;
+	case BatchDB:
+	{
+		//setup where we run the same set of queries on a list of databases (provided in Database)
+		//preproccess the queries to load in receptor/ligand structures
+
+		//read in each line of the batch file which should be
+		//cmd in_ligand in_receptor(for DC Search)
+		ifstream batch(Input.c_str());
+		if (!batch)
+		{
+			cerr << "Could not read batch file " << Input << "\n";
+			exit(-1);
+		}
+
+		vector<QInfo> qinfos;
+		string line;
+		while (getline(batch, line))
+		{
+			stringstream toks(line);
+			string cmd, ligand, receptor, output; //output always empty for batch
+			toks >> cmd;
+
+			if (!toks)
+				break;
+			if (cmd == "DCSearch")
+			{
+				double less = 0, more = 0;
+				toks >> ligand;
+				toks >> receptor;
+				toks >> less;
+				toks >> more;
+
+				OBConversion inmol;
+				OBConversion exmol;
+				inmol.SetInFormat(inmol.FormatFromExt(ligand));
+				exmol.SetInFormat(exmol.FormatFromExt(receptor));
+
+				OBMol imol;
+				Molecule inMol;
+				if (ligand.size() > 0 && inmol.ReadFile(&imol, ligand))
+				{
+					inMol.set(imol, Resolution, MaxDimension, ProbeRadius, less);
+				}
+
+				OBMol emol;
+				Molecule exMol;
+				if (receptor.size() > 0 && exmol.ReadFile(&emol, receptor))
+				{
+					exMol.set(emol, Resolution, MaxDimension, ProbeRadius, more);
+				}
+
+				qinfos.push_back(QInfo(line, inMol, exMol, less, more));
+			}
+			else if (cmd == "NNSearch")
+			{
+				unsigned k = 1;
+				toks >> ligand;
+				toks >> k;
+
+				OBConversion inmol;
+				inmol.SetInFormat(inmol.FormatFromExt(ligand));
+
+				//single mol only
+				OBMol imol;
+				Molecule inMol;
+				if (ligand.size() > 0 && inmol.ReadFile(&imol, ligand))
+				{
+					inMol.set(imol, Resolution, MaxDimension, ProbeRadius, 0);
+				}
+
+				qinfos.push_back(QInfo(line, inMol, k));
+			}
+			else
+			{
+				cerr << "Illegal command " << cmd << " in batch file.\n";
+				exit(-1);
+			}
+		}
+
+		//read in list of databases
+		ifstream dbs(Database.c_str());
+		if (!dbs)
+		{
+			cerr << "Could not read db file list " << Database << "\n";
+			exit(-1);
+		}
+
+		while (getline(dbs, line))
+		{
+			filesystem::path dbfile(line.c_str());
+			GSSTreeSearcher gss(Verbose);
+
+			if (!gss.load(dbfile))
+			{
+				cerr << "Could not read database " << line << "\n";
+				exit(-1);
+			}
+
+			if(gss.getResolution() != Resolution || gss.getDimension() != MaxDimension)
+			{
+				cerr << "Resolution or dimension mismatch\n";
+				exit(-1);
+			}
+
+			vector<Molecule> res;
+			for(unsigned i = 0, n = qinfos.size(); i < n; i++)
+			{
+				cout << line << " " << qinfos[i].str << "\n";
+				if(qinfos[i].cmd == NNSearch)
+				{
+					gss.nn_search(qinfos[i].in, qinfos[i].k, false, res);
+				}
+				else
+				{
+					gss.dc_search(qinfos[i].in, qinfos[i].ex, true, false, res);
+				}
+			}
+		}
+
+	}
+		break;
 	}
 	return 0;
 }
