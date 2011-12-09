@@ -13,7 +13,7 @@
 #include <lemon/connectivity.h>
 #include <lemon/graph_to_eps.h>
 #include <lemon/dimacs.h>
-
+#include <lemon/lp.h>
 #include <ANN/ANN.h>
 #include "Timer.h"
 using namespace lemon;
@@ -560,7 +560,7 @@ typedef pair<unsigned, unsigned> IndexPair;
 
 static void writeEGDot(SmartGraph& g, SmartGraph::EdgeMap<double>& length,
 		ostream& out, SmartGraph::NodeMap<IndexPair>& edgePairs,
-		MaxWeightedMatching<SmartGraph, SmartGraph::EdgeMap<double> >& matcher)
+		unordered_set<unsigned>& matched)
 {
 	out << "graph name {" << endl;
 	out << "  node [ shape=ellipse, fontname=Helvetica, fontsize=10 ];" << endl;
@@ -576,7 +576,7 @@ static void writeEGDot(SmartGraph& g, SmartGraph::EdgeMap<double>& length,
 	for (SmartGraph::EdgeIt e(g); e != INVALID; ++e)
 	{
 		string extra = "";
-		if(matcher.matching(e))
+		if(matched.count(g.id(e)))
 			extra = "style = bold, ";
 		out << "  n" << g.id(g.u(e)) << " -- " << " n" << g.id(g.v(e))
 				<< " [ " << extra << "label=\"" << length[e] << "\" ]; " << endl;
@@ -597,37 +597,14 @@ bool MatcherPacker::knnQuadMergeClusters(const DataViewer *D,
 	vector<SmartGraph::Node> Snodes;
 
 	ClusterCache ccache(clusters.size());
-	float max = makeKNNGraph(D, clusters, maxSz, dcache, ccache, SG, Sweights, Sindex,
+	makeKNNGraph(D, clusters, maxSz, dcache, ccache, SG, Sweights, Sindex,
 			Snodes);
 
-	OutDegMap<SmartGraph> degrees(SG);
-	SmartGraph::NodeMap<vector<SmartGraph::Node> > constrainNodes(SG);
 	SmartGraph::EdgeMap<SmartGraph::Node> edgeNodes(SG);
 
 	SmartGraph EG;
 	SmartGraph::NodeMap<IndexPair> edgePairs(EG);
 	SmartGraph::EdgeMap<double> Eweights(EG);
-	//construct the constrained edge graph - every edge becomes a node, plus
-	//node constrained required degreee-1 additional nodes for each node
-	unsigned cnodeCnt = 0;
-	vector<SmartGraph::Node> allcnodes;
-	for (SmartGraph::NodeIt n(SG); n != INVALID; ++n)
-	{
-		unsigned deg = degrees[n];
-		if (deg > 0)
-			deg--;
-		vector<SmartGraph::Node> cnodes;
-		cnodes.reserve(deg);
-		for (unsigned i = 0; i < deg; i++)
-		{
-			cnodes.push_back(EG.addNode());
-			allcnodes.push_back(cnodes.back());
-			cnodeCnt++;
-			edgePairs[cnodes.back()] = IndexPair(Sindex[n], Sindex[n]); //for debug, rm
-		}
-		constrainNodes[n] = cnodes;
-	}
-
 
 	//create node for each edge
 	vector<SmartGraph::Node> enodes;
@@ -637,23 +614,10 @@ bool MatcherPacker::knnQuadMergeClusters(const DataViewer *D,
 		SmartGraph::Node en = EG.addNode();
 		enodeCnt++;
 		edgeNodes[e] = en;
-		//conect to constraintNodes
 		SmartGraph::Node u = SG.u(e);
 		SmartGraph::Node v = SG.v(e);
 
-		enodes.push_back(en);
 		edgePairs[en] = IndexPair(Sindex[u], Sindex[v]);
-
-		const vector<SmartGraph::Node> unodes = constrainNodes[u];
-		for (unsigned i = 0, n = unodes.size(); i < n; i++)
-		{
-			Eweights[EG.addEdge(unodes[i], en)] = 2*max;
-		}
-		const vector<SmartGraph::Node> vnodes = constrainNodes[v];
-		for (unsigned i = 0, n = vnodes.size(); i < n; i++)
-		{
-			Eweights[EG.addEdge(vnodes[i], en)] = 2*max;
-		}
 	}
 
 	ofstream sgout("sg.dot");
@@ -665,7 +629,6 @@ bool MatcherPacker::knnQuadMergeClusters(const DataViewer *D,
 	//of merging all four shapes
 	for (SmartGraph::EdgeIt e(SG); e != INVALID; ++e)
 	{
-		//conect to constraintNodes
 		SmartGraph::Node u = SG.u(e);
 		SmartGraph::Node v = SG.v(e);
 
@@ -707,13 +670,79 @@ bool MatcherPacker::knnQuadMergeClusters(const DataViewer *D,
 
 	seen.clear();
 
-	MaxWeightedMatching<SmartGraph, SmartGraph::EdgeMap<double> > matcher(EG,
-			Eweights);
-	matcher.run();
-	cout << matcher.matchingWeight() << " " << countNodes(EG) << "\n";
+	Mip mip;
+
+	SmartGraph::EdgeMap<Mip::Col> colmap(EG);
+
+	//setup objective function
+	Mip::Expr o;
+	for (SmartGraph::EdgeIt e(EG); e != INVALID; ++e)
+	{
+		colmap[e] = mip.addCol();
+
+		cout << "I " << EG.id(e) << " " << mip.id(colmap[e]) << "\n";
+		o += Eweights[e]*colmap[e];
+		//while we're at it, bound the values
+		mip.colLowerBound(colmap[e], 0);
+		mip.colUpperBound(colmap[e], 1);
+
+		mip.colType(colmap[e], Mip::INTEGER);
+	}
+	mip.max();
+	mip.obj(o);
+
+	//now constraints, one for each original SG node
+	for (SmartGraph::NodeIt n(SG); n != INVALID; ++n)
+	{
+		unordered_set<unsigned> edgeIds;
+		//get all the edges out
+		for (SmartGraph::IncEdgeIt sgedge(SG, n); sgedge != INVALID; ++sgedge)
+		{
+			//each sgedge corresponds to a node in EG, all the outedges
+			//of which should be added to the constraint
+			SmartGraph::Node en = edgeNodes[sgedge];
+			for (SmartGraph::IncEdgeIt egedge(EG, en); egedge != INVALID; ++egedge)
+			{
+				edgeIds.insert(EG.id(egedge));
+			}
+		}
+
+		Mip::Expr cons;
+		for(unordered_set<unsigned>::iterator itr = edgeIds.begin(), end = edgeIds.end(); itr != end; ++itr)
+		{
+			cout << *itr << "\t" << mip.id(colmap[EG.edgeFromId(*itr)]) << "\n";
+			cons += colmap[EG.edgeFromId(*itr)];
+			assert(colmap[EG.edgeFromId(*itr)] != INVALID);
+		}
+
+		mip.addRow(cons <= 1);
+	}
+
+	mip.solve();
+
+	if(mip.type() == Mip::OPTIMAL)
+	{
+		cout << "solution " << mip.solValue() << "\n";
+	}
+
+	unordered_set<unsigned> setedges;
+	for (SmartGraph::EdgeIt e(EG); e != INVALID; ++e)
+	{
+		if(mip.sol(colmap[e]) > 0)
+			setedges.insert(EG.id(e));
+	}
+
+
 
 	ofstream egout("eg.dot");
-	writeEGDot(EG, Eweights, egout, edgePairs, matcher);
+	writeEGDot(EG, Eweights, egout, edgePairs, setedges);
+
+	exit(0);
+
+	MaxWeightedMatching<SmartGraph, SmartGraph::EdgeMap<double> > matcher(EG,
+				Eweights);
+		matcher.run();
+		cout << matcher.matchingWeight() << " " << countNodes(EG) << "\n";
 
 
 	//merge quads that were matched

@@ -41,7 +41,8 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug.1035050897" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug">
 								<option id="gnu.cpp.link.option.libs.1769803431" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="oeszybki"/>
-									<listOptionValue builtIn="false" value="lemon"/>
+									<listOptionValue builtIn="false" value="glpk"/>
+									<listOptionValue builtIn="false" value="emon"/>
 									<listOptionValue builtIn="false" value="openbabel"/>
 									<listOptionValue builtIn="false" value="ann"/>
 									<listOptionValue builtIn="false" value="newmat"/>
@@ -130,6 +131,7 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.release.1621250117" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.release">
 								<option id="gnu.cpp.link.option.libs.236000983" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="oeszybki"/>
+									<listOptionValue builtIn="false" value="glpk"/>
 									<listOptionValue builtIn="false" value="emon"/>
 									<listOptionValue builtIn="false" value="openbabel"/>
 									<listOptionValue builtIn="false" value="ann"/>
@@ -223,7 +225,8 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug.2061418021" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug">
 								<option id="gnu.cpp.link.option.libs.1267507203" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="oeszybki"/>
-									<listOptionValue builtIn="false" value="lemon"/>
+									<listOptionValue builtIn="false" value="glpk"/>
+									<listOptionValue builtIn="false" value="emon"/>
 									<listOptionValue builtIn="false" value="openbabel"/>
 									<listOptionValue builtIn="false" value="ann"/>
 									<listOptionValue builtIn="false" value="newmat"/>
