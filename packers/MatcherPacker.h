@@ -145,7 +145,7 @@ class MatcherPacker: public Packer
 			unsigned maxSz, DCache& dcache, ClusterCache& ccache,
 			vector<KNNSlice>& V, float& maxdist) const;
 
-	void makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
+	float makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 			unsigned maxSz, DCache& dcache, ClusterCache& ccache,
 			lemon::SmartGraph& G, lemon::SmartGraph::EdgeMap<double>& E,
 			lemon::SmartGraph::NodeMap<unsigned>& Sindex,

@@ -11,6 +11,9 @@
 #include <lemon/matching.h>
 #include <lemon/list_graph.h>
 #include <lemon/connectivity.h>
+#include <lemon/graph_to_eps.h>
+#include <lemon/dimacs.h>
+
 #include <ANN/ANN.h>
 #include "Timer.h"
 using namespace lemon;
@@ -48,13 +51,14 @@ void MatcherPacker::pack(const DataViewer* dv, vector<Cluster>& clusters) const
 	{
 		OnDemandCache dcache(dv);
 
-		if(doQuadPack)
+		if (doQuadPack)
 		{
-			while(curSz < packSize && knnQuadMergeClusters(dv, clusters, curSz, dcache))
+			while (curSz < packSize
+					&& knnQuadMergeClusters(dv, clusters, curSz, dcache))
 				curSz *= 4;
 
 			//always run a cleanup of any small guys
-			if(knnMergeClusters(dv, clusters, curSz, dcache))
+			if (knnMergeClusters(dv, clusters, curSz, dcache))
 				curSz *= 2;
 		}
 
@@ -280,8 +284,8 @@ void MatcherPacker::initialKNNSample(const DataViewer *D,
 	}
 }
 
-//create a knn graph
-void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
+//create a knn graph, return max value of any edge since we reverse the meanings of distances
+float MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 		unsigned maxsz, DCache& dcache, ClusterCache& ccache, SmartGraph& G,
 		SmartGraph::EdgeMap<double>& E, SmartGraph::NodeMap<unsigned>& Sindex,
 		vector<SmartGraph::Node>& nodes) const
@@ -347,9 +351,8 @@ void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 	else //approximate knn
 	{
 		vector<KNNSlice> B(N);
-		float maxdist = 0;
 
-		initialKNNSample(D, clusters, maxsz, dcache, ccache, B, maxdist);
+		initialKNNSample(D, clusters, maxsz, dcache, ccache, B, max);
 
 		bool keepgoing = true;
 		while (keepgoing)
@@ -400,8 +403,8 @@ void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 							changed += B[u1].update(IndDist(u2, dist), K);
 							changed += B[u2].update(IndDist(u1, dist), K);
 
-							if (dist > maxdist)
-								maxdist = dist;
+							if (dist > max)
+								max = dist;
 						}
 					}
 
@@ -423,8 +426,8 @@ void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 							if (B[u2].update(IndDist(u1, dist), K))
 								changed++;
 
-							if (dist > maxdist)
-								maxdist = dist;
+							if (dist > max)
+								max = dist;
 						}
 					}
 				}
@@ -444,17 +447,26 @@ void MatcherPacker::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 			Sindex[nodes[i]] = i;
 		}
 
+		typedef pair<unsigned, unsigned> UPair;
+		unordered_set<UPair> seen;
 		for (unsigned i = 0; i < N; i++)
 		{
 			for (unsigned j = 0, nn = B[i].neighbors.size(); j < nn; j++)
 			{
 				unsigned neigh = B[i].neighbors[j].j;
-				float dist = B[i].neighbors[j].dist;
-				SmartGraph::Edge e = G.addEdge(nodes[i], nodes[neigh]);
-				E[e] = maxdist - dist; //compute max weighting
+
+				if (seen.count(UPair(i, neigh)) == 0)
+				{
+					seen.insert(UPair(i, neigh));
+					seen.insert(UPair(neigh, i));
+					float dist = B[i].neighbors[j].dist;
+					SmartGraph::Edge e = G.addEdge(nodes[i], nodes[neigh]);
+					E[e] = max - dist; //compute max weighting
+				}
 			}
 		}
 	}
+	return max;
 }
 
 /* find the pseudo-optimal matching of every pair of clusters
@@ -523,6 +535,55 @@ bool MatcherPacker::knnMergeClusters(const DataViewer *D,
 	return didmerge;
 }
 
+//write dot file from graph
+static void writeDot(SmartGraph& g, SmartGraph::EdgeMap<double>& length,
+		SmartGraph::NodeMap<unsigned>& index,
+		ostream& out)
+{
+	out << "graph name {" << endl;
+	out << "  node [ shape=ellipse, fontname=Helvetica, fontsize=10 ];" << endl;
+	for (SmartGraph::NodeIt n(g); n != INVALID; ++n)
+	{
+		out << "  n" << g.id(n) << " [ label=\"" << index[n] << "\" ]; " << endl;
+	}
+	out << "  edge [ shape=ellipse, fontname=Helvetica, fontsize=10 ];" << endl;
+	for (SmartGraph::EdgeIt e(g); e != INVALID; ++e)
+	{
+		out << "  n" << g.id(g.u(e)) << " -- " << " n" << g.id(g.v(e))
+				<< " [ label=\"" << length[e] << "\" ]; " << endl;
+	}
+	out << "}" << endl;
+
+}
+
+typedef pair<unsigned, unsigned> IndexPair;
+
+static void writeEGDot(SmartGraph& g, SmartGraph::EdgeMap<double>& length,
+		ostream& out, SmartGraph::NodeMap<IndexPair>& edgePairs,
+		MaxWeightedMatching<SmartGraph, SmartGraph::EdgeMap<double> >& matcher)
+{
+	out << "graph name {" << endl;
+	out << "  node [ shape=ellipse, fontname=Helvetica, fontsize=10 ];" << endl;
+	for (SmartGraph::NodeIt n(g); n != INVALID; ++n)
+	{
+		IndexPair p = edgePairs[n];
+		if(p.first != p.second)
+			out << "  n" << g.id(n) << " [ label=\"" << p.first << ":" << p.second << "\" ]; " << endl;
+		else
+			out << "  n" << g.id(n) << " [ shape=triangle, label=\"" << p.first << "\" ]; \n";
+	}
+	out << "  edge [ shape=ellipse, fontname=Helvetica, fontsize=10 ];" << endl;
+	for (SmartGraph::EdgeIt e(g); e != INVALID; ++e)
+	{
+		string extra = "";
+		if(matcher.matching(e))
+			extra = "style = bold, ";
+		out << "  n" << g.id(g.u(e)) << " -- " << " n" << g.id(g.v(e))
+				<< " [ " << extra << "label=\"" << length[e] << "\" ]; " << endl;
+	}
+	out << "}" << endl;
+}
+
 /* like knnMergeClusters, but does a quad merge by constructing
  * and edge graph with node constraints from the knn graph
  */
@@ -536,7 +597,7 @@ bool MatcherPacker::knnQuadMergeClusters(const DataViewer *D,
 	vector<SmartGraph::Node> Snodes;
 
 	ClusterCache ccache(clusters.size());
-	makeKNNGraph(D, clusters, maxSz, dcache, ccache, SG, Sweights, Sindex,
+	float max = makeKNNGraph(D, clusters, maxSz, dcache, ccache, SG, Sweights, Sindex,
 			Snodes);
 
 	OutDegMap<SmartGraph> degrees(SG);
@@ -544,11 +605,12 @@ bool MatcherPacker::knnQuadMergeClusters(const DataViewer *D,
 	SmartGraph::EdgeMap<SmartGraph::Node> edgeNodes(SG);
 
 	SmartGraph EG;
-	typedef pair<unsigned, unsigned> IndexPair;
 	SmartGraph::NodeMap<IndexPair> edgePairs(EG);
 	SmartGraph::EdgeMap<double> Eweights(EG);
 	//construct the constrained edge graph - every edge becomes a node, plus
 	//node constrained required degreee-1 additional nodes for each node
+	unsigned cnodeCnt = 0;
+	vector<SmartGraph::Node> allcnodes;
 	for (SmartGraph::NodeIt n(SG); n != INVALID; ++n)
 	{
 		unsigned deg = degrees[n];
@@ -559,15 +621,21 @@ bool MatcherPacker::knnQuadMergeClusters(const DataViewer *D,
 		for (unsigned i = 0; i < deg; i++)
 		{
 			cnodes.push_back(EG.addNode());
+			allcnodes.push_back(cnodes.back());
+			cnodeCnt++;
+			edgePairs[cnodes.back()] = IndexPair(Sindex[n], Sindex[n]); //for debug, rm
 		}
 		constrainNodes[n] = cnodes;
 	}
 
+
 	//create node for each edge
 	vector<SmartGraph::Node> enodes;
+	unsigned enodeCnt = 0;
 	for (SmartGraph::EdgeIt e(SG); e != INVALID; ++e)
 	{
 		SmartGraph::Node en = EG.addNode();
+		enodeCnt++;
 		edgeNodes[e] = en;
 		//conect to constraintNodes
 		SmartGraph::Node u = SG.u(e);
@@ -579,14 +647,17 @@ bool MatcherPacker::knnQuadMergeClusters(const DataViewer *D,
 		const vector<SmartGraph::Node> unodes = constrainNodes[u];
 		for (unsigned i = 0, n = unodes.size(); i < n; i++)
 		{
-			Eweights[EG.addEdge(unodes[i], en)] = 0;
+			Eweights[EG.addEdge(unodes[i], en)] = 2*max;
 		}
 		const vector<SmartGraph::Node> vnodes = constrainNodes[v];
 		for (unsigned i = 0, n = vnodes.size(); i < n; i++)
 		{
-			Eweights[EG.addEdge(vnodes[i], en)] = 0;
+			Eweights[EG.addEdge(vnodes[i], en)] = 2*max;
 		}
 	}
+
+	ofstream sgout("sg.dot");
+	writeDot(SG, Sweights, Sindex, sgout);
 
 	unordered_set<IndexPair> seen;
 
@@ -639,6 +710,11 @@ bool MatcherPacker::knnQuadMergeClusters(const DataViewer *D,
 	MaxWeightedMatching<SmartGraph, SmartGraph::EdgeMap<double> > matcher(EG,
 			Eweights);
 	matcher.run();
+	cout << matcher.matchingWeight() << " " << countNodes(EG) << "\n";
+
+	ofstream egout("eg.dot");
+	writeEGDot(EG, Eweights, egout, edgePairs, matcher);
+
 
 	//merge quads that were matched
 	vector<Cluster> newclusters;
@@ -657,15 +733,20 @@ bool MatcherPacker::knnQuadMergeClusters(const DataViewer *D,
 			//have a match, all involved better be the same match state
 			unsigned c = edgePairs[e2].first;
 			unsigned d = edgePairs[e2].second;
+			cout << "want to merge " << EG.id(e1) << " " << EG.id(e2) << "\n";
+			cout << "want to merge " << a << " " << b << " " << c << " " << d << "\n";
+			if(c == d) //a constraint node
+				continue;
 
 			if (packed[a] && packed[b] && packed[c] && packed[d])
 			{
-				 //already dealt with
+				//already dealt with
 			}
 			else if (!packed[a] && !packed[b] && !packed[c] && !packed[d])
 			{
 				packed[a] = packed[b] = packed[c] = packed[d] = true;
-cout << "merging " << a << " " << b << " " << c << " " << d << "\n";
+				cout << "merging " << a << " " << b << " " << c << " " << d
+						<< "\n";
 				if (clusters[a].size() + clusters[b].size() + clusters[c].size()
 						+ clusters[d].size() <= packSize)
 				{
@@ -690,7 +771,8 @@ cout << "merging " << a << " " << b << " " << c << " " << d << "\n";
 			}
 			else
 			{
-				cout << "want to merge " <<  a << " " << b << " " << c << " " << d << "\n";
+				cout << "want to merge " << a << " " << b << " " << c << " "
+						<< d << "\n";
 				abort();
 			}
 		}
@@ -833,17 +915,19 @@ double MatcherPacker::quadCost(unsigned a, unsigned b, unsigned c, unsigned d,
 	}
 	else
 	{
-		unsigned C[] = {a,b,c,d};
+		unsigned C[] =
+		{ a, b, c, d };
 		float dist = 0;
-		for(unsigned i = 0; i < 4; i++)
+		for (unsigned i = 0; i < 4; i++)
 		{
-			for(unsigned j = i+1; j < 4; j++)
+			for (unsigned j = i + 1; j < 4; j++)
 			{
 				float d = 0;
-				if(!cache.isCached(C[i], C[j], d))
+				if (!cache.isCached(C[i], C[j], d))
 				{
-					d = clusterDistance(D, clusters[C[i]], clusters[C[j]], dcache);
-					cache.set(C[i],C[j], d);
+					d = clusterDistance(D, clusters[C[i]], clusters[C[j]],
+							dcache);
+					cache.set(C[i], C[j], d);
 				}
 				dist = max(dist, d);
 			}
