@@ -17,7 +17,7 @@
 class GreedyPacker: public Packer
 {
 public:
-	GreedyPacker(unsigned ps, ClusterDistance metric=AverageLink): Packer(ps, metric) {}
+	GreedyPacker(unsigned ps, ClusterDistance metric=AverageLink, unsigned k = 0, unsigned s = 0): Packer(ps, metric, k, s) {}
 	~GreedyPacker() {}
 
 	virtual void pack(const DataViewer* dv, vector<Cluster>& clusters) const;

@@ -8,6 +8,8 @@
 #include "GreedyPacker.h"
 #include <boost/multi_array.hpp>
 
+using namespace lemon;
+
 //distances between i and j
 struct IntraClusterDist
 {
@@ -15,9 +17,15 @@ struct IntraClusterDist
 	unsigned j;
 	float dist;
 
-	IntraClusterDist(): i(0), j(0), dist(HUGE_VAL) {}
+	IntraClusterDist() :
+			i(0), j(0), dist(HUGE_VAL)
+	{
+	}
 
-	IntraClusterDist(unsigned I, unsigned J, float d): i(I), j(J), dist(d) {}
+	IntraClusterDist(unsigned I, unsigned J, float d) :
+			i(I), j(J), dist(d)
+	{
+	}
 
 	bool operator<(const IntraClusterDist& rhs) const
 	{
@@ -25,9 +33,10 @@ struct IntraClusterDist
 	}
 };
 
-
-typedef bool (*ICDComp)(const IntraClusterDist& lhs, const IntraClusterDist& rhs);
-static bool reverseDist(const IntraClusterDist& lhs, const IntraClusterDist& rhs)
+typedef bool (*ICDComp)(const IntraClusterDist& lhs,
+		const IntraClusterDist& rhs);
+static bool reverseDist(const IntraClusterDist& lhs,
+		const IntraClusterDist& rhs)
 {
 	return lhs.dist > rhs.dist;
 }
@@ -39,14 +48,21 @@ class DistancePQ
 	vector<IntraClusterDist>& Q;
 
 public:
-	DistancePQ(vector<IntraClusterDist>& q): Q(q)
+	DistancePQ(vector<IntraClusterDist>& q) :
+			Q(q)
 	{
 		make_heap(Q.begin(), Q.end(), reverseDist);
 	}
 
-	bool empty() const { return Q.size() == 0; }
+	bool empty() const
+	{
+		return Q.size() == 0;
+	}
 
-	const IntraClusterDist& top() const { return Q[0]; }
+	const IntraClusterDist& top() const
+	{
+		return Q[0];
+	}
 
 	void push(const IntraClusterDist& c)
 	{
@@ -65,38 +81,39 @@ public:
 	{
 		unsigned c = 0;
 		unsigned end = Q.size();
-		while(c < end)
+		while (c < end)
 		{
-			if(Q[c].i != i && Q[c].i != j && Q[c].j != i && Q[c].j != j)
+			if (Q[c].i != i && Q[c].i != j && Q[c].j != i && Q[c].j != j)
 			{
 				c++;
 			}
 			else
 			{
 				end--;
-				swap(Q[c],Q[end]);
+				swap(Q[c], Q[end]);
 			}
 		}
 
-		Q.erase(Q.begin()+end, Q.end());
+		Q.erase(Q.begin() + end, Q.end());
 		make_heap(Q.begin(), Q.end(), reverseDist);
 	}
 
 };
 
-void GreedyPacker::pack(const DataViewer* dv, vector<Cluster>& finalclusters) const
+void GreedyPacker::pack(const DataViewer* dv,
+		vector<Cluster>& finalclusters) const
 {
 	if (dv->size() == 0)
 		return;
 
 	vector<unsigned> indices(dv->size());
-	for(unsigned i = 0, n = indices.size(); i < n; i++)
+	for (unsigned i = 0, n = indices.size(); i < n; i++)
 		indices[i] = i;
 
 	//start with each object in its own cluster
 	unsigned N = indices.size();
 	vector<Cluster> clusters;
-	clusters.reserve(N*2);
+	clusters.reserve(N * 2);
 	clusters.resize(N);
 	for (unsigned i = 0, n = indices.size(); i < n; i++)
 	{
@@ -104,35 +121,55 @@ void GreedyPacker::pack(const DataViewer* dv, vector<Cluster>& finalclusters) co
 		clusters[i].setToSingleton(index, dv->getMIV(index), dv->getMSV(index));
 	}
 
-	//compute all intra cluster distances
-	vector<IntraClusterDist> distances; distances.reserve(N*N / 2);
-	boost::multi_array<float, 2> darray(boost::extents[N][N]);
-	FullCache dcache(dv);
-
-	for (unsigned i = 0; i < N; i++)
+	vector<IntraClusterDist> distances;
+	DCache *dcacheptr = NULL;
+	if (K == 0)
 	{
-		darray[i][i] = 0;
-		for (unsigned j = 0; j < i; j++)
-		{
-			float dist = clusterDistance(dv, clusters[i], clusters[j], dcache);
-			darray[i][j] = darray[j][i] = dist;
-			distances.push_back(IntraClusterDist(i,j,dist));
-		}
-	}
+		//compute all intra cluster distances
+		distances.reserve(N * N / 2);
+		boost::multi_array<float, 2> darray(boost::extents[N][N]);
+		dcacheptr = new FullCache(dv);
 
+		for (unsigned i = 0; i < N; i++)
+		{
+			darray[i][i] = 0;
+			for (unsigned j = 0; j < i; j++)
+			{
+				float dist = clusterDistance(dv, clusters[i], clusters[j],
+						*dcacheptr);
+				darray[i][j] = darray[j][i] = dist;
+				distances.push_back(IntraClusterDist(i, j, dist));
+			}
+		}
+
+	}
+	else
+	{
+		dcacheptr = new OnDemandCache(dv);
+
+		ClusterCache ccache(clusters.size());
+		SmartGraph SG;
+		SmartGraph::EdgeMap<double> Sweights(SG);
+		SmartGraph::NodeMap<unsigned> Sindex(SG);
+		vector<SmartGraph::Node> Snodes;
+
+		makeKNNGraph(dv, clusters, packSize, *dcacheptr, ccache, SG, Sweights, Sindex,
+				Snodes);
+
+	}
 	DistancePQ pQ(distances); //manipulates a reference of distances
 
 	unsigned max = packSize;
-	while(!pQ.empty())
+	while (!pQ.empty())
 	{
 		//get the smallest distance
 		unsigned i = pQ.top().i;
 		unsigned j = pQ.top().j;
 		pQ.pop();
 
-		if(clusters[i].isValid() && clusters[j].isValid())
+		if (clusters[i].isValid() && clusters[j].isValid())
 		{
-			if(clusters[i].size() + clusters[j].size() <= max)
+			if (clusters[i].size() + clusters[j].size() <= max)
 			{
 				unsigned c = clusters.size();
 				//merge, create a new cluster
@@ -142,24 +179,28 @@ void GreedyPacker::pack(const DataViewer* dv, vector<Cluster>& finalclusters) co
 				pQ.removeIJ(i, j);
 				//now compute the distance between this cluster and all remaining clusters
 				//and add to priority Q
-				for(unsigned d = 0; d < c; d++)
+				for (unsigned d = 0; d < c; d++)
 				{
-					if(clusters[d].isValid())
+					if (clusters[d].isValid())
 					{
-						float dist = clusterDistance(dv, clusters.back(), clusters[d], dcache);
-						pQ.push(IntraClusterDist(c,d,dist));
+						float dist = clusterDistance(dv, clusters.back(),
+								clusters[d], *dcacheptr);
+						pQ.push(IntraClusterDist(c, d, dist));
 					}
 				}
 			}
 		}
 	}
 
+	delete dcacheptr;
+	dcacheptr = NULL;
+
 	//remove empty clusters
 	finalclusters.clear();
-	finalclusters.reserve(ceil(N/(double)packSize));
-	for(unsigned i = 0, n = clusters.size(); i < n; i++)
+	finalclusters.reserve(ceil(N / (double) packSize));
+	for (unsigned i = 0, n = clusters.size(); i < n; i++)
 	{
-		if(clusters[i].isValid())
+		if (clusters[i].isValid())
 		{
 			finalclusters.push_back(Cluster());
 			finalclusters.back().moveInto(clusters[i]);

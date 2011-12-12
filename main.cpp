@@ -273,14 +273,14 @@ int main(int argc, char *argv[])
 		switch (PackerChoice)
 		{
 		case FullMerge:
-			packer = PackerPtr(new FullMergePacker(Pack, ClusterDist));
+			packer = PackerPtr(new FullMergePacker(Pack, ClusterDist, Knn, Sentinals));
 			break;
 		case MatchPack:
 			packer = PackerPtr(
 					new MatcherPacker(Pack, Knn, Sentinals, ClusterDist, QuadPack));
 			break;
 		case GreedyMerge:
-			packer = PackerPtr(new GreedyPacker(Pack, ClusterDist));
+			packer = PackerPtr(new GreedyPacker(Pack, ClusterDist, Knn, Sentinals));
 			break;
 		case Spectral:
 			packer = PackerPtr(
