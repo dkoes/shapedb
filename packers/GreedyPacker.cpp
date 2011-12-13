@@ -156,7 +156,20 @@ void GreedyPacker::pack(const DataViewer* dv,
 		makeKNNGraph(dv, clusters, packSize, *dcacheptr, ccache, SG, Sweights, Sindex,
 				Snodes);
 
+		for (SmartGraph::EdgeIt e(SG); e != INVALID; ++e)
+		{
+			SmartGraph::Node u = SG.u(e);
+			SmartGraph::Node v = SG.v(e);
+
+			unsigned i = Sindex[u];
+			unsigned j = Sindex[v];
+			float dist = Sweights[e];
+
+			distances.push_back(IntraClusterDist(i,j,dist));
+		}
+
 	}
+
 	DistancePQ pQ(distances); //manipulates a reference of distances
 
 	unsigned max = packSize;
