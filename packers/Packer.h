@@ -13,6 +13,29 @@
 #include <boost/multi_array.hpp>
 #include <lemon/smart_graph.h>
 
+//distances between i and j
+struct IntraClusterDist
+{
+	unsigned i;
+	unsigned j;
+	float dist;
+
+	IntraClusterDist() :
+			i(0), j(0), dist(HUGE_VAL)
+	{
+	}
+
+	IntraClusterDist(unsigned I, unsigned J, float d) :
+			i(I), j(J), dist(d)
+	{
+	}
+
+	bool operator<(const IntraClusterDist& rhs) const
+	{
+		return dist < rhs.dist;
+	}
+};
+
 //abstract class for a bottom up packer, can run in quadratic time
 class Packer
 {
@@ -24,7 +47,6 @@ public:
 protected:
 	unsigned packSize;
 	ClusterDistance distMetric;
-
 
 	//caches intercluster distances
 	class ClusterCache
@@ -79,7 +101,8 @@ protected:
 
 			vector<JDist>& row = cache[i];
 			JDist val(j, 0);
-			vector<JDist>::iterator pos = lower_bound(row.begin(), row.end(), val);
+			vector<JDist>::iterator pos = lower_bound(row.begin(), row.end(),
+					val);
 
 			if (pos != row.end() && pos->j == j)
 			{
@@ -105,7 +128,8 @@ protected:
 
 			vector<JDist>& row = cache[i];
 			JDist val(j, v);
-			vector<JDist>::iterator pos = lower_bound(row.begin(), row.end(), val);
+			vector<JDist>::iterator pos = lower_bound(row.begin(), row.end(),
+					val);
 
 			if (pos != row.end() && pos->j == j)
 			{
@@ -170,8 +194,14 @@ protected:
 			unsigned j;
 			float dist;
 
-			JDist(): j(0), dist(0) {}
-			JDist(unsigned J, float D): j(J), dist(D) {}
+			JDist() :
+					j(0), dist(0)
+			{
+			}
+			JDist(unsigned J, float D) :
+					j(J), dist(D)
+			{
+			}
 
 			bool operator<(const JDist& rhs) const
 			{
@@ -184,7 +214,7 @@ protected:
 			}
 		};
 
-		vector< vector<JDist> > cache;
+		vector<vector<JDist> > cache;
 		const DataViewer* dv;
 
 	public:
@@ -197,16 +227,17 @@ protected:
 
 		float get(unsigned i, unsigned j)
 		{
-			if(j > i) //normalize order - store only once
-				swap(i,j);
-			else if(i == j)
+			if (j > i) //normalize order - store only once
+				swap(i, j);
+			else if (i == j)
 				return 0;
 
 			vector<JDist>& row = cache[i];
-			JDist val(j,0);
-			vector<JDist>::iterator pos = lower_bound(row.begin(), row.end(), val);
+			JDist val(j, 0);
+			vector<JDist>::iterator pos = lower_bound(row.begin(), row.end(),
+					val);
 
-			if(pos != row.end() && pos->j == j)
+			if (pos != row.end() && pos->j == j)
 			{
 				//already exists
 				return pos->dist;
@@ -224,7 +255,7 @@ protected:
 		unsigned size() const
 		{
 			unsigned ret = 0;
-			for(unsigned i = 0, n = cache.size(); i < n; i++)
+			for (unsigned i = 0, n = cache.size(); i < n; i++)
 			{
 				ret += cache[i].size();
 			}
@@ -276,6 +307,9 @@ protected:
 
 	float clusterDistance(const DataViewer* D, const Cluster& a,
 			const Cluster& b, DCache& dcache) const;
+
+	void computeDistanceVector(const DataViewer* D, vector<Cluster>& clusters,
+			vector<IntraClusterDist>& distances, DCache *& dcache) const;
 
 	unsigned K; //for knn, if zero use full
 	unsigned S; //number of sentinals for knn building, if zero, do random

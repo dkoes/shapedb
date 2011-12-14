@@ -494,3 +494,63 @@ float Packer::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 	}
 	return max;
 }
+
+//compute a vector of all the edge/distances we care about between these clusters
+//will be the full n^2 list if Knn is off, otherwise constructs the Knn graph
+//this abstracts away the knn graph creation for those packers who don't need to
+//work on the actual graph
+//initializes dcache if necessary
+void Packer::computeDistanceVector(const DataViewer* dv, vector<Cluster>& clusters, vector<IntraClusterDist>& distances, DCache *& dcache) const
+{
+	distances.clear();
+	unsigned N = clusters.size();
+	if (K == 0)
+	{
+		//compute all intra cluster distances
+		distances.reserve(N * N / 2);
+		boost::multi_array<float, 2> darray(boost::extents[N][N]);
+		if(dcache == NULL)
+			dcache = new FullCache(dv);
+
+		for (unsigned i = 0; i < N; i++)
+		{
+			darray[i][i] = 0;
+			for (unsigned j = 0; j < i; j++)
+			{
+				float dist = clusterDistance(dv, clusters[i], clusters[j],
+						*dcache);
+				darray[i][j] = darray[j][i] = dist;
+				distances.push_back(IntraClusterDist(i, j, dist));
+			}
+		}
+
+	}
+	else
+	{
+		if(dcache == NULL)
+			dcache = new OnDemandCache(dv);
+
+		ClusterCache ccache(clusters.size());
+		SmartGraph SG;
+		SmartGraph::EdgeMap<double> Sweights(SG);
+		SmartGraph::NodeMap<unsigned> Sindex(SG);
+		vector<SmartGraph::Node> Snodes;
+
+		makeKNNGraph(dv, clusters, packSize, *dcache, ccache, SG, Sweights, Sindex,
+				Snodes);
+
+		for (SmartGraph::EdgeIt e(SG); e != INVALID; ++e)
+		{
+			SmartGraph::Node u = SG.u(e);
+			SmartGraph::Node v = SG.v(e);
+
+			unsigned i = Sindex[u];
+			unsigned j = Sindex[v];
+			float dist = Sweights[e];
+
+			distances.push_back(IntraClusterDist(i,j,dist));
+		}
+
+	}
+}
+

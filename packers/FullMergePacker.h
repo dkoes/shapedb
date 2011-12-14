@@ -18,7 +18,7 @@ class FullMergePacker: public Packer
 public:
 
 private:
-	bool fullMergeClusters(const DataViewer* D, vector<Cluster>& clusters, DCache& dcache) const;
+	bool fullMergeClusters(const DataViewer* D, vector<Cluster>& clusters, DCache*& dcache) const;
 
 public:
 

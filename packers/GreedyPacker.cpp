@@ -10,28 +10,6 @@
 
 using namespace lemon;
 
-//distances between i and j
-struct IntraClusterDist
-{
-	unsigned i;
-	unsigned j;
-	float dist;
-
-	IntraClusterDist() :
-			i(0), j(0), dist(HUGE_VAL)
-	{
-	}
-
-	IntraClusterDist(unsigned I, unsigned J, float d) :
-			i(I), j(J), dist(d)
-	{
-	}
-
-	bool operator<(const IntraClusterDist& rhs) const
-	{
-		return dist < rhs.dist;
-	}
-};
 
 typedef bool (*ICDComp)(const IntraClusterDist& lhs,
 		const IntraClusterDist& rhs);
@@ -100,6 +78,61 @@ public:
 
 };
 
+//keep track of what clusters are connected to what
+class ClusterConnections
+{
+	vector< vector<unsigned> > table;
+public:
+
+	//assumes distances are distinct edges
+	ClusterConnections(const vector<IntraClusterDist>& distances)
+	{
+		for(unsigned i = 0, n = distances.size(); i < n; i++)
+		{
+			unsigned I = distances[i].i;
+			unsigned J = distances[i].j;
+
+			unsigned m = max(I,J);
+			if(table.size() <= m)
+				table.resize(m+1);
+
+			table[I].push_back(J);
+			table[J].push_back(I);
+		}
+
+		for(unsigned i = 0, n = table.size(); i < n; i++)
+		{
+			sort(table[i].begin(), table[i].end());
+		}
+	}
+
+	//return all clusters connected to c
+	const vector<unsigned>& neighbors(unsigned c) const
+	{
+		assert(c < table.size());
+		return table[c];
+	}
+
+	//merge i and j into a new cluster c
+	//i and j go away, c is connected to everything they are connected to
+	void merge(unsigned i, unsigned j, unsigned c)
+	{
+		if(table.size() <= c)
+			table.resize(c+1);
+
+		table[c].insert(table[c].end(), table[i].begin(), table[i].end());
+		table[c].insert(table[c].end(), table[j].begin(), table[j].end());
+
+		table[i].clear();
+		table[j].clear();
+
+		//uniquify
+		sort(table[c].begin(), table[c].end());
+		vector<unsigned>::iterator newend = unique(table[c].begin(), table[c].end());
+		table[c].erase(newend, table[c].end());
+	}
+};
+
 void GreedyPacker::pack(const DataViewer* dv,
 		vector<Cluster>& finalclusters) const
 {
@@ -123,54 +156,14 @@ void GreedyPacker::pack(const DataViewer* dv,
 
 	vector<IntraClusterDist> distances;
 	DCache *dcacheptr = NULL;
-	if (K == 0)
-	{
-		//compute all intra cluster distances
-		distances.reserve(N * N / 2);
-		boost::multi_array<float, 2> darray(boost::extents[N][N]);
-		dcacheptr = new FullCache(dv);
 
-		for (unsigned i = 0; i < N; i++)
-		{
-			darray[i][i] = 0;
-			for (unsigned j = 0; j < i; j++)
-			{
-				float dist = clusterDistance(dv, clusters[i], clusters[j],
-						*dcacheptr);
-				darray[i][j] = darray[j][i] = dist;
-				distances.push_back(IntraClusterDist(i, j, dist));
-			}
-		}
-
-	}
-	else
-	{
-		dcacheptr = new OnDemandCache(dv);
-
-		ClusterCache ccache(clusters.size());
-		SmartGraph SG;
-		SmartGraph::EdgeMap<double> Sweights(SG);
-		SmartGraph::NodeMap<unsigned> Sindex(SG);
-		vector<SmartGraph::Node> Snodes;
-
-		makeKNNGraph(dv, clusters, packSize, *dcacheptr, ccache, SG, Sweights, Sindex,
-				Snodes);
-
-		for (SmartGraph::EdgeIt e(SG); e != INVALID; ++e)
-		{
-			SmartGraph::Node u = SG.u(e);
-			SmartGraph::Node v = SG.v(e);
-
-			unsigned i = Sindex[u];
-			unsigned j = Sindex[v];
-			float dist = Sweights[e];
-
-			distances.push_back(IntraClusterDist(i,j,dist));
-		}
-
-	}
+	computeDistanceVector(dv, clusters, distances, dcacheptr);
 
 	DistancePQ pQ(distances); //manipulates a reference of distances
+
+	//keep track of what clusters are connected for the knn case
+	//this isn't really necessary for non-KNN, but that's a curiousity anyway
+	ClusterConnections connections(distances);
 
 	unsigned max = packSize;
 	while (!pQ.empty())
@@ -189,11 +182,14 @@ void GreedyPacker::pack(const DataViewer* dv,
 				clusters.push_back(Cluster());
 				clusters.back().mergeInto(clusters[i], clusters[j]);
 
+				connections.merge(i, j, c);
 				pQ.removeIJ(i, j);
 				//now compute the distance between this cluster and all remaining clusters
 				//and add to priority Q
-				for (unsigned d = 0; d < c; d++)
+				const vector<unsigned>& neighs = connections.neighbors(c);
+				for (unsigned nbr = 0, n = neighs.size(); nbr < n; nbr++)
 				{
+					unsigned d = neighs[nbr];
 					if (clusters[d].isValid())
 					{
 						float dist = clusterDistance(dv, clusters.back(),

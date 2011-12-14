@@ -27,55 +27,28 @@ void FullMergePacker::pack(const DataViewer* dv, vector<Cluster>& clusters) cons
 		clusters[i].setToSingleton(index, dv->getMIV(index), dv->getMSV(index));
 	}
 
-	FullCache dcache(dv);
+	DCache *dcache = NULL;
 	//combine everything as much as possible
 	while (fullMergeClusters(dv, clusters, dcache))
 		;
 
+	if(dcache) delete dcache;
+
 }
 
-//distances between i and j
-struct IntraClusterDist
-{
-	unsigned i;
-	unsigned j;
-	float dist;
-
-	IntraClusterDist() :
-			i(0), j(0), dist(HUGE_VAL)
-	{
-	}
-
-	IntraClusterDist(unsigned I, unsigned J, float d) :
-			i(I), j(J), dist(d)
-	{
-	}
-
-	bool operator<(const IntraClusterDist& rhs) const
-	{
-		return dist < rhs.dist;
-	}
-};
 
 bool FullMergePacker::fullMergeClusters(const DataViewer *D,
-		vector<Cluster>& clusters, DCache& dcache) const
+		vector<Cluster>& clusters, DCache *& dcache) const
 {
 	unsigned N = clusters.size();
 	if (N == 1)
 		return false;
 
 	vector<IntraClusterDist> distances;
-	distances.reserve(N * N / 2);
+	computeDistanceVector(D, clusters, distances, dcache);
+
 	unsigned maxclust = 0;
 
-	for (unsigned i = 0; i < N; i++)
-	{
-		for (unsigned j = 0; j < i; j++)
-		{
-			float dist = clusterDistance(D, clusters[i], clusters[j], dcache);
-			distances.push_back(IntraClusterDist(i, j, dist));
-		}
-	}
 	sort(distances.begin(), distances.end());
 
 	vector<Cluster> newclusters;
@@ -122,7 +95,7 @@ bool FullMergePacker::fullMergeClusters(const DataViewer *D,
 		unsigned best = 0;
 		for (unsigned i = 0, n = newclusters.size() - 1; i < n; i++)
 		{
-			float dist = clusterDistance(D, newclusters.back(), newclusters[i], dcache);
+			float dist = clusterDistance(D, newclusters.back(), newclusters[i], *dcache);
 			if (dist < minval)
 			{
 				minval = dist;

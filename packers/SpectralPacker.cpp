@@ -217,28 +217,6 @@ void SpectralPacker::createPartitionedClusters(const DataViewer* dv,
 	}
 }
 
-//distances between i and j
-struct IntraClusterDist
-{
-	unsigned i;
-	unsigned j;
-	float dist;
-
-	IntraClusterDist() :
-			i(0), j(0), dist(HUGE_VAL)
-	{
-	}
-
-	IntraClusterDist(unsigned I, unsigned J, float d) :
-			i(I), j(J), dist(d)
-	{
-	}
-
-	bool operator<(const IntraClusterDist& rhs) const
-	{
-		return dist < rhs.dist;
-	}
-};
 
 static double completeLink(const MatrixXd& D, const vector<unsigned>& a, const vector<unsigned>& b)
 {
