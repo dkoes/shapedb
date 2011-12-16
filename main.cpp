@@ -118,10 +118,8 @@ cl::opt<unsigned> KCenters("kcenters",
 cl::opt<unsigned> KSampleMult("ksamplex",
 		cl::desc("multiplictive factor for ksampling"), cl::init(10));
 
-cl::opt<unsigned> LeafPack("leaf-pack",
-		cl::desc("Cutoff to trigger leaf packing"), cl::init(100000));
-cl::opt<unsigned> NodePack("node-pack",
-		cl::desc("Cutoff to trigger leaf packing"), cl::init(100000));
+cl::opt<unsigned> SwitchToPack("switch-to-pack",
+		cl::desc("Cutoff to trigger packing in nodes and leaves"), cl::init(100000));
 
 cl::opt<unsigned> Pack("pack", cl::desc("Maximum quantities per a node"),
 		cl::init(8));
@@ -290,7 +288,7 @@ int main(int argc, char *argv[])
 
 		setDistance(ShapeDist, MaxDimension);
 
-		GSSLevelCreator leveler(&topdown, packer.get(), NodePack, LeafPack);
+		GSSLevelCreator leveler(&topdown, packer.get(), SwitchToPack, SwitchToPack);
 
 		GSSTreeCreator creator(&leveler, SuperNodeDepth);
 
