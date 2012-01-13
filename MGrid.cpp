@@ -127,7 +127,7 @@ void MGrid::copyFrom(const MGrid& from)
 	}
 }
 
-//given the solvent accessibly surface, make an approximation to the
+//given the solvent accessible surface, make an approximation to the
 //solvent excluded molecular surface by drawing spheres from the boundary
 //of the sa and noting where they don't intersect
 void MGrid::makeSurface(const MGrid& sagrid, const MGrid& lesssagrid, double probe)

@@ -116,7 +116,7 @@ cl::opt<string> ExcludeMol("exmol",
 cl::opt<unsigned> KCenters("kcenters",
 		cl::desc("number of centers for ksample-split"), cl::init(8));
 cl::opt<unsigned> KSampleMult("ksamplex",
-		cl::desc("multiplictive factor for ksampling"), cl::init(10));
+		cl::desc("multiplictive factor for ksampling"), cl::init(5));
 
 cl::opt<unsigned> SwitchToPack("switch-to-pack",
 		cl::desc("Cutoff to trigger packing in nodes and leaves"), cl::init(100000));

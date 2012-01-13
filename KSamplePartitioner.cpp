@@ -9,6 +9,8 @@
 #include "ShapeDistance.h"
 
 #include <boost/multi_array.hpp>
+
+#include <ext/algorithm>
 using namespace boost;
 
 //create an instances of ksamplepartitioner with all of this's settings and the specified data
@@ -93,20 +95,18 @@ void KSamplePartitioner::getCenter(const vector<unsigned>& cluster, const Mappab
 }
 
 
+
 void KSamplePartitioner::partition(vector<TopDownPartitioner*>& parts)
 {
 	//grab k*mult samples
 	unsigned nsamples = kcenters*ksamples;
 	assert(nsamples > 0);
-	//assume reasonable input distribution, just slice out instead of random
-	unsigned inc = indices.size()/nsamples;
-	if(inc == 0) inc = 1;
+	nsamples = std::min(nsamples, (unsigned)indices.size());
 
-	vector<unsigned> sampleIndices; sampleIndices.reserve(nsamples+1);
-	for(unsigned i = 0, n = indices.size(); i < n; i += inc)
-	{
-		sampleIndices.push_back(indices[i]);
-	}
+	//random sample, unfortunately linear in indices size
+	vector<unsigned> sampleIndices(nsamples, 0);
+	srand(1); //provide determinism, as long as not multi-threaded
+	random_sample_n(indices.begin(), indices.end(), sampleIndices.begin(), 0);
 
 	//cluster samples
 	vector< vector<unsigned> > clusters;
