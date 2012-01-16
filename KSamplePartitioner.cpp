@@ -106,7 +106,7 @@ void KSamplePartitioner::partition(vector<TopDownPartitioner*>& parts)
 	//random sample, unfortunately linear in indices size
 	vector<unsigned> sampleIndices(nsamples, 0);
 	srand(1); //provide determinism, as long as not multi-threaded
-	random_sample_n(indices.begin(), indices.end(), sampleIndices.begin(), 0);
+	random_sample_n(indices.begin(), indices.end(), sampleIndices.begin(), nsamples);
 
 	//cluster samples
 	vector< vector<unsigned> > clusters;
@@ -175,13 +175,16 @@ void KSamplePartitioner::partition(vector<TopDownPartitioner*>& parts)
 	}
 
 	//create new partitions from indices
+	cout << "PARTS";
 	for (unsigned i = 0, n = partitions.size(); i < n; i++)
 	{
 		if(partitions[i].size() > 0)
 		{
+			cout << " " << partitions[i].size() ;
 			parts.push_back(create(data, partitions[i]));
 		}
 	}
+	cout << "\n";
 
 }
 
