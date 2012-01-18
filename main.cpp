@@ -265,7 +265,7 @@ int main(int argc, char *argv[])
 	case Create:
 	{
 		//read in all the molecules and calculate the max bounding box
-		KSamplePartitioner topdown(KCenters, KSampleMult);
+		KSamplePartitioner topdown(KCenters, KSampleMult, KSamplePartitioner::AveCenter, SwitchToPack);
 
 		PackerPtr packer;
 		switch (PackerChoice)

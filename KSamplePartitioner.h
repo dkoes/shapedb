@@ -19,18 +19,17 @@ private:
 	unsigned kcenters; //number of centers
 	unsigned ksamples; //sample ksamples*kcenters
 	CenterChoice centerFind; //algorithm for choosing center of a sampled cluster
-
+	unsigned stopPartitionSize; // size where we stop partitioning
 	void kCluster(const vector<unsigned>& indices, vector< vector<unsigned> >& clusters);
 
 	void getCenter(const vector<unsigned>& cluster, const MappableOctTree *& MIV, const MappableOctTree *& MSV) const;
 
-
+	unsigned fitKCenterToSize(unsigned  n) const;
 	virtual TopDownPartitioner* create(const DataViewer* dv, vector<unsigned>& ind) const;
 
 public:
-	KSamplePartitioner(): kcenters(8), ksamples(5), centerFind(AveCenter) {}
-	KSamplePartitioner(unsigned kc, unsigned ks): kcenters(kc), ksamples(ks) {}
-	KSamplePartitioner(const DataViewer *dv, unsigned kc, unsigned ks): TopDownPartitioner(dv), kcenters(kc), ksamples(ks) {}
+	KSamplePartitioner(unsigned kc, unsigned ks, CenterChoice ch, unsigned stop): kcenters(kc), ksamples(ks), stopPartitionSize(stop) {}
+	KSamplePartitioner(const DataViewer *dv, unsigned kc, unsigned ks, CenterChoice ch, unsigned stop): TopDownPartitioner(dv), kcenters(kc), ksamples(ks), centerFind(ch), stopPartitionSize(stop) {}
 	~KSamplePartitioner() {}
 
 	virtual TopDownPartitioner* create(const DataViewer* dv) const;

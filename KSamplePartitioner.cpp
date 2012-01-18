@@ -13,11 +13,26 @@
 #include <ext/algorithm>
 using namespace boost;
 
+//when the total number of items (n) divided by kcenters is smaller than the stop size,
+//reduce kcenter to something that will create fuller partitions
+unsigned KSamplePartitioner::fitKCenterToSize(unsigned  n) const
+{
+  if(n/kcenters < stopPartitionSize)
+  {
+    unsigned newKC = (n-1)/stopPartitionSize+1;
+    //should never have n < stop, but always divide to be on the safe size
+    if(newKC <= 1) newKC = 2;
+    return newKC;
+  }
+  else
+    return kcenters;
+}
+
 //create an instances of ksamplepartitioner with all of this's settings and the specified data
 //initialize to fully represent the data
 TopDownPartitioner* KSamplePartitioner::create(const DataViewer* dv) const
 {
-	TopDownPartitioner* ret = new KSamplePartitioner(dv, kcenters, ksamples);
+	TopDownPartitioner* ret = new KSamplePartitioner(dv, fitKCenterToSize(dv->size()), ksamples, centerFind, stopPartitionSize);
 	ret->initFromData();
 	return ret;
 }
@@ -25,7 +40,7 @@ TopDownPartitioner* KSamplePartitioner::create(const DataViewer* dv) const
 //initialize using a slice of the data from ind
 TopDownPartitioner* KSamplePartitioner::create(const DataViewer* dv, vector<unsigned>& ind) const
 {
-	KSamplePartitioner* ret = new KSamplePartitioner(dv, kcenters, ksamples);
+	KSamplePartitioner* ret = new KSamplePartitioner(dv, fitKCenterToSize(ind.size()), ksamples, centerFind, stopPartitionSize);
 	swap(ret->indices, ind);
 	return ret;
 }
@@ -102,7 +117,6 @@ void KSamplePartitioner::partition(vector<TopDownPartitioner*>& parts)
 	unsigned nsamples = kcenters*ksamples;
 	assert(nsamples > 0);
 	nsamples = std::min(nsamples, (unsigned)indices.size());
-
 	//random sample, unfortunately linear in indices size
 	vector<unsigned> sampleIndices(nsamples, 0);
 	srand(1); //provide determinism, as long as not multi-threaded
@@ -146,8 +160,9 @@ void KSamplePartitioner::partition(vector<TopDownPartitioner*>& parts)
 		partitions[best].push_back(index);
 	}
 
+	unsigned numPart = partitions.size(); //all must at least contain the center
 	//identify any singletons and add them to an alternative cluster
-	if (partitions.size() > 1)
+	if (partitions.size() > 2)
 	{
 		for (unsigned i = 0, n = partitions.size(); i < n; i++)
 		{
@@ -170,21 +185,22 @@ void KSamplePartitioner::partition(vector<TopDownPartitioner*>& parts)
 
 				partitions[best].push_back(index);
 				partitions[i].clear();
+				numPart--;
+
+				if(numPart <= 2)
+					break;
 			}
 		}
 	}
 
 	//create new partitions from indices
-	cout << "PARTS";
 	for (unsigned i = 0, n = partitions.size(); i < n; i++)
 	{
 		if(partitions[i].size() > 0)
 		{
-			cout << " " << partitions[i].size() ;
 			parts.push_back(create(data, partitions[i]));
 		}
 	}
-	cout << "\n";
 
 }
 
