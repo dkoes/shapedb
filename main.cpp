@@ -43,7 +43,8 @@ enum CommandEnum
 cl::opt<CommandEnum> Command(
 		cl::desc("Operation to perform:"),
 		cl::Required,
-		cl::values(clEnumVal(Create, "Create a molecule shape index."),
+		cl::values(
+				clEnumVal(Create, "Create a molecule shape index."),
 				clEnumVal(NNSearch, "Nearest neighbor search"),
 				clEnumVal(DCSearch, "Distance constraint search"),
 				clEnumVal(MolGrid, "Generate molecule grid and debug output"),
@@ -64,7 +65,8 @@ cl::opt<PackerEnum> PackerChoice(
 				clEnumValN(Spectral, "spectral", "Spectral packing"),
 				clEnumValEnd), cl::init(MatchPack));
 
-cl::opt<bool> QuadPack("quad-pack", cl::desc("Use quad packing"), cl::init(false));
+cl::opt<bool> QuadPack("quad-pack", cl::desc("Use quad packing"),
+		cl::init(false));
 cl::opt<unsigned> K("k", cl::desc("k nearest neighbors to find for NNSearch"),
 		cl::init(1));
 cl::opt<unsigned> Knn("knn", cl::desc("K for knn graph creation"), cl::init(8));
@@ -119,7 +121,8 @@ cl::opt<unsigned> KSampleMult("ksamplex",
 		cl::desc("multiplictive factor for ksampling"), cl::init(5));
 
 cl::opt<unsigned> SwitchToPack("switch-to-pack",
-		cl::desc("Cutoff to trigger packing in nodes and leaves"), cl::init(100000));
+		cl::desc("Cutoff to trigger packing in nodes and leaves"),
+		cl::init(100000));
 
 cl::opt<unsigned> Pack("pack", cl::desc("Maximum quantities per a node"),
 		cl::init(8));
@@ -152,6 +155,13 @@ cl::opt<unsigned> SuperNodeDepth("superdepth",
 		cl::desc("Depth to descend to create aggregrated super root"),
 		cl::init(0));
 
+cl::opt<unsigned> TimeTrials("time-trials",
+		cl::desc("Number of runs to get average for benchmarking"),
+		cl::init(1));
+cl::opt<bool> ClearCache("clear-cache",
+		cl::desc("Clear file cache between each benchmarking run"),
+		cl::init(false));
+
 static void spherizeMol(OBMol& mol, vector<MolSphere>& spheres)
 {
 	spheres.clear();
@@ -168,7 +178,8 @@ static void spherizeMol(OBMol& mol, vector<MolSphere>& spheres)
 
 //do search between include and exclude
 static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
-		const string& excludeMol, const string& output, double less, double more)
+		const string& excludeMol, const string& output, double less,
+		double more)
 {
 	double dimension = gss.getDimension();
 	double resolution = gss.getResolution();
@@ -219,12 +230,13 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 
 }
 
-void do_nnsearch(GSSTreeSearcher& gss, const string& input, const string& output, unsigned k)
+void do_nnsearch(GSSTreeSearcher& gss, const string& input,
+		const string& output, unsigned k)
 {
 	//read query molecule(s)
 	vector<Molecule> res;
-	Molecule::iterator molitr(input, gss.getDimension(),
-			gss.getResolution(), ProbeRadius);
+	Molecule::iterator molitr(input, gss.getDimension(), gss.getResolution(),
+			ProbeRadius);
 	for (; molitr; ++molitr)
 	{
 		const Molecule& mol = *molitr;
@@ -250,10 +262,20 @@ struct QInfo
 	double less;
 	double more;
 
-	QInfo(): cmd(Create), k(1), less(0), more(0) {}
+	QInfo() :
+			cmd(Create), k(1), less(0), more(0)
+	{
+	}
 
-	QInfo(const string& s, const Molecule& i, const Molecule& e, double l, double m): str(s), cmd(DCSearch), in(i), ex(e), less(l), more(m) {}
-	QInfo(const string& s, const Molecule& i, unsigned _k): str(s), cmd(NNSearch), in(i), k(_k) {}
+	QInfo(const string& s, const Molecule& i, const Molecule& e, double l,
+			double m) :
+			str(s), cmd(DCSearch), in(i), ex(e), less(l), more(m)
+	{
+	}
+	QInfo(const string& s, const Molecule& i, unsigned _k) :
+			str(s), cmd(NNSearch), in(i), k(_k)
+	{
+	}
 };
 
 int main(int argc, char *argv[])
@@ -265,20 +287,24 @@ int main(int argc, char *argv[])
 	case Create:
 	{
 		//read in all the molecules and calculate the max bounding box
-		KSamplePartitioner topdown(KCenters, KSampleMult, KSamplePartitioner::AveCenter, SwitchToPack);
+		KSamplePartitioner topdown(KCenters, KSampleMult,
+				KSamplePartitioner::AveCenter, SwitchToPack);
 
 		PackerPtr packer;
 		switch (PackerChoice)
 		{
 		case FullMerge:
-			packer = PackerPtr(new FullMergePacker(Pack, ClusterDist, Knn, Sentinals));
+			packer = PackerPtr(
+					new FullMergePacker(Pack, ClusterDist, Knn, Sentinals));
 			break;
 		case MatchPack:
 			packer = PackerPtr(
-					new MatcherPacker(Pack, Knn, Sentinals, ClusterDist, QuadPack));
+					new MatcherPacker(Pack, Knn, Sentinals, ClusterDist,
+							QuadPack));
 			break;
 		case GreedyMerge:
-			packer = PackerPtr(new GreedyPacker(Pack, ClusterDist, Knn, Sentinals));
+			packer = PackerPtr(
+					new GreedyPacker(Pack, ClusterDist, Knn, Sentinals));
 			break;
 		case Spectral:
 			packer = PackerPtr(
@@ -288,7 +314,8 @@ int main(int argc, char *argv[])
 
 		setDistance(ShapeDist, MaxDimension);
 
-		GSSLevelCreator leveler(&topdown, packer.get(), SwitchToPack, SwitchToPack);
+		GSSLevelCreator leveler(&topdown, packer.get(), SwitchToPack,
+				SwitchToPack);
 
 		GSSTreeCreator creator(&leveler, SuperNodeDepth);
 
@@ -336,7 +363,8 @@ int main(int argc, char *argv[])
 		//read query molecule(s)
 		if (IncludeMol.size() > 0 || ExcludeMol.size() > 0)
 		{
-			do_dcsearch(gss, IncludeMol, ExcludeMol, Output, LessDist, MoreDist);
+			do_dcsearch(gss, IncludeMol, ExcludeMol, Output, LessDist,
+					MoreDist);
 		}
 		else // range from single molecules
 		{
@@ -447,37 +475,54 @@ int main(int argc, char *argv[])
 		string line;
 		while (getline(batch, line))
 		{
-			Timer t;
 			stringstream toks(line);
 			string cmd, ligand, receptor, output; //output always empty for batch
 			toks >> cmd;
 
 			if (!toks)
 				break;
-			if (cmd == "DCSearch")
-			{
-				double less = 0, more = 0;
-				toks >> ligand;
-				toks >> receptor;
-				toks >> less;
-				toks >> more;
-				do_dcsearch(gss, ligand, receptor, output, less, more);
-			}
-			else if (cmd == "NNSearch")
-			{
-				unsigned k = 1;
-				toks >> ligand;
-				toks >> k;
 
-				do_nnsearch(gss, ligand, output, k);
-			}
-			else
+			vector<double> times;
+
+			for (unsigned i = 0; i < TimeTrials; i++)
 			{
-				cerr << "Illegal command " << cmd << " in batch file.\n";
-				exit(-1);
+				if (ClearCache)
+					std::system("clearfilecache");
+
+				Timer t;
+
+				if (cmd == "DCSearch")
+				{
+					double less = 0, more = 0;
+					toks >> ligand;
+					toks >> receptor;
+					toks >> less;
+					toks >> more;
+					do_dcsearch(gss, ligand, receptor, output, less, more);
+				}
+				else if (cmd == "NNSearch")
+				{
+					unsigned k = 1;
+					toks >> ligand;
+					toks >> k;
+
+					do_nnsearch(gss, ligand, output, k);
+				}
+				else
+				{
+					cerr << "Illegal command " << cmd << " in batch file.\n";
+					exit(-1);
+				}
+
+				times.push_back(t.elapsed());
 			}
 
-			cout << "Batch " << line << " " << t.elapsed() << "\n";
+			cout << "Batch " << line;
+			for(unsigned i = 0, n = times.size(); i < n; i++)
+			{
+				cout << " " << times[i];
+			}
+			cout << "\n";
 		}
 	}
 		break;
@@ -522,14 +567,16 @@ int main(int argc, char *argv[])
 				Molecule inMol;
 				if (ligand.size() > 0 && inmol.ReadFile(&imol, ligand))
 				{
-					inMol.set(imol, Resolution, MaxDimension, ProbeRadius, less);
+					inMol.set(imol, Resolution, MaxDimension, ProbeRadius,
+							less);
 				}
 
 				OBMol emol;
 				Molecule exMol;
 				if (receptor.size() > 0 && exmol.ReadFile(&emol, receptor))
 				{
-					exMol.set(emol, Resolution, MaxDimension, ProbeRadius, more);
+					exMol.set(emol, Resolution, MaxDimension, ProbeRadius,
+							more);
 				}
 
 				qinfos.push_back(QInfo(line, inMol, exMol, less, more));
@@ -579,17 +626,18 @@ int main(int argc, char *argv[])
 				exit(-1);
 			}
 
-			if(gss.getResolution() != Resolution || gss.getDimension() != MaxDimension)
+			if (gss.getResolution() != Resolution
+					|| gss.getDimension() != MaxDimension)
 			{
 				cerr << "Resolution or dimension mismatch\n";
 				exit(-1);
 			}
 
 			vector<Molecule> res;
-			for(unsigned i = 0, n = qinfos.size(); i < n; i++)
+			for (unsigned i = 0, n = qinfos.size(); i < n; i++)
 			{
 				cout << line << " " << qinfos[i].str << "\n";
-				if(qinfos[i].cmd == NNSearch)
+				if (qinfos[i].cmd == NNSearch)
 				{
 					gss.nn_search(qinfos[i].in, qinfos[i].k, false, res);
 				}
