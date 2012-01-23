@@ -526,7 +526,7 @@ int main(int argc, char *argv[])
 			cout << "Batch " << line;
 			for(unsigned i = 0, n = times.size(); i < n; i++)
 			{
-				cout << " " << times[i];
+				printf(" %.5f", times[i]);
 			}
 			cout << "\n";
 		}
