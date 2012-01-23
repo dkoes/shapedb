@@ -161,6 +161,9 @@ cl::opt<unsigned> TimeTrials("time-trials",
 cl::opt<bool> ClearCache("clear-cache",
 		cl::desc("Clear file cache between each benchmarking run"),
 		cl::init(false));
+cl::opt<bool> ClearCacheFirst("clear-cache-first",
+		cl::desc("Clear file cache before each benchmarking run"),
+		cl::init(false));
 
 static void spherizeMol(OBMol& mol, vector<MolSphere>& spheres)
 {
@@ -483,6 +486,9 @@ int main(int argc, char *argv[])
 				break;
 
 			vector<double> times;
+
+			if(ClearCacheFirst)
+				std::system("clearfilecache");
 
 			for (unsigned i = 0; i < TimeTrials; i++)
 			{
