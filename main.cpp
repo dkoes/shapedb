@@ -485,6 +485,22 @@ int main(int argc, char *argv[])
 			if (!toks)
 				break;
 
+			double less = 0, more = 0;
+			unsigned k = 1;
+
+			if (cmd == "DCSearch")
+			{
+				toks >> ligand;
+				toks >> receptor;
+				toks >> less;
+				toks >> more;
+			}
+			else if (cmd == "NNSearch")
+			{
+				toks >> ligand;
+				toks >> k;
+			}
+
 			vector<double> times;
 
 			if(ClearCacheFirst)
@@ -499,19 +515,10 @@ int main(int argc, char *argv[])
 
 				if (cmd == "DCSearch")
 				{
-					double less = 0, more = 0;
-					toks >> ligand;
-					toks >> receptor;
-					toks >> less;
-					toks >> more;
 					do_dcsearch(gss, ligand, receptor, output, less, more);
 				}
 				else if (cmd == "NNSearch")
 				{
-					unsigned k = 1;
-					toks >> ligand;
-					toks >> k;
-
 					do_nnsearch(gss, ligand, output, k);
 				}
 				else
