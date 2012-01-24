@@ -59,6 +59,13 @@ public:
 		cz = z+dim/2;
 	}
 
+	void getBottomCorner(float& bx, float& by, float& bz) const
+	{
+		bx = x;
+		by = y;
+		bz = z;
+	}
+
 	//return i'th octant
 	Cube getOctant(unsigned i) const
 	{

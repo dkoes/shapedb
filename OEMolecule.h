@@ -41,6 +41,24 @@ class OEMolecule
 	OEMol mol;
 	vector<OEScalarGrid> grids;
 
+	//downsample to a lower resolution, generating an MSV
+	void downsample(const OEScalarGrid& source, OEScalarGrid& target, float dim, float newres)
+	{
+		float minmax[6] = {-dim,-dim,-dim,dim,dim,dim};
+		target = OEScalarGrid(minmax,newres);
+
+		for(unsigned i = 0, n = source.GetSize(); i < n; i++)
+		{
+			if(source[i])
+			{
+				float x=0, y=0, z=0;
+				source.ElementToSpatialCoord(i, x, y, z);
+
+				target(x,y,z) =1 ;
+			}
+		}
+
+	}
 	//create a set of grids of different resolution from spheres
 	void createGrids(double dimension, double resolution, double probeRadius, double adjust)
 	{
@@ -52,24 +70,32 @@ class OEMolecule
 		else //solvent accessible
 			OEMakeAccessibleSurface(surf, mol, resolution, probeRadius);
 
+		OEScalarGrid mgrid;
+		OEMakeGridFromSurface(mgrid, surf,  OEVoxelizeMethod::Distance);
+
+		for(unsigned i = 0, n = mgrid.GetSize(); i < n; i++)
+		{
+			//discretize to 0/1
+			if(mgrid[i] <= -adjust)
+			{
+				mgrid[i] = 1;
+			}
+			else
+				mgrid[i] = 0;
+		}
+
 		OEScalarGrid grid;
-		OEMakeBitGridFromSurface(grid, surf,  resolution, adjust);
+		//keep resolution, be shift to canonical grid
+		downsample(mgrid, grid, dimension, resolution);
+
+
 		grids.push_back(grid);
 		double res = resolution * 2;
 		while (res <= dimension)
 		{
-			OEMakeBitGridFromSurface(grid,surf, res, adjust);
+			downsample(grids.back(), grid, dimension, res);
 			grids.push_back(grid);
-
-			cout << "res " << res << " spacing " << grids.back().GetSpacing() << " size " << grids.back().GetSize() << "\n";
-
-			unsigned cnt = 0;
-			for(unsigned i = 0, n = grids.back().GetSize(); i < n; i++)
-			{
-				if(grids.back()[i])
-					cnt++;
-			}
-			cout << "   cnt " << cnt << "\n";
+			res *= 2;
 		}
 	}
 
@@ -126,9 +152,9 @@ public:
 	void write(ostream& out) const
 	{
 		oemolostream ofs;
+		ofs.openstring();
 		ofs.SetFormat(OEFormat::OEB);
 		ofs.Setgz(true);
-		ofs.openstring();
 
 		OEWriteMolecule(ofs, mol);
 		string mstr = ofs.GetString();
@@ -140,6 +166,31 @@ public:
 
 	bool intersects(const Cube& cube) const
 	{
+		/*
+		bool fullcheck = false;
+		float cx=0,cy=0,cz=0;
+		cube.getBottomCorner(cx,cy,cz);
+		float dim = cube.getDimension();
+		float res = grids[0].GetSpacing();
+		for(float x = cx+res/2, stopx = cx+dim; x < stopx; x+= res)
+		{
+			for(float y=cy+res/2, stopy = cy+dim; y < stopy; y+= res)
+			{
+				for(float z=cz+res/2, stopz = cz+dim; z < stopz; z+= res)
+				{
+					if(grids[0].IsInGrid(x,y,z) && grids[0](x,y,z))
+					{
+						fullcheck = true;
+						break;
+					}
+				}
+				if(fullcheck) break;
+			}
+			if(fullcheck) break;
+		}
+		return fullcheck;
+*/
+		bool hcheck = false;
 		for (unsigned i = 0, n = grids.size(); i < n; i++)
 		{
 			if (grids[i].GetSpacing() == cube.getDimension())
@@ -147,12 +198,14 @@ public:
 				float x, y, z;
 				cube.getCenter(x, y, z);
 				if(grids[i].IsInGrid(x,y,z) && grids[i](x,y,z))
-					return true;
+					hcheck = true;
 				else
-					return false;
+					hcheck = false;
+				break;
 			}
 		}
-		return false;
+
+		return hcheck;
 	}
 
 	//return true if no shape
@@ -178,7 +231,8 @@ class OEMolIterator
 	{
 		OEMol mol;
 		valid = OEReadMolecule(ifs, mol);
-		currmolecule.set(mol, dimension, resolution, probe, adjust);
+		if(valid)
+			currmolecule.set(mol, dimension, resolution, probe, adjust);
 	}
 public:
 	OEMolIterator(const string& fname, float dim, float res, float prb = 1.4,

@@ -2,4 +2,4 @@
 #include "OBMolecule.h"
 
 //single point to choose between molecule implementations
-typedef OBMolecule Molecule;
+typedef OEMolecule Molecule;

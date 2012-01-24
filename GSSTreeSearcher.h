@@ -19,7 +19,7 @@
 using namespace boost;
 using namespace std;
 
-typedef OBMolecule Object; //eventually template this
+typedef Molecule Object; //eventually template this
 
 
 class GSSTreeSearcher

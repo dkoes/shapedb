@@ -175,15 +175,15 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 	//read query molecule(s)
 
 	//use explicit volumes
-	OBMolecule::iterator imolitr(includeMol, dimension, resolution, ProbeRadius,
+	Molecule::iterator imolitr(includeMol, dimension, resolution, ProbeRadius,
 			less);
-	OBMolecule inMol = *imolitr;
+	Molecule inMol = *imolitr;
 
-	OBMolecule::iterator exmolitr(excludeMol, dimension, resolution, ProbeRadius,
+	Molecule::iterator exmolitr(excludeMol, dimension, resolution, ProbeRadius,
 			more);
-	OBMolecule exMol = *exmolitr;
+	Molecule exMol = *exmolitr;
 
-	vector<OBMolecule> res;
+	vector<Molecule> res;
 
 	//search
 	if (!ScanOnly)
@@ -191,7 +191,7 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 
 	if (ScanCheck || ScanOnly)
 	{
-		vector<OBMolecule> res2;
+		vector<Molecule> res2;
 		gss.dc_scan_search(inMol, exMol, true, output.size() > 0, res2);
 		if (res2.size() != res.size())
 		{
@@ -199,7 +199,7 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 		}
 	}
 
-	OBMolecule::molostream outmols(output);
+	Molecule::molostream outmols(output);
 	for (unsigned i = 0, n = res.size(); i < n; i++)
 		outmols.write(res[i]);
 
@@ -209,16 +209,16 @@ void do_nnsearch(GSSTreeSearcher& gss, const string& input,
 		const string& output, unsigned k)
 {
 	//read query molecule(s)
-	vector<OBMolecule> res;
-	OBMolecule::iterator molitr(input, gss.getDimension(), gss.getResolution(),
+	vector<Molecule> res;
+	Molecule::iterator molitr(input, gss.getDimension(), gss.getResolution(),
 			ProbeRadius);
 	for (; molitr; ++molitr)
 	{
-		const OBMolecule& mol = *molitr;
+		const Molecule& mol = *molitr;
 		gss.nn_search(mol, k, output.size() > 0, res);
 	}
 
-	OBMolecule::molostream outmols(output);
+	Molecule::molostream outmols(output);
 
 	for (unsigned i = 0, n = res.size(); i < n; i++)
 		outmols.write(res[i]);
@@ -228,8 +228,8 @@ struct QInfo
 {
 	string str;
 	CommandEnum cmd;
-	OBMolecule in;
-	OBMolecule ex;
+	Molecule in;
+	Molecule ex;
 	unsigned k;
 	double less;
 	double more;
@@ -239,12 +239,12 @@ struct QInfo
 	{
 	}
 
-	QInfo(const string& s, const OBMolecule& i, const OBMolecule& e, double l,
+	QInfo(const string& s, const Molecule& i, const Molecule& e, double l,
 			double m) :
 			str(s), cmd(DCSearch), in(i), ex(e), less(l), more(m)
 	{
 	}
-	QInfo(const string& s, const OBMolecule& i, unsigned _k) :
+	QInfo(const string& s, const Molecule& i, unsigned _k) :
 			str(s), cmd(NNSearch), in(i), k(_k)
 	{
 	}
@@ -292,7 +292,7 @@ int main(int argc, char *argv[])
 		GSSTreeCreator creator(&leveler, SuperNodeDepth);
 
 		filesystem::path dbpath(Database.c_str());
-		OBMolecule::iterator molitr(Input, MaxDimension, Resolution, ProbeRadius);
+		Molecule::iterator molitr(Input, MaxDimension, Resolution, ProbeRadius);
 		if (!creator.create(dbpath, molitr, MaxDimension, Resolution))
 		{
 			cerr << "Error creating database\n";
@@ -340,15 +340,15 @@ int main(int argc, char *argv[])
 		}
 		else // range from single molecules
 		{
-			for (OBMolecule::iterator inmols(Input, dimension, resolution,
+			for (Molecule::iterator inmols(Input, dimension, resolution,
 					ProbeRadius); inmols; ++inmols)
 			{
-				OBMolecule smallmol = *inmols;
-				OBMolecule bigmol = smallmol;
+				Molecule smallmol = *inmols;
+				Molecule bigmol = smallmol;
 				smallmol.adjust(dimension, resolution, ProbeRadius, LessDist);
 				bigmol.adjust(dimension, resolution, ProbeRadius, -MoreDist);
 
-				vector<OBMolecule> res;
+				vector<Molecule> res;
 				//search
 				if (!ScanOnly)
 					gss.dc_search(smallmol, bigmol, false, Output.size() > 1,
@@ -356,7 +356,7 @@ int main(int argc, char *argv[])
 
 				if (ScanCheck || ScanOnly)
 				{
-					vector<OBMolecule> res2;
+					vector<Molecule> res2;
 					gss.dc_scan_search(smallmol, bigmol, false,
 							Output.size() > 1, res2);
 					if (res2.size() != res.size())
@@ -365,7 +365,7 @@ int main(int argc, char *argv[])
 					}
 				}
 
-				OBMolecule::molostream outmols(Output);
+				Molecule::molostream outmols(Output);
 				for (unsigned i = 0, n = res.size(); i < n; i++)
 					outmols.write(res[i]);
 			}
@@ -377,7 +377,7 @@ int main(int argc, char *argv[])
 		ofstream out(Output.c_str());
 		float adjust = LessDist;
 
-		for (OBMolIterator mitr(Input, MaxDimension, Resolution, ProbeRadius,
+		for (Molecule::iterator mitr(Input, MaxDimension, Resolution, ProbeRadius,
 				adjust); mitr; ++mitr)
 		{
 			MappableOctTree *tree = MappableOctTree::create(MaxDimension,
@@ -521,11 +521,11 @@ int main(int argc, char *argv[])
 				toks >> less;
 				toks >> more;
 
-				OBMolecule::iterator inmol(ligand, MaxDimension, Resolution, ProbeRadius, less);
-				OBMolecule inMol = *inmol;
+				Molecule::iterator inmol(ligand, MaxDimension, Resolution, ProbeRadius, less);
+				Molecule inMol = *inmol;
 
-				OBMolecule::iterator exmol(receptor, MaxDimension, Resolution, ProbeRadius, more);
-				OBMolecule exMol = *exmol;
+				Molecule::iterator exmol(receptor, MaxDimension, Resolution, ProbeRadius, more);
+				Molecule exMol = *exmol;
 
 				qinfos.push_back(QInfo(line, inMol, exMol, less, more));
 			}
@@ -535,8 +535,8 @@ int main(int argc, char *argv[])
 				toks >> ligand;
 				toks >> k;
 
-				OBMolecule::iterator inmol(ligand, MaxDimension, Resolution, ProbeRadius, 0);
-				OBMolecule inMol = *inmol;
+				Molecule::iterator inmol(ligand, MaxDimension, Resolution, ProbeRadius, 0);
+				Molecule inMol = *inmol;
 
 				qinfos.push_back(QInfo(line, inMol, k));
 			}
@@ -573,7 +573,7 @@ int main(int argc, char *argv[])
 				exit(-1);
 			}
 
-			vector<OBMolecule> res;
+			vector<Molecule> res;
 			for (unsigned i = 0, n = qinfos.size(); i < n; i++)
 			{
 				cout << line << " " << qinfos[i].str << "\n";
