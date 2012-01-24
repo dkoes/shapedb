@@ -165,20 +165,6 @@ cl::opt<bool> ClearCacheFirst("clear-cache-first",
 		cl::desc("Clear file cache before each benchmarking run"),
 		cl::init(false));
 
-static void spherizeMol(OBMol& mol, vector<MolSphere>& spheres)
-{
-	spheres.clear();
-	spheres.reserve(mol.NumAtoms());
-	for (OBAtomIterator aitr = mol.BeginAtoms(); aitr != mol.EndAtoms(); ++aitr)
-	{
-		OBAtom* atom = *aitr;
-		spheres.push_back(
-				MolSphere(atom->x(), atom->y(), atom->z(),
-						etab.GetVdwRad(atom->GetAtomicNum())));
-	}
-
-}
-
 //do search between include and exclude
 static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 		const string& excludeMol, const string& output, double less,
@@ -189,25 +175,15 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 	//read query molecule(s)
 
 	//use explicit volumes
-	OBConversion inmol;
-	OBConversion exmol;
-	inmol.SetInFormat(inmol.FormatFromExt(includeMol));
-	exmol.SetInFormat(exmol.FormatFromExt(excludeMol));
+	OBMolecule::iterator imolitr(includeMol, dimension, resolution, ProbeRadius,
+			less);
+	OBMolecule inMol = *imolitr;
 
-	OBMol imol;
-	Molecule inMol;
-	if (includeMol.size() > 0 && inmol.ReadFile(&imol, includeMol))
-	{
-		inMol.set(imol, resolution, dimension, ProbeRadius, less);
-	}
-	OBMol emol;
-	Molecule exMol;
-	if (excludeMol.size() > 0 && exmol.ReadFile(&emol, excludeMol))
-	{
-		exMol.set(emol, resolution, dimension, ProbeRadius, more);
-	}
+	OBMolecule::iterator exmolitr(excludeMol, dimension, resolution, ProbeRadius,
+			more);
+	OBMolecule exMol = *exmolitr;
 
-	vector<Molecule> res;
+	vector<OBMolecule> res;
 
 	//search
 	if (!ScanOnly)
@@ -215,7 +191,7 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 
 	if (ScanCheck || ScanOnly)
 	{
-		vector<Molecule> res2;
+		vector<OBMolecule> res2;
 		gss.dc_scan_search(inMol, exMol, true, output.size() > 0, res2);
 		if (res2.size() != res.size())
 		{
@@ -223,13 +199,9 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 		}
 	}
 
-	OBConversion outconv;
-	outconv.SetOutFormat(outconv.FormatFromExt(output.c_str()));
-	ofstream out(output.c_str());
-	outconv.SetOutStream(&out);
-
+	OBMolecule::molostream outmols(output);
 	for (unsigned i = 0, n = res.size(); i < n; i++)
-		outconv.Write(&res[i].getMol());
+		outmols.write(res[i]);
 
 }
 
@@ -237,30 +209,27 @@ void do_nnsearch(GSSTreeSearcher& gss, const string& input,
 		const string& output, unsigned k)
 {
 	//read query molecule(s)
-	vector<Molecule> res;
-	Molecule::iterator molitr(input, gss.getDimension(), gss.getResolution(),
+	vector<OBMolecule> res;
+	OBMolecule::iterator molitr(input, gss.getDimension(), gss.getResolution(),
 			ProbeRadius);
 	for (; molitr; ++molitr)
 	{
-		const Molecule& mol = *molitr;
+		const OBMolecule& mol = *molitr;
 		gss.nn_search(mol, k, output.size() > 0, res);
 	}
 
-	OBConversion outconv;
-	outconv.SetOutFormat(outconv.FormatFromExt(output.c_str()));
-	ofstream out(output.c_str());
-	outconv.SetOutStream(&out);
+	OBMolecule::molostream outmols(output);
 
 	for (unsigned i = 0, n = res.size(); i < n; i++)
-		outconv.Write(&res[i].getMol());
+		outmols.write(res[i]);
 }
 
 struct QInfo
 {
 	string str;
 	CommandEnum cmd;
-	Molecule in;
-	Molecule ex;
+	OBMolecule in;
+	OBMolecule ex;
 	unsigned k;
 	double less;
 	double more;
@@ -270,12 +239,12 @@ struct QInfo
 	{
 	}
 
-	QInfo(const string& s, const Molecule& i, const Molecule& e, double l,
+	QInfo(const string& s, const OBMolecule& i, const OBMolecule& e, double l,
 			double m) :
 			str(s), cmd(DCSearch), in(i), ex(e), less(l), more(m)
 	{
 	}
-	QInfo(const string& s, const Molecule& i, unsigned _k) :
+	QInfo(const string& s, const OBMolecule& i, unsigned _k) :
 			str(s), cmd(NNSearch), in(i), k(_k)
 	{
 	}
@@ -323,7 +292,7 @@ int main(int argc, char *argv[])
 		GSSTreeCreator creator(&leveler, SuperNodeDepth);
 
 		filesystem::path dbpath(Database.c_str());
-		Molecule::iterator molitr(Input, MaxDimension, Resolution, ProbeRadius);
+		OBMolecule::iterator molitr(Input, MaxDimension, Resolution, ProbeRadius);
 		if (!creator.create(dbpath, molitr, MaxDimension, Resolution))
 		{
 			cerr << "Error creating database\n";
@@ -371,39 +340,24 @@ int main(int argc, char *argv[])
 		}
 		else // range from single molecules
 		{
-			OBConversion inconv;
-			inconv.SetInFormat(inconv.FormatFromExt(Input));
-			ifstream in(Input.c_str());
-			inconv.SetInStream(&in);
-
-			OBMol mol;
-			while (inconv.Read(&mol))
+			for (OBMolecule::iterator inmols(Input, dimension, resolution,
+					ProbeRadius); inmols; ++inmols)
 			{
-				vector<MolSphere> littlespheres, bigspheres;
-				spherizeMol(mol, littlespheres);
-				bigspheres = littlespheres;
+				OBMolecule smallmol = *inmols;
+				OBMolecule bigmol = smallmol;
+				smallmol.adjust(dimension, resolution, ProbeRadius, LessDist);
+				bigmol.adjust(dimension, resolution, ProbeRadius, -MoreDist);
 
-				//adjust radii
-				for (unsigned i = 0, n = littlespheres.size(); i < n; i++)
-				{
-					littlespheres[i].incrementRadius(-LessDist);
-					bigspheres[i].incrementRadius(MoreDist);
-				}
-
-				vector<Molecule> res;
+				vector<OBMolecule> res;
 				//search
 				if (!ScanOnly)
-					gss.dc_search(
-							Molecule(littlespheres, dimension, resolution),
-							Molecule(bigspheres, dimension, resolution), false,
-							Output.size() > 1, res);
+					gss.dc_search(smallmol, bigmol, false, Output.size() > 1,
+							res);
 
 				if (ScanCheck || ScanOnly)
 				{
-					vector<Molecule> res2;
-					gss.dc_scan_search(
-							Molecule(littlespheres, dimension, resolution),
-							Molecule(bigspheres, dimension, resolution), false,
+					vector<OBMolecule> res2;
+					gss.dc_scan_search(smallmol, bigmol, false,
 							Output.size() > 1, res2);
 					if (res2.size() != res.size())
 					{
@@ -411,13 +365,9 @@ int main(int argc, char *argv[])
 					}
 				}
 
-				OBConversion outconv;
-				outconv.SetOutFormat(outconv.FormatFromExt(Output.c_str()));
-				ofstream out(Output.c_str());
-				outconv.SetOutStream(&out);
-
+				OBMolecule::molostream outmols(Output);
 				for (unsigned i = 0, n = res.size(); i < n; i++)
-					outconv.Write(&res[i].getMol());
+					outmols.write(res[i]);
 			}
 		}
 	}
@@ -427,7 +377,7 @@ int main(int argc, char *argv[])
 		ofstream out(Output.c_str());
 		float adjust = LessDist;
 
-		for (MolIterator mitr(Input, MaxDimension, Resolution, ProbeRadius,
+		for (OBMolIterator mitr(Input, MaxDimension, Resolution, ProbeRadius,
 				adjust); mitr; ++mitr)
 		{
 			MappableOctTree *tree = MappableOctTree::create(MaxDimension,
@@ -503,7 +453,7 @@ int main(int argc, char *argv[])
 
 			vector<double> times;
 
-			if(ClearCacheFirst)
+			if (ClearCacheFirst)
 				std::system("clearfilecache");
 
 			for (unsigned i = 0; i < TimeTrials; i++)
@@ -531,7 +481,7 @@ int main(int argc, char *argv[])
 			}
 
 			cout << "Batch " << line;
-			for(unsigned i = 0, n = times.size(); i < n; i++)
+			for (unsigned i = 0, n = times.size(); i < n; i++)
 			{
 				cout << " " << times[i];
 			}
@@ -571,26 +521,11 @@ int main(int argc, char *argv[])
 				toks >> less;
 				toks >> more;
 
-				OBConversion inmol;
-				OBConversion exmol;
-				inmol.SetInFormat(inmol.FormatFromExt(ligand));
-				exmol.SetInFormat(exmol.FormatFromExt(receptor));
+				OBMolecule::iterator inmol(ligand, MaxDimension, Resolution, ProbeRadius, less);
+				OBMolecule inMol = *inmol;
 
-				OBMol imol;
-				Molecule inMol;
-				if (ligand.size() > 0 && inmol.ReadFile(&imol, ligand))
-				{
-					inMol.set(imol, Resolution, MaxDimension, ProbeRadius,
-							less);
-				}
-
-				OBMol emol;
-				Molecule exMol;
-				if (receptor.size() > 0 && exmol.ReadFile(&emol, receptor))
-				{
-					exMol.set(emol, Resolution, MaxDimension, ProbeRadius,
-							more);
-				}
+				OBMolecule::iterator exmol(receptor, MaxDimension, Resolution, ProbeRadius, more);
+				OBMolecule exMol = *exmol;
 
 				qinfos.push_back(QInfo(line, inMol, exMol, less, more));
 			}
@@ -600,16 +535,8 @@ int main(int argc, char *argv[])
 				toks >> ligand;
 				toks >> k;
 
-				OBConversion inmol;
-				inmol.SetInFormat(inmol.FormatFromExt(ligand));
-
-				//single mol only
-				OBMol imol;
-				Molecule inMol;
-				if (ligand.size() > 0 && inmol.ReadFile(&imol, ligand))
-				{
-					inMol.set(imol, Resolution, MaxDimension, ProbeRadius, 0);
-				}
+				OBMolecule::iterator inmol(ligand, MaxDimension, Resolution, ProbeRadius, 0);
+				OBMolecule inMol = *inmol;
 
 				qinfos.push_back(QInfo(line, inMol, k));
 			}
@@ -646,7 +573,7 @@ int main(int argc, char *argv[])
 				exit(-1);
 			}
 
-			vector<Molecule> res;
+			vector<OBMolecule> res;
 			for (unsigned i = 0, n = qinfos.size(); i < n; i++)
 			{
 				cout << line << " " << qinfos[i].str << "\n";
