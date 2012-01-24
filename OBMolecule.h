@@ -47,10 +47,12 @@ class OBMolecule
 
 		MGrid sagrid(dimension, resolution);
 		MGrid lesssagrid(dimension, resolution);
+		double extraR = 0;
+		if(adjust < 0) extraR += -adjust;
 		for (unsigned i = 0, n = spheres.size(); i < n; i++)
 		{
 			const MolSphere& sphere = spheres[i];
-			grids[0].markXYZSphere(sphere.x, sphere.y, sphere.z, sphere.r - adjust);
+			grids[0].markXYZSphere(sphere.x, sphere.y, sphere.z, sphere.r+extraR);
 			if (probeRadius > 0)
 			{
 				sagrid.markXYZSphere(sphere.x, sphere.y, sphere.z,
@@ -63,8 +65,7 @@ class OBMolecule
 		if (probeRadius > 0)
 			grids[0].makeSurface(sagrid, lesssagrid, probeRadius);
 
-		if(false  && adjust > 0)
-			grids[0].shrink(adjust);
+		if(adjust > 0)			grids[0].shrink(adjust);
 
 		double res = resolution * 2;
 		while (res <= dimension)
