@@ -103,7 +103,7 @@ cl::opt<double> MoreDist(
 		cl::init(1.0));
 
 cl::opt<double> ProbeRadius("probe-radius",
-		cl::desc("Radius of water probe for SA calculations"), cl::init(0));
+		cl::desc("Radius of water probe for exmol only"), cl::init(1.4));
 
 cl::opt<double> MaxDimension("max-dim", cl::desc("Maximum dimension."),
 		cl::init(64));
@@ -175,7 +175,7 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 	//read query molecule(s)
 
 	//use explicit volumes
-	Molecule::iterator imolitr(includeMol, dimension, resolution, ProbeRadius,
+	Molecule::iterator imolitr(includeMol, dimension, resolution, 0,
 			less);
 	Molecule inMol = *imolitr;
 
@@ -210,8 +210,7 @@ void do_nnsearch(GSSTreeSearcher& gss, const string& input,
 {
 	//read query molecule(s)
 	vector<Molecule> res;
-	Molecule::iterator molitr(input, gss.getDimension(), gss.getResolution(),
-			ProbeRadius);
+	Molecule::iterator molitr(input, gss.getDimension(), gss.getResolution(),0);
 	for (; molitr; ++molitr)
 	{
 		const Molecule& mol = *molitr;
@@ -292,7 +291,7 @@ int main(int argc, char *argv[])
 		GSSTreeCreator creator(&leveler, SuperNodeDepth);
 
 		filesystem::path dbpath(Database.c_str());
-		Molecule::iterator molitr(Input, MaxDimension, Resolution, ProbeRadius);
+		Molecule::iterator molitr(Input, MaxDimension, Resolution, 0);
 		if (!creator.create(dbpath, molitr, MaxDimension, Resolution))
 		{
 			cerr << "Error creating database\n";
@@ -340,13 +339,12 @@ int main(int argc, char *argv[])
 		}
 		else // range from single molecules
 		{
-			for (Molecule::iterator inmols(Input, dimension, resolution,
-					ProbeRadius); inmols; ++inmols)
+			for (Molecule::iterator inmols(Input, dimension, resolution,0); inmols; ++inmols)
 			{
 				Molecule smallmol = *inmols;
 				Molecule bigmol = smallmol;
-				smallmol.adjust(dimension, resolution, ProbeRadius, LessDist);
-				bigmol.adjust(dimension, resolution, ProbeRadius, -MoreDist);
+				smallmol.adjust(dimension, resolution, 0, LessDist);
+				bigmol.adjust(dimension, resolution, 0, -MoreDist);
 
 				vector<Molecule> res;
 				//search
@@ -521,7 +519,7 @@ int main(int argc, char *argv[])
 				toks >> less;
 				toks >> more;
 
-				Molecule::iterator inmol(ligand, MaxDimension, Resolution, ProbeRadius, less);
+				Molecule::iterator inmol(ligand, MaxDimension, Resolution, 0, less);
 				Molecule inMol = *inmol;
 
 				Molecule::iterator exmol(receptor, MaxDimension, Resolution, ProbeRadius, more);
@@ -535,7 +533,7 @@ int main(int argc, char *argv[])
 				toks >> ligand;
 				toks >> k;
 
-				Molecule::iterator inmol(ligand, MaxDimension, Resolution, ProbeRadius, 0);
+				Molecule::iterator inmol(ligand, MaxDimension, Resolution, 0, 0);
 				Molecule inMol = *inmol;
 
 				qinfos.push_back(QInfo(line, inMol, k));
