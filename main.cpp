@@ -65,8 +65,6 @@ cl::opt<PackerEnum> PackerChoice(
 				clEnumValN(Spectral, "spectral", "Spectral packing"),
 				clEnumValEnd), cl::init(MatchPack));
 
-cl::opt<bool> QuadPack("quad-pack", cl::desc("Use quad packing"),
-		cl::init(false));
 cl::opt<unsigned> K("k", cl::desc("k nearest neighbors to find for NNSearch"),
 		cl::init(1));
 cl::opt<unsigned> Knn("knn", cl::desc("K for knn graph creation"), cl::init(8));
@@ -270,8 +268,7 @@ int main(int argc, char *argv[])
 			break;
 		case MatchPack:
 			packer = PackerPtr(
-					new MatcherPacker(Pack, Knn, Sentinals, ClusterDist,
-							QuadPack));
+					new MatcherPacker(Pack, Knn, Sentinals, ClusterDist));
 			break;
 		case GreedyMerge:
 			packer = PackerPtr(

@@ -22,19 +22,11 @@ class MatcherPacker: public Packer
 	bool knnMergeClusters(const DataViewer* D, vector<Cluster>& clusters,
 			unsigned maxSz, DCache& dcache) const;
 
-	double quadCost(unsigned a, unsigned b, unsigned c, unsigned d,
-			const vector<Cluster>& clusters, const DataViewer* D,
-			ClusterCache& cache, DCache& dcache) const;
 
-	bool knnQuadMergeClusters(const DataViewer* D, vector<Cluster>& clusters,
-			unsigned maxSz, DCache& dcache) const;
-
-
-	bool doQuadPack; //if true combine quads EXPERIMENTAL
 public:
 	MatcherPacker(unsigned ps, unsigned k = 0, unsigned s = 0,
-			ClusterDistance metric = AverageLink, bool doQ = false) :
-			Packer(ps, metric, k, s), doQuadPack(doQ)
+			ClusterDistance metric = AverageLink) :
+			Packer(ps, metric, k, s)
 	{
 	}
 	~MatcherPacker()
