@@ -138,12 +138,10 @@ void KSamplePartitioner::partition(vector<TopDownPartitioner*>& parts)
 
 	vector< vector<unsigned> > partitions;
 	partitions.resize(numclusters);
-
 	//now add each data iterm to the cluster whose center it is closest to
 	for (unsigned i = 0, n = indices.size(); i < n; i++)
 	{
 		unsigned index = indices[i];
-
 		//TODO: use triangle inequality to make this more efficient
 		float mindist = HUGE_VAL;
 		unsigned best = 0;
@@ -156,13 +154,38 @@ void KSamplePartitioner::partition(vector<TopDownPartitioner*>& parts)
 				best = j;
 			}
 		}
-
 		partitions[best].push_back(index);
 	}
 
-	unsigned numPart = partitions.size(); //all must at least contain the center
-	//identify any singletons and add them to an alternative cluster
-	if (partitions.size() > 2)
+	//if the centers are identical (boo) then we may only have a single cluster
+	unsigned numPart = 0;
+	for(unsigned i = 0, n = partitions.size(); i < n; i++)
+	{
+		if(partitions[i].size() > 0)
+			numPart++;
+	}
+
+	if(numPart == 1)
+	{
+		//this is irritating, but if we encounter a group of identical shapes,
+		//must split to avoid infinite recursion
+		partitions.clear();
+		partitions.resize(2);
+		for (unsigned i = 0, n = indices.size(); i < n; i++)
+		{
+			unsigned index = indices[i];
+			if(i % 2)
+			{
+				partitions[0].push_back(index);
+			}
+			else
+			{
+				partitions[1].push_back(index);
+			}
+		}
+		numPart = 2;
+	}
+	else if (numPart > 2)
 	{
 		for (unsigned i = 0, n = partitions.size(); i < n; i++)
 		{
