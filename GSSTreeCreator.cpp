@@ -18,7 +18,7 @@ static string nextString(filesystem::path p, const char *base, unsigned i)
 	return filesystem::path(p / str.str()).string();
 }
 
-//return true if successfull
+//return true if successful
 bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr,
 		float dim, float res)
 {
