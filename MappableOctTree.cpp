@@ -357,6 +357,8 @@ bool MappableOctTree::createRoundedSet_r(unsigned N, MChildNode* nodes,
 	}
 }
 
+//round trees in in as much as possible while maintaining local distiguishability
+//and put the result in out
 bool MappableOctTree::createRoundedSet(unsigned N, const MappableOctTree**in,
 		bool roundUp, MappableOctTree** out)
 {
