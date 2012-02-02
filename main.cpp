@@ -120,7 +120,7 @@ cl::opt<unsigned> KSampleMult("ksamplex",
 
 cl::opt<unsigned> SwitchToPack("switch-to-pack",
 		cl::desc("Cutoff to trigger packing in nodes and leaves"),
-		cl::init(100000));
+		cl::init(32768));
 
 cl::opt<unsigned> Pack("pack", cl::desc("Maximum quantities per a node"),
 		cl::init(8));
