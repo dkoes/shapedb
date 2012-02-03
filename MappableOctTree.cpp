@@ -1055,6 +1055,33 @@ void MappableOctTree::dumpRawGrid(ostream& out, float res) const
 }
 
 #include <arpa/inet.h>
+
+//sproxel csv format, voxelValue is the string to specify voxels occupied by the object
+void MappableOctTree::dumpSproxelGrid(ostream& out, float res,  const string& voxelValue) const
+{
+	unsigned short max = ceil(dimension / res);
+	out << max << "," << max << "," << max << "\n";
+
+	string blank = "#00000000";
+	for (unsigned i = 0; i < max; i++)
+	{
+		for (unsigned j = 0; j < max; j++)
+		{
+			for (unsigned k = 0; k < max; k++)
+			{
+				if(k != 0)
+					out << ",";
+				if (root.checkCoord(tree, i, j, k, max))
+					out << voxelValue;
+				else
+					out << blank;
+			}
+			out << "\n";
+		}
+		out << "\n";
+	}
+}
+
 //mira grid format
 void MappableOctTree::dumpMiraGrid(ostream& out, float res) const
 {

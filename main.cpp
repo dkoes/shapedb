@@ -163,6 +163,8 @@ cl::opt<bool> ClearCacheFirst("clear-cache-first",
 		cl::desc("Clear file cache before each benchmarking run"),
 		cl::init(false));
 
+cl::opt<string> SproxelColor("sproxel-color", cl::desc("Sproxel voxel descriptor"), cl::init("#0000ffff"));
+
 //do search between include and exclude
 static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 		const string& excludeMol, const string& output, double less,
@@ -392,6 +394,8 @@ int main(int argc, char *argv[])
 					tree->dumpRawGrid(out, Resolution);
 				else if (filesystem::extension(Output.c_str()) == ".mira")
 					tree->dumpMiraGrid(out, Resolution);
+				else if (filesystem::extension(Output.c_str()) == ".csv")
+					tree->dumpSproxelGrid(out, Resolution,SproxelColor);
 				else
 					tree->dumpGrid(out, Resolution);
 			}
