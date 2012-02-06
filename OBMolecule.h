@@ -81,7 +81,6 @@ class OBMolecule
 			1.4, float adjust = 0)
 	{
 		mol = m;
-
 		spheres.clear();
 		spheres.reserve(mol.NumAtoms());
 		for (OBAtomIterator aitr = mol.BeginAtoms(); aitr != mol.EndAtoms();

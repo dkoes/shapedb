@@ -7,7 +7,6 @@
 
 #include "MGrid.h"
 
-
 /*
  * Molecule.cpp
  *
@@ -20,7 +19,7 @@
 void MGrid::gridToPoint(unsigned long g, double& x, double& y, double& z) const
 {
 	double res = resolution;
-	unsigned length = dimension/res;
+	unsigned length = dimension / res;
 	z = g % length;
 	g /= length;
 	y = g % length;
@@ -31,42 +30,46 @@ void MGrid::gridToPoint(unsigned long g, double& x, double& y, double& z) const
 	y *= res;
 	z *= res;
 
-	x -= dimension/2;
-	y -= dimension/2;
-	z -= dimension/2;
+	x -= dimension / 2;
+	y -= dimension / 2;
+	z -= dimension / 2;
 
-	x += res/2.0;
-	y += res/2.0;
-	z += res/2.0;
+	x += res / 2.0;
+	y += res / 2.0;
+	z += res / 2.0;
 }
-
 
 int MGrid::pointToGrid(double x, double y, double z) const
 {
 	double dim = dimension;
 	double res = resolution;
-	unsigned len = dim/res;
-	x+= dim/2;
-	y+= dim/2;
-	z += dim/2;
+	unsigned len = dim / res;
+	x += dim / 2;
+	y += dim / 2;
+	z += dim / 2;
 
-	if(x < 0) return -1;
-	if(x >= dim) return -1;
-	if(y < 0) return -1;
-	if(y >= dim) return -1;
-	if(z < 0) return -1;
-	if(z >= dim) return -1;
+	if (x < 0)
+		return -1;
+	if (x >= dim)
+		return -1;
+	if (y < 0)
+		return -1;
+	if (y >= dim)
+		return -1;
+	if (z < 0)
+		return -1;
+	if (z >= dim)
+		return -1;
 
 	x /= res;
 	y /= res;
 	z /= res;
 
 	unsigned ret = x;
-	ret = ret*len + y;
-	ret = ret*len + z;
+	ret = ret * len + y;
+	ret = ret * len + z;
 	return ret;
 }
-
 
 //return the "radius" (half length) of a chord a distance d from the
 //center of a circle of radius r
@@ -82,7 +85,8 @@ void MGrid::markZChord(double x, double y, double z, double r)
 {
 	int start = pointToGrid(x, y, z - r);
 	int end = pointToGrid(x, y, z + r);
-	if(start < 0 || end < 0) return;
+	if (start < 0 || end < 0)
+		return;
 	grid.set_range(start, end, true);
 }
 
@@ -100,14 +104,29 @@ void MGrid::markYZCircle(double x, double y, double z, double r)
 
 void MGrid::markXYZSphere(double x, double y, double z, double r)
 {
-	//mark all yz circles
-	for (double d = 0; d <= r; d += resolution)
+	if (sphereInGrid(x, y, z, r))
 	{
-		double cr = chordRadius(r, d);
-		markYZCircle(x + d, y, z, cr);
-		if (d != 0)
-			markYZCircle(x - d, y, z, cr);
+		//mark all yz circles
+		for (double d = 0; d <= r; d += resolution)
+		{
+			double cr = chordRadius(r, d);
+			markYZCircle(x + d, y, z, cr);
+			if (d != 0)
+				markYZCircle(x - d, y, z, cr);
+		}
 	}
+}
+
+bool MGrid::sphereInGrid(float x, float y, float z, float r) const
+{
+	float mind = -dimension / 2 - r;
+	float maxd = dimension / 2 + r;
+
+	if (x < mind || y < mind || z < mind)
+		return false;
+	if (x > maxd || y > maxd || z > maxd)
+		return false;
+	return true;
 }
 
 //this downsamples from from
@@ -120,9 +139,9 @@ void MGrid::copyFrom(const MGrid& from)
 	while (en < en_end)
 	{
 		unsigned g = *en;
-		double x,y,z;
-		from.gridToPoint(g, x,y,z);
-		grid.set(pointToGrid(x,y,z));
+		double x, y, z;
+		from.gridToPoint(g, x, y, z);
+		grid.set(pointToGrid(x, y, z));
 		++en;
 	}
 }
@@ -130,21 +149,22 @@ void MGrid::copyFrom(const MGrid& from)
 //given the solvent accessible surface, make an approximation to the
 //solvent excluded molecular surface by drawing spheres from the boundary
 //of the sa and noting where they don't intersect
-void MGrid::makeSurface(const MGrid& sagrid, const MGrid& lesssagrid, double probe)
+void MGrid::makeSurface(const MGrid& sagrid, const MGrid& lesssagrid,
+		double probe)
 {
 	bvect shell = sagrid.grid - lesssagrid.grid;
 	bvect::enumerator en = shell.first();
 	bvect::enumerator en_end = shell.end();
 
-	MGrid reachable(dimension,resolution);
+	MGrid reachable(dimension, resolution);
 	while (en < en_end)
 	{
 		unsigned g = *en;
-		double x,y,z;
-		sagrid.gridToPoint(g, x,y,z);
-		if(!sagrid.isInteriorPoint(x,y,z))
+		double x, y, z;
+		sagrid.gridToPoint(g, x, y, z);
+		if (!sagrid.isInteriorPoint(x, y, z))
 		{
-			reachable.markXYZSphere(x,y,z,probe);
+			reachable.markXYZSphere(x, y, z, probe);
 		}
 		++en;
 	}
@@ -156,16 +176,16 @@ void MGrid::makeSurface(const MGrid& sagrid, const MGrid& lesssagrid, double pro
 bool MGrid::isInteriorPoint(float x, float y, float z) const
 {
 	//all neighbors must be set
-	for(int xm = -1; xm <= 1; xm++)
+	for (int xm = -1; xm <= 1; xm++)
 	{
-		float xc = x+resolution*xm;
-		for(int ym = -1; ym <=1; ym++)
+		float xc = x + resolution * xm;
+		for (int ym = -1; ym <= 1; ym++)
 		{
-			float yc = y+resolution*ym;
-			for(int zm = -1; zm <= 1; zm++)
+			float yc = y + resolution * ym;
+			for (int zm = -1; zm <= 1; zm++)
 			{
-				float zc = z+resolution*zm;
-				if(!test(xc,yc,zc))
+				float zc = z + resolution * zm;
+				if (!test(xc, yc, zc))
 					return false;
 			}
 		}
@@ -177,13 +197,12 @@ bool MGrid::isInteriorPoint(float x, float y, float z) const
 //(ignoring edge/corner neighbors)
 bool MGrid::isExposedPoint(float x, float y, float z) const
 {
-	if(test(x+resolution,y,z) && test(x-resolution,y,z) &&
-			test(x,y+resolution,z) && test(x,y-resolution,z) &&
-			test(x,y,z+resolution) && test(x,y,z-resolution))
+	if (test(x + resolution, y, z) && test(x - resolution, y, z)
+			&& test(x, y + resolution, z) && test(x, y - resolution, z)
+			&& test(x, y, z + resolution) && test(x, y, z - resolution))
 		return false;
 	return true;
 }
-
 
 //remove all gridpoints that are exposed points
 void MGrid::shrinkByOne()
@@ -195,9 +214,9 @@ void MGrid::shrinkByOne()
 	while (en < en_end)
 	{
 		unsigned g = *en;
-		double x,y,z;
-		gridToPoint(g, x,y,z);
-		if(isExposedPoint(x,y,z))
+		double x, y, z;
+		gridToPoint(g, x, y, z);
+		if (isExposedPoint(x, y, z))
 		{
 			toRemove.set(g);
 		}
@@ -209,8 +228,8 @@ void MGrid::shrinkByOne()
 //reduce the size of the object by the specified amount
 void MGrid::shrink(double amount)
 {
-	unsigned num = ceil(amount/resolution);
-	for(unsigned i = 0; i < num; i++)
+	unsigned num = ceil(amount / resolution);
+	for (unsigned i = 0; i < num; i++)
 	{
 		shrinkByOne();
 	}

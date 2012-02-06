@@ -22,8 +22,8 @@ class MGrid
 	void markYZCircle(double x, double y, double z, double r);
 	void shrinkByOne();
 
-	double dimension;
-	double resolution;
+	double dimension; //max size, in distance unites
+	double resolution; //size of each grid cube
 	bvect grid;
 public:
 	MGrid() {}
@@ -46,6 +46,8 @@ public:
 	bool isInteriorPoint(float x, float y, float z) const;
 	bool isExposedPoint(float x, float y, float z) const;
 
+	//return true if at least part of the sphere fits in the grid
+	bool sphereInGrid(float x, float y, float z, float r) const;
 	void shrink(double amount);
 
 };
