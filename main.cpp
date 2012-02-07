@@ -199,9 +199,12 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 		}
 	}
 
-	Molecule::molostream outmols(output);
-	for (unsigned i = 0, n = res.size(); i < n; i++)
-		outmols.write(res[i]);
+	if (output.size() > 0)
+	{
+		Molecule::molostream outmols(output);
+		for (unsigned i = 0, n = res.size(); i < n; i++)
+			outmols.write(res[i]);
+	}
 
 }
 
@@ -458,7 +461,9 @@ int main(int argc, char *argv[])
 			for (unsigned i = 0; i < TimeTrials; i++)
 			{
 				if (ClearCache)
+				{
 					std::system("clearfilecache");
+				}
 
 				Timer t;
 
