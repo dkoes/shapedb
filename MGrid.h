@@ -38,7 +38,11 @@ public:
 
 	bool test(float x, float y, float z) const
 	{
-		return grid.test(pointToGrid(x,y,z));
+		int pt = pointToGrid(x,y,z);
+		if(pt >= 0)
+			return grid.test(pt);
+		else
+			return false;
 	}
 
 	void makeSurface(const MGrid& sagrid, const MGrid& lesssagrid, double probe);
