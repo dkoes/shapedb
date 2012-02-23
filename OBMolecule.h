@@ -49,6 +49,7 @@ class OBMolecule
 		MGrid lesssagrid(dimension, resolution);
 		double extraR = 0;
 		if(adjust < 0) extraR += -adjust;
+		double extend = sqrt(2*resolution*resolution);
 		for (unsigned i = 0, n = spheres.size(); i < n; i++)
 		{
 			const MolSphere& sphere = spheres[i];
@@ -56,9 +57,9 @@ class OBMolecule
 			if (probeRadius > 0)
 			{
 				sagrid.markXYZSphere(sphere.x, sphere.y, sphere.z,
-						sphere.r + probeRadius);
+						sphere.r + probeRadius + extend);
 				lesssagrid.markXYZSphere(sphere.x, sphere.y, sphere.z,
-						sphere.r + probeRadius - resolution);
+						sphere.r + probeRadius);
 			}
 		}
 
@@ -148,6 +149,12 @@ public:
 			}
 		}
 		return false;
+	}
+
+	//return true if point is within object
+	bool containsPoint(float x, float y, float z) const
+	{
+		return grids[0].test(x,y,z);
 	}
 
 

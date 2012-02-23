@@ -36,6 +36,19 @@ struct MolSphere
 		return v * v;
 	}
 
+	//true if point within sphere
+	bool containsPoint(float px, float py, float pz) const
+	{
+		float X = px-x;
+		X *= X;
+		float Y = py-y;
+		Y *= Y;
+		float Z = pz-z;
+		Z *= Z;
+
+		return X+Y+Z <= r*r;
+	}
+
 	//thank you stack overflow for not making me think..
 	bool intersectsCube(const Cube& cube) const
 	{

@@ -23,14 +23,20 @@ struct Vertex
 {
 	float x, y, z;
 
-	Vertex(): x(0), y(0), z(0) {}
-	Vertex(float X, float Y, float Z): x(X), y(Y), z(Z) {}
+	Vertex() :
+			x(0), y(0), z(0)
+	{
+	}
+	Vertex(float X, float Y, float Z) :
+			x(X), y(Y), z(Z)
+	{
+	}
 
 	bool operator<(const Vertex& rhs) const
 	{
-		if(x != rhs.x)
+		if (x != rhs.x)
 			return x < rhs.x;
-		if(y != rhs.y)
+		if (y != rhs.y)
 			return y < rhs.y;
 		return z < rhs.z;
 	}
@@ -42,11 +48,11 @@ struct Vertex
 
 	float distanceSq(const Vertex& rhs) const
 	{
-		float X = x-rhs.x;
-		float Y = y-rhs.y;
-		float Z = z-rhs.z;
+		float X = x - rhs.x;
+		float Y = y - rhs.y;
+		float Z = z - rhs.z;
 
-		return X*X+Y*Y+Z*Z;
+		return X * X + Y * Y + Z * Z;
 	}
 };
 
@@ -58,19 +64,20 @@ struct MChildNode
 	{
 		//you would think there would be a more portably way to get this bit-packed alignment,
 		//but I couldn't figure one out - isLeafs should overlap
-		bool isLeaf:1;
-		struct {
-			bool isLeaf:1;
-			unsigned pattern:8;
-			unsigned numbits:4;
-		}  __attribute__((__packed__)) leaf;
+		bool isLeaf :1;
+		struct
+		{
+			bool isLeaf :1;
+			unsigned pattern :8;
+			unsigned numbits :4;
+		}__attribute__((__packed__)) leaf;
 
 		struct
 		{
-			bool isLeaf: 1;
-			unsigned index: MINDEX_BITS;
-		}  __attribute__((__packed__)) node;
-	} __attribute__((__packed__));
+			bool isLeaf :1;
+			unsigned index :MINDEX_BITS;
+		}__attribute__((__packed__)) node;
+	}__attribute__((__packed__));
 
 	MChildNode() :
 			isLeaf(true)
@@ -79,7 +86,8 @@ struct MChildNode
 	}
 
 	//use to create node
-	MChildNode(unsigned i): isLeaf(false)
+	MChildNode(unsigned i) :
+			isLeaf(false)
 	{
 		node.index = i;
 	}
@@ -91,8 +99,8 @@ struct MChildNode
 		leaf.pattern = pat;
 		leaf.numbits = i;
 	}
-	void intersectUnionVolume(const MOctNode* tree, const MChildNode& rhs, const MOctNode* rtree, float cubeVol,
-			 float& intersectval,
+	void intersectUnionVolume(const MOctNode* tree, const MChildNode& rhs,
+			const MOctNode* rtree, float cubeVol, float& intersectval,
 			float& unionval) const;
 
 	float
@@ -104,17 +112,22 @@ struct MChildNode
 
 	void invert(MOctNode* tree, float maxvol);
 
-	bool containedIn(const MOctNode* tree, const MChildNode& rhs, const MOctNode* rtree) const;
+	bool containedIn(const MOctNode* tree, const MChildNode& rhs,
+			const MOctNode* rtree) const;
 
 	float volume(const MOctNode* tree, float dim3) const; //pass volume of full node
 	float volume(const vector<MOctNode>& tree, float dim3) const;
 
-	bool equals(const MOctNode* tree, const MChildNode& rhs, const MOctNode* rtree) const;
+	bool equals(const MOctNode* tree, const MChildNode& rhs,
+			const MOctNode* rtree) const;
 
-	void collectVertices(vector<Vertex>& vertices, Cube box, const MOctNode* tree) const;
+	void collectVertices(vector<Vertex>& vertices, Cube box,
+			const MOctNode* tree) const;
 
-	bool checkCoord(const MOctNode* tree, unsigned i, unsigned j, unsigned k, unsigned max) const;
-	void countLeavesAtDepths(const MOctNode* tree, unsigned depth, vector<unsigned>& counts) const;
+	bool checkCoord(const MOctNode* tree, unsigned i, unsigned j, unsigned k,
+			unsigned max) const;
+	void countLeavesAtDepths(const MOctNode* tree, unsigned depth,
+			vector<unsigned>& counts) const;
 }__attribute__((__packed__));
 
 struct MOctNode
@@ -122,7 +135,8 @@ struct MOctNode
 	float vol; //cache the volume of this subtree to speed things up
 	MChildNode children[8];
 
-	MOctNode(): vol(0)
+	MOctNode() :
+			vol(0)
 	{
 	}
 
@@ -141,8 +155,9 @@ class MappableOctTree
 	}
 
 	//assume memory is allocate to tree
-	MappableOctTree(float dim, const MChildNode& r, const vector<MOctNode>& nodes) :
-			 root(r),dimension(dim), N(nodes.size())
+	MappableOctTree(float dim, const MChildNode& r,
+			const vector<MOctNode>& nodes) :
+			root(r), dimension(dim), N(nodes.size())
 	{
 		for (unsigned i = 0, n = nodes.size(); i < n; i++)
 		{
@@ -152,14 +167,21 @@ class MappableOctTree
 
 	MappableOctTree(const MappableOctTree& rhs);
 
-	static MChildNode createFrom_r(unsigned N, MChildNode* nodes, const MappableOctTree** trees, vector<MOctNode>& newtree, bool isUnion, float cubeVol);
-	MChildNode createTruncated_r(const MChildNode& node, float res, bool fillIn, vector<MOctNode>& newtree, float cubeVol) const;
-	MChildNode createRounded_r(const MChildNode& node, float res, bool fillIn, vector<MOctNode>& newtree, float cubeVol) const;
+	static MChildNode createFrom_r(unsigned N, MChildNode* nodes,
+			const MappableOctTree** trees, vector<MOctNode>& newtree,
+			bool isUnion, float cubeVol);
+	MChildNode createTruncated_r(const MChildNode& node, float res, bool fillIn,
+			vector<MOctNode>& newtree, float cubeVol) const;
+	MChildNode createRounded_r(const MChildNode& node, float res, bool fillIn,
+			vector<MOctNode>& newtree, float cubeVol) const;
 
-	static bool createRoundedSet_r(unsigned N, MChildNode* nodes, const MappableOctTree** trees, bool roundUp,
-			vector< vector<MOctNode> >& newtrees, vector<MChildNode>& newroots, float cubeVol);
+	static bool createRoundedSet_r(unsigned N, MChildNode* nodes,
+			const MappableOctTree** trees, bool roundUp,
+			vector<vector<MOctNode> >& newtrees, vector<MChildNode>& newroots,
+			float cubeVol);
 
-	static MappableOctTree* newFromVector(const vector<MOctNode>& newtree, const MChildNode& newroot, float dim);
+	static MappableOctTree* newFromVector(const vector<MOctNode>& newtree,
+			const MChildNode& newroot, float dim);
 public:
 
 	MappableOctTree* clone() const;
@@ -174,18 +196,22 @@ public:
 	MappableOctTree* createRounded(float vol, bool fillIn) const;
 
 	//return intersect of the n trees found in arr
-	static MappableOctTree* createFromIntersection(unsigned N, const MappableOctTree** in);
+	static MappableOctTree* createFromIntersection(unsigned N,
+			const MappableOctTree** in);
 	//union
-	static MappableOctTree* createFromUnion(unsigned N, const MappableOctTree** in);
+	static MappableOctTree* createFromUnion(unsigned N,
+			const MappableOctTree** in);
 
 	//round trees in in as much as possible while maintaining local distiguishability
 	//and put the result in out
-	static bool createRoundedSet(unsigned N, const MappableOctTree**in, bool roundUp,  MappableOctTree** out);
+	static bool createRoundedSet(unsigned N, const MappableOctTree**in,
+			bool roundUp, MappableOctTree** out);
 
 	//volume calculations that don't require creating a tmp tree
 	float intersectVolume(const MappableOctTree * rhs) const;
 	float unionVolume(const MappableOctTree *rhs) const;
-	void intersectUnionVolume(const MappableOctTree *rhs, float& ival, float& uval) const;
+	void intersectUnionVolume(const MappableOctTree *rhs, float& ival,
+			float& uval) const;
 
 	bool containedIn(const MappableOctTree *rhs) const;
 
@@ -203,7 +229,7 @@ public:
 
 	unsigned bytes() const
 	{
-		return sizeof(MappableOctTree) + N*sizeof(MOctNode);
+		return sizeof(MappableOctTree) + N * sizeof(MOctNode);
 	}
 
 	unsigned nodes() const
@@ -216,28 +242,44 @@ public:
 	void dumpGrid(ostream& out, float res) const;
 	void dumpRawGrid(ostream& out, float res) const;
 	void dumpMiraGrid(ostream& out, float res) const;
-	void dumpSproxelGrid(ostream& out, float res, const string& voxelValue = "#FFFFFFFF") const;
+	void dumpSproxelGrid(ostream& out, float res, const string& voxelValue =
+			"#FFFFFFFF") const;
 	void countLeavesAtDepths(vector<unsigned>& counts) const;
 private:
 	template<class Object>
 	static MChildNode create_r(float res, const Cube& cube, const Object& obj,
 			vector<MOctNode>& tree)
 	{
+		MChildNode ret;
+		if (cube.getDimension() <= res) //must be a leaf
+		{
+			ret.isLeaf = true;
+			//ultimately, follow standard practice and only evaluate the
+			//intersection with the center of the cube
+			float x = 0, y = 0, z = 0;
+			cube.getCenter(x, y, z);
+			if (obj.containsPoint(x, y, z))
+			{
+				ret.leaf.pattern = 0xff;
+				ret.leaf.numbits = 8;
+			}
+			else
+			{
+				ret.leaf.pattern = 0;
+				ret.leaf.numbits = 0;
+			}
+
+			return ret;
+		}
+
 		//does the object overlap with this cube?
 		bool intersects = obj.intersects(cube);
-		MChildNode ret;
 		if (!intersects)
 		{
 			//no overlap, all done
 			ret.isLeaf = true;
 			ret.leaf.pattern = 0;
 			ret.leaf.numbits = 0;
-		}
-		else if (cube.getDimension() <= res /* || obj.containedIn(cube) */) //consider it full - todo: contained in currently slows things down
-		{
-			ret.isLeaf = true;
-			ret.leaf.pattern = 0xff;
-			ret.leaf.numbits = 8;
 		}
 		else //subdivide into children
 		{
@@ -250,9 +292,10 @@ private:
 			unsigned pos = tree.size();
 			ret.node.index = tree.size();
 
-			if(tree.size() >= (1<<MINDEX_BITS))
+			if (tree.size() >= (1 << MINDEX_BITS))
 			{
-				cerr << "Too many nodes for MINDEX_BITS. Must recompile to support larger octtress.\n";
+				cerr
+						<< "Too many nodes for MINDEX_BITS. Must recompile to support larger octtress.\n";
 				abort();
 			}
 			tree.push_back(MOctNode());
@@ -264,16 +307,16 @@ private:
 				tree[pos].children[i] = child;
 				if (child.isLeaf)
 				{
-					if(child.leaf.pattern == 0)
+					if (child.leaf.pattern == 0)
 						filledcnt++;
-					else if(child.leaf.pattern == 0xff)
+					else if (child.leaf.pattern == 0xff)
 					{
 						filledcnt++;
-						pat |= (1<<i);
+						pat |= (1 << i);
 						bitcnt++;
 					}
 				}
-				tree[pos].vol += child.volume(tree,newc.volume());
+				tree[pos].vol += child.volume(tree, newc.volume());
 			}
 			//are all the children full or empty? then can represent as a pattern
 			if (filledcnt == 8)
@@ -303,6 +346,6 @@ public:
 
 		return ret;
 	}
-} __attribute__((__packed__));
+}__attribute__((__packed__));
 
 #endif /* MAPPABLEOCTTREE_H_ */
