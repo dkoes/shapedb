@@ -656,6 +656,7 @@ public:
 		valid = inconv.ReadFile(&mol, fname);
 		if(!keepHydrogens)
 			mol.DeleteHydrogens();
+		mol.SetHybridizationPerceived(); //otherwise segfault trying to gethyb
 		currmolecule.set(mol, dimension, resolution, probe, adjust);
 	}
 
