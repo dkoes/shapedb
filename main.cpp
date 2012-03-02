@@ -165,6 +165,8 @@ cl::opt<bool> ClearCacheFirst("clear-cache-first",
 
 cl::opt<string> SproxelColor("sproxel-color", cl::desc("Sproxel voxel descriptor"), cl::init("#0000ffff"));
 
+cl::opt<bool> KeepHydrogens("h",cl::desc("Retain hydrogens in input molecules"),cl::init(false));
+
 //do search between include and exclude
 static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 		const string& excludeMol, const string& output, double less,
@@ -175,11 +177,11 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 	//read query molecule(s)
 
 	//use explicit volumes
-	Molecule::iterator imolitr(includeMol, dimension, resolution, 0,
+	Molecule::iterator imolitr(includeMol, dimension, resolution, KeepHydrogens, ProbeRadius,
 			less);
 	Molecule inMol = *imolitr;
 
-	Molecule::iterator exmolitr(excludeMol, dimension, resolution, ProbeRadius,
+	Molecule::iterator exmolitr(excludeMol, dimension, resolution, KeepHydrogens, ProbeRadius,
 			more);
 	Molecule exMol = *exmolitr;
 
@@ -213,7 +215,7 @@ void do_nnsearch(GSSTreeSearcher& gss, const string& input,
 {
 	//read query molecule(s)
 	vector<Molecule> res;
-	Molecule::iterator molitr(input, gss.getDimension(), gss.getResolution(),0);
+	Molecule::iterator molitr(input, gss.getDimension(), gss.getResolution(),KeepHydrogens,ProbeRadius,0);
 	for (; molitr; ++molitr)
 	{
 		const Molecule& mol = *molitr;
@@ -293,7 +295,7 @@ int main(int argc, char *argv[])
 		GSSTreeCreator creator(&leveler, SuperNodeDepth);
 
 		filesystem::path dbpath(Database.c_str());
-		Molecule::iterator molitr(Input, MaxDimension, Resolution, 0);
+		Molecule::iterator molitr(Input, MaxDimension, Resolution, KeepHydrogens, ProbeRadius, 0);
 		if (!creator.create(dbpath, molitr, MaxDimension, Resolution))
 		{
 			cerr << "Error creating database\n";
@@ -341,7 +343,7 @@ int main(int argc, char *argv[])
 		}
 		else // range from single molecules
 		{
-			for (Molecule::iterator inmols(Input, dimension, resolution,0); inmols; ++inmols)
+			for (Molecule::iterator inmols(Input, dimension, resolution,KeepHydrogens,ProbeRadius,0); inmols; ++inmols)
 			{
 				Molecule smallmol = *inmols;
 				Molecule bigmol = smallmol;
@@ -377,7 +379,7 @@ int main(int argc, char *argv[])
 		ofstream out(Output.c_str());
 		float adjust = LessDist;
 
-		for (Molecule::iterator mitr(Input, MaxDimension, Resolution, ProbeRadius,
+		for (Molecule::iterator mitr(Input, MaxDimension, Resolution, KeepHydrogens, ProbeRadius,
 				adjust); mitr; ++mitr)
 		{
 			MappableOctTree *tree = MappableOctTree::create(MaxDimension,
@@ -525,10 +527,10 @@ int main(int argc, char *argv[])
 				toks >> less;
 				toks >> more;
 
-				Molecule::iterator inmol(ligand, MaxDimension, Resolution, 0, less);
+				Molecule::iterator inmol(ligand, MaxDimension, Resolution, KeepHydrogens, ProbeRadius, less);
 				Molecule inMol = *inmol;
 
-				Molecule::iterator exmol(receptor, MaxDimension, Resolution, ProbeRadius, more);
+				Molecule::iterator exmol(receptor, MaxDimension, Resolution, KeepHydrogens, ProbeRadius, more);
 				Molecule exMol = *exmol;
 
 				qinfos.push_back(QInfo(line, inMol, exMol, less, more));
@@ -539,7 +541,7 @@ int main(int argc, char *argv[])
 				toks >> ligand;
 				toks >> k;
 
-				Molecule::iterator inmol(ligand, MaxDimension, Resolution, 0, 0);
+				Molecule::iterator inmol(ligand, MaxDimension, Resolution, KeepHydrogens, ProbeRadius, 0);
 				Molecule inMol = *inmol;
 
 				qinfos.push_back(QInfo(line, inMol, k));

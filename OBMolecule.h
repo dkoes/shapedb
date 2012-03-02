@@ -194,24 +194,29 @@ class OBMolIterator
 	OBMol mol;
 	OBMolecule currmolecule;
 	bool valid;
+	bool keepHydrogens;
 	float dimension;
 	float resolution;
 	float probe;
 	float adjust; //chagne radii
 
+
 	void readOne()
 	{
 		valid = inconv.Read(&mol);
+		if(!keepHydrogens)
+			mol.DeleteHydrogens();
 		currmolecule.set(mol, dimension, resolution, probe, adjust);
 	}
 public:
-	OBMolIterator(const string& fname, float dim, float res, float prb = 1.4,
-			float adj = 0) :
-			valid(true), dimension(dim), resolution(res), probe(prb), adjust(
+	OBMolIterator(const string& fname, float dim, float res, bool keepH, float prb,	float adj) :
+			valid(true), keepHydrogens(keepH), dimension(dim), resolution(res), probe(prb), adjust(
 					adj)
 	{
 		inconv.SetInFormat(inconv.FormatFromExt(fname));
 		valid = inconv.ReadFile(&mol, fname);
+		if(!keepHydrogens)
+			mol.DeleteHydrogens();
 		currmolecule.set(mol, dimension, resolution, probe, adjust);
 	}
 

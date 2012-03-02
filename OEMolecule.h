@@ -208,6 +208,15 @@ public:
 		return hcheck;
 	}
 
+	//return true if point is within object
+	bool containsPoint(float x, float y, float z) const
+	{
+		if(grids[0].IsInGrid(x,y,z) && grids[0](x,y,z))
+		{
+			return true;
+		}
+		return false;
+	}
 	//return true if no shape
 	bool empty() const
 	{
