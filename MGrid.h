@@ -10,6 +10,7 @@
 #define MGRID_H_
 
 #include <bm/bm.h>
+#include "Cube.h"
 
 typedef bm::bvector<bm::standard_allocator> bvect;
 
@@ -21,6 +22,7 @@ class MGrid
 	void markZChord(double x, double y, double z, double r);
 	void markYZCircle(double x, double y, double z, double r);
 	void shrinkByOne();
+	void growByOne();
 
 	double dimension; //max size, in distance unites
 	double resolution; //size of each grid cube
@@ -42,17 +44,34 @@ public:
 		if(pt >= 0)
 			return grid.test(pt);
 		else
-			return false;
+			return true; //for exposed point testing and shrinking this makes the most sense
 	}
 
+	//test for x,y,z - match signature expected from oct tree creation
+	bool containsPoint(float x, float y, float z) const
+	{
+		return test(x,y,z);
+	}
+
+	//return true if possibly intersects cube - by always returning true
+	//explores every grid point with contains point resulting in some
+	//unnecessary oct-tree creation
+	bool intersects(const Cube& cube) const
+	{
+		return true;
+	}
+
+	void setPoint(float x, float y, float z);
 	void makeSurface(const MGrid& sagrid, const MGrid& lesssagrid, double probe);
 
 	bool isInteriorPoint(float x, float y, float z) const;
 	bool isExposedPoint(float x, float y, float z) const;
+	bool isRightOutsideBorder(float x, float y, float z) const;
 
 	//return true if at least part of the sphere fits in the grid
 	bool sphereInGrid(float x, float y, float z, float r) const;
 	void shrink(double amount);
+	void grow(double amount);
 
 };
 

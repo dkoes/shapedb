@@ -573,9 +573,9 @@ public:
 	}
 
 	//mutate small to be smaller/larger
-	void adjust(float dimension, float resolution, float probe, float adj)
+	void adjust(float dimension, float resolution, float probe)
 	{
-		set(mol, dimension, resolution, probe, adj);
+		set(mol, dimension, resolution, probe, 0);
 	}
 
 	bool intersects(const Cube& cube) const
@@ -637,27 +637,24 @@ class OBAMolIterator
 	float dimension;
 	float resolution;
 	float probe;
-	float adjust; //chagne radii
 
 	void readOne()
 	{
 		valid = inconv.Read(&mol);
 		if(!keepHydrogens)
 			mol.DeleteHydrogens();
-		currmolecule.set(mol, dimension, resolution, probe, adjust);
+		currmolecule.set(mol, dimension, resolution, probe);
 	}
 public:
-	OBAMolIterator(const string& fname, float dim, float res, bool keepH, float prb,
-			float adj) :
-			valid(true), keepHydrogens(keepH), dimension(dim), resolution(res), probe(prb), adjust(
-					adj)
+	OBAMolIterator(const string& fname, float dim, float res, bool keepH, float prb) :
+			valid(true), keepHydrogens(keepH), dimension(dim), resolution(res), probe(prb)
 	{
 		inconv.SetInFormat(inconv.FormatFromExt(fname));
 		valid = inconv.ReadFile(&mol, fname);
 		if(!keepHydrogens)
 			mol.DeleteHydrogens();
 		mol.SetHybridizationPerceived(); //otherwise segfault trying to gethyb
-		currmolecule.set(mol, dimension, resolution, probe, adjust);
+		currmolecule.set(mol, dimension, resolution, probe);
 	}
 
 	//validity check

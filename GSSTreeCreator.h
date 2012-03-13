@@ -46,7 +46,7 @@ using namespace boost;
 using namespace std;
 
 #include "WorkFile.h"
-#include "Molecule.h"
+#include "molecules/Molecule.h"
 
 typedef Molecule Object; //eventually template this
 

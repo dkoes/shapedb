@@ -58,16 +58,51 @@ GSSTreeSearcher::~GSSTreeSearcher()
 //find all the shapes in the database that lie bewtween smallObj and bigObj
 //if invertBig is set, than treat as an excluded volume
 void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
+		float smallShrink, float bigShrink,
 		bool invertBig, bool loadObjs, vector<Object>& res)
 {
 	res.clear();
-	const MappableOctTree *smallTree = MappableOctTree::create(dimension,
+	MappableOctTree *smallTree = MappableOctTree::create(dimension,
 			resolution, smallObj);
+
+	if(smallShrink > 0)
+	{
+		MGrid grid;
+		smallTree->makeGrid(grid, resolution);
+		grid.shrink(smallShrink);
+		free(smallTree);
+		smallTree = MappableOctTree::createFromGrid(grid);
+	}
 	MappableOctTree *bigTree = MappableOctTree::create(dimension, resolution,
 			bigObj);
 
 	if (invertBig)
+	{
+		if(bigShrink > 0)
+		{
+			MGrid grid;
+			bigTree->makeGrid(grid, resolution);
+			grid.shrink(bigShrink);
+			free(bigTree);
+			bigTree = MappableOctTree::createFromGrid(grid);
+		}
 		bigTree->invert();
+	}
+	else
+	{
+		//not invert, may need to grow
+		if(bigShrink > 0)
+		{
+			if(bigShrink > 0)
+			{
+				MGrid grid;
+				bigTree->makeGrid(grid, resolution);
+				grid.grow(bigShrink);
+				free(bigTree);
+				bigTree = MappableOctTree::createFromGrid(grid);
+			}
+		}
+	}
 
 	Timer t;
 	vector<file_index> respos;
@@ -111,8 +146,8 @@ void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
 			cout << " level " << i <<": " << levelCnts[i] << " " << maxlevelCnts[i] << " " << usefulLevelCnts[i] << "\n";
 		}
 	}
-	delete smallTree;
-	delete bigTree;
+	free(smallTree);
+	free(bigTree);
 }
 
 void GSSTreeSearcher::TopKObj::add(file_index pos, double dist)
@@ -290,7 +325,7 @@ bool GSSTreeSearcher::fitsInbetween(const MappableOctTree *MIV,
 
 //find everyting between small and big using linear scan
 void GSSTreeSearcher::dc_scan_search(const Object& smallObj,
-		const Object& bigObj, bool invertBig, bool loadObjs, vector<Object>& res)
+		const Object& bigObj, float smallShrink, float bigShrink, bool invertBig, bool loadObjs, vector<Object>& res)
 {
 	res.clear();
 	const MappableOctTree *smallTree = MappableOctTree::create(dimension,

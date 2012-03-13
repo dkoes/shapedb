@@ -24,7 +24,7 @@
 #include "CommandLine2/CommandLine.h"
 #include "GSSTreeCreator.h"
 #include "GSSTreeSearcher.h"
-#include "Molecule.h"
+#include "molecules/Molecule.h"
 #include "KSamplePartitioner.h"
 #include "packers/Packers.h"
 #include <boost/shared_ptr.hpp>
@@ -40,11 +40,8 @@ enum CommandEnum
 	Create, NNSearch, DCSearch, MolGrid, BatchSearch, BatchDB
 };
 
-cl::opt<CommandEnum> Command(
-		cl::desc("Operation to perform:"),
-		cl::Required,
-		cl::values(
-				clEnumVal(Create, "Create a molecule shape index."),
+cl::opt<CommandEnum> Command(cl::desc("Operation to perform:"), cl::Required,
+		cl::values(clEnumVal(Create, "Create a molecule shape index."),
 				clEnumVal(NNSearch, "Nearest neighbor search"),
 				clEnumVal(DCSearch, "Distance constraint search"),
 				clEnumVal(MolGrid, "Generate molecule grid and debug output"),
@@ -56,10 +53,8 @@ enum PackerEnum
 {
 	FullMerge, Spectral, GreedyMerge, MatchPack
 };
-cl::opt<PackerEnum> PackerChoice(
-		cl::desc("Packing algorithm:"),
-		cl::values(
-				clEnumValN(FullMerge,"full-merge", "Greedy full merge."),
+cl::opt<PackerEnum> PackerChoice(cl::desc("Packing algorithm:"),
+		cl::values(clEnumValN(FullMerge,"full-merge", "Greedy full merge."),
 				clEnumValN(GreedyMerge,"greedy-merge", "Greedy iterative merge."),
 				clEnumValN(MatchPack,"match-merge", "Optimal matching merging."),
 				clEnumValN(Spectral, "spectral", "Spectral packing"),
@@ -89,13 +84,11 @@ cl::opt<string> Input("in", cl::desc("Input file"));
 cl::opt<string> Output("out", cl::desc("Output file"));
 cl::opt<string> Database("db", cl::desc("Database file"));
 
-cl::opt<double> LessDist(
-		"less",
+cl::opt<double> LessDist("less",
 		cl::desc(
 				"Distance to reduce query mol by for constraint search (default 1A)."),
 		cl::init(1.0));
-cl::opt<double> MoreDist(
-		"more",
+cl::opt<double> MoreDist("more",
 		cl::desc(
 				"Distance to increase query mol by for constraint search (default 1A)."),
 		cl::init(1.0));
@@ -163,9 +156,11 @@ cl::opt<bool> ClearCacheFirst("clear-cache-first",
 		cl::desc("Clear file cache before each benchmarking run"),
 		cl::init(false));
 
-cl::opt<string> SproxelColor("sproxel-color", cl::desc("Sproxel voxel descriptor"), cl::init("#0000ffff"));
+cl::opt<string> SproxelColor("sproxel-color",
+		cl::desc("Sproxel voxel descriptor"), cl::init("#0000ffff"));
 
-cl::opt<bool> KeepHydrogens("h",cl::desc("Retain hydrogens in input molecules"),cl::init(false));
+cl::opt<bool> KeepHydrogens("h",
+		cl::desc("Retain hydrogens in input molecules"), cl::init(false));
 
 //do search between include and exclude
 static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
@@ -177,24 +172,25 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 	//read query molecule(s)
 
 	//use explicit volumes
-	Molecule::iterator imolitr(includeMol, dimension, resolution, KeepHydrogens, ProbeRadius,
-			less);
+	Molecule::iterator imolitr(includeMol, dimension, resolution, KeepHydrogens,
+			ProbeRadius);
 	Molecule inMol = *imolitr;
 
-	Molecule::iterator exmolitr(excludeMol, dimension, resolution, KeepHydrogens, ProbeRadius,
-			more);
+	Molecule::iterator exmolitr(excludeMol, dimension, resolution,
+			KeepHydrogens, ProbeRadius);
 	Molecule exMol = *exmolitr;
 
 	vector<Molecule> res;
 
 	//search
 	if (!ScanOnly)
-		gss.dc_search(inMol, exMol, true, output.size() > 0, res);
+		gss.dc_search(inMol, exMol, less, more, true, output.size() > 0, res);
 
 	if (ScanCheck || ScanOnly)
 	{
 		vector<Molecule> res2;
-		gss.dc_scan_search(inMol, exMol, true, output.size() > 0, res2);
+		gss.dc_scan_search(inMol, exMol, less, more, true, output.size() > 0,
+				res2);
 		if (res2.size() != res.size())
 		{
 			cerr << "Scanning found different number: " << res2.size() << "\n";
@@ -215,7 +211,8 @@ void do_nnsearch(GSSTreeSearcher& gss, const string& input,
 {
 	//read query molecule(s)
 	vector<Molecule> res;
-	Molecule::iterator molitr(input, gss.getDimension(), gss.getResolution(),KeepHydrogens,ProbeRadius,0);
+	Molecule::iterator molitr(input, gss.getDimension(), gss.getResolution(),
+			KeepHydrogens, ProbeRadius);
 	for (; molitr; ++molitr)
 	{
 		const Molecule& mol = *molitr;
@@ -295,7 +292,8 @@ int main(int argc, char *argv[])
 		GSSTreeCreator creator(&leveler, SuperNodeDepth);
 
 		filesystem::path dbpath(Database.c_str());
-		Molecule::iterator molitr(Input, MaxDimension, Resolution, KeepHydrogens, ProbeRadius, 0);
+		Molecule::iterator molitr(Input, MaxDimension, Resolution,
+				KeepHydrogens, ProbeRadius);
 		if (!creator.create(dbpath, molitr, MaxDimension, Resolution))
 		{
 			cerr << "Error creating database\n";
@@ -343,24 +341,20 @@ int main(int argc, char *argv[])
 		}
 		else // range from single molecules
 		{
-			for (Molecule::iterator inmols(Input, dimension, resolution,KeepHydrogens,ProbeRadius,0); inmols; ++inmols)
+			for (Molecule::iterator inmols(Input, dimension, resolution,
+					KeepHydrogens, ProbeRadius); inmols; ++inmols)
 			{
-				Molecule smallmol = *inmols;
-				Molecule bigmol = smallmol;
-				smallmol.adjust(dimension, resolution, 0, LessDist);
-				bigmol.adjust(dimension, resolution, 0, -MoreDist);
-
 				vector<Molecule> res;
 				//search
 				if (!ScanOnly)
-					gss.dc_search(smallmol, bigmol, false, Output.size() > 1,
-							res);
+					gss.dc_search(*inmols, *inmols, LessDist, MoreDist, false,
+							Output.size() > 1, res);
 
 				if (ScanCheck || ScanOnly)
 				{
 					vector<Molecule> res2;
-					gss.dc_scan_search(smallmol, bigmol, false,
-							Output.size() > 1, res2);
+					gss.dc_scan_search(*inmols, *inmols, LessDist, MoreDist,
+							false, Output.size() > 1, res2);
 					if (res2.size() != res.size())
 					{
 						cerr << "Scanning found different number\n";
@@ -374,40 +368,6 @@ int main(int argc, char *argv[])
 		}
 	}
 		break;
-	case MolGrid:
-	{
-		ofstream out(Output.c_str());
-		float adjust = LessDist;
-
-		for (Molecule::iterator mitr(Input, MaxDimension, Resolution, KeepHydrogens, ProbeRadius,
-				adjust); mitr; ++mitr)
-		{
-			MappableOctTree *tree = MappableOctTree::create(MaxDimension,
-					Resolution, *mitr);
-			cout << "Size of tree " << tree->bytes() << "\n";
-			cout << "Volume of tree " << tree->volume() << "\n";
-			cout << "Nodes of tree " << tree->nodes() << "\n";
-			vector<unsigned> cnts;
-			tree->countLeavesAtDepths(cnts);
-			for (unsigned i = 0, n = cnts.size(); i < n; i++)
-			{
-				cout << i << " : " << cnts[i] << "\n";
-			}
-			if (out)
-			{
-				if (filesystem::extension(Output.c_str()) == ".raw")
-					tree->dumpRawGrid(out, Resolution);
-				else if (filesystem::extension(Output.c_str()) == ".mira")
-					tree->dumpMiraGrid(out, Resolution);
-				else if (filesystem::extension(Output.c_str()) == ".csv")
-					tree->dumpSproxelGrid(out, Resolution,SproxelColor);
-				else
-					tree->dumpGrid(out, Resolution);
-			}
-			free(tree);
-		}
-		break;
-	}
 	case BatchSearch:
 	{
 		//read in database
@@ -527,10 +487,12 @@ int main(int argc, char *argv[])
 				toks >> less;
 				toks >> more;
 
-				Molecule::iterator inmol(ligand, MaxDimension, Resolution, KeepHydrogens, ProbeRadius, less);
+				Molecule::iterator inmol(ligand, MaxDimension, Resolution,
+						KeepHydrogens, ProbeRadius);
 				Molecule inMol = *inmol;
 
-				Molecule::iterator exmol(receptor, MaxDimension, Resolution, KeepHydrogens, ProbeRadius, more);
+				Molecule::iterator exmol(receptor, MaxDimension, Resolution,
+						KeepHydrogens, ProbeRadius);
 				Molecule exMol = *exmol;
 
 				qinfos.push_back(QInfo(line, inMol, exMol, less, more));
@@ -541,7 +503,8 @@ int main(int argc, char *argv[])
 				toks >> ligand;
 				toks >> k;
 
-				Molecule::iterator inmol(ligand, MaxDimension, Resolution, KeepHydrogens, ProbeRadius, 0);
+				Molecule::iterator inmol(ligand, MaxDimension, Resolution,
+						KeepHydrogens, ProbeRadius);
 				Molecule inMol = *inmol;
 
 				qinfos.push_back(QInfo(line, inMol, k));
@@ -589,13 +552,59 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					gss.dc_search(qinfos[i].in, qinfos[i].ex, true, false, res);
+					gss.dc_search(qinfos[i].in, qinfos[i].ex, qinfos[i].less,
+							qinfos[i].more, true, false, res);
 				}
 			}
 		}
 
 	}
 		break;
+	case MolGrid:
+	{
+		ofstream out(Output.c_str());
+
+		for (Molecule::iterator mitr(Input, MaxDimension, Resolution,
+				KeepHydrogens, ProbeRadius); mitr; ++mitr)
+		{
+			MappableOctTree *tree = MappableOctTree::create(MaxDimension,
+					Resolution, *mitr);
+
+			if(LessDist >= 0)
+			{
+				MGrid grid;
+				tree->makeGrid(grid, Resolution);
+
+				grid.shrink(LessDist);
+				free(tree);
+				tree = MappableOctTree::createFromGrid(grid);
+			}
+
+			cout << "Size of tree " << tree->bytes() << "\n";
+			cout << "Volume of tree " << tree->volume() << "\n";
+			cout << "Nodes of tree " << tree->nodes() << "\n";
+
+			vector<unsigned> cnts;
+			tree->countLeavesAtDepths(cnts);
+			for (unsigned i = 0, n = cnts.size(); i < n; i++)
+			{
+				cout << i << " : " << cnts[i] << "\n";
+			}
+			if (out)
+			{
+				if (filesystem::extension(Output.c_str()) == ".raw")
+					tree->dumpRawGrid(out, Resolution);
+				else if (filesystem::extension(Output.c_str()) == ".mira")
+					tree->dumpMiraGrid(out, Resolution);
+				else if (filesystem::extension(Output.c_str()) == ".csv")
+					tree->dumpSproxelGrid(out, Resolution, SproxelColor);
+				else
+					tree->dumpGrid(out, Resolution);
+			}
+			free(tree);
+		}
+		break;
+	}
 	}
 	return 0;
 }

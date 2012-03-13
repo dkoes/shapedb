@@ -6,15 +6,7 @@
  */
 
 #include "MGrid.h"
-
-/*
- * Molecule.cpp
- *
- *  Created on: Oct 14, 2011
- *      Author: dkoes
- */
-
-#include "Molecule.h"
+#include "molecules/Molecule.h"
 
 void MGrid::gridToPoint(unsigned long g, double& x, double& y, double& z) const
 {
@@ -146,6 +138,12 @@ void MGrid::copyFrom(const MGrid& from)
 	}
 }
 
+void MGrid::setPoint(float x, float y, float z)
+{
+	unsigned p  = pointToGrid(x,y,z);
+	grid.set(p, true);
+}
+
 //given the solvent accessible surface, make an approximation to the
 //solvent excluded molecular surface by drawing spheres from the boundary
 //of the sa and noting where they don't intersect
@@ -204,6 +202,18 @@ bool MGrid::isExposedPoint(float x, float y, float z) const
 	return true;
 }
 
+bool MGrid::isRightOutsideBorder(float x, float y, float z) const
+{
+	if(test(x,y,z))
+		return false;
+	if (test(x + resolution, y, z) || test(x - resolution, y, z)
+			|| test(x, y + resolution, z) || test(x, y - resolution, z)
+			|| test(x, y, z + resolution) || test(x, y, z - resolution))
+		return true;
+	return false;
+}
+
+
 //remove all gridpoints that are exposed points
 void MGrid::shrinkByOne()
 {
@@ -225,6 +235,27 @@ void MGrid::shrinkByOne()
 	grid -= toRemove;
 }
 
+void MGrid::growByOne()
+{
+	bvect::enumerator en = grid.first();
+	bvect::enumerator en_end = grid.end();
+
+	bvect toAdd;
+	while (en < en_end)
+	{
+		unsigned g = *en;
+		double x, y, z;
+		gridToPoint(g, x, y, z);
+		if (isRightOutsideBorder(x, y, z))
+		{
+			toAdd.set(g);
+		}
+		++en;
+	}
+	grid |= toAdd;
+}
+
+
 //reduce the size of the object by the specified amount
 void MGrid::shrink(double amount)
 {
@@ -236,3 +267,13 @@ void MGrid::shrink(double amount)
 
 }
 
+//grow the size of the object by the specified amount
+void MGrid::grow(double amount)
+{
+	unsigned num = ceil(amount / resolution);
+	for (unsigned i = 0; i < num; i++)
+	{
+		growByOne();
+	}
+
+}

@@ -16,6 +16,7 @@
 #include <fstream>
 
 #include "Cube.h"
+#include "MGrid.h"
 #include <boost/tuple/tuple.hpp>
 using namespace std;
 
@@ -239,6 +240,9 @@ public:
 
 	bool equals(const MappableOctTree* rhs) const;
 
+	//create a grid representing this octtree
+	void makeGrid(MGrid& grid, float res) const;
+
 	void dumpGrid(ostream& out, float res) const;
 	void dumpRawGrid(ostream& out, float res) const;
 	void dumpMiraGrid(ostream& out, float res) const;
@@ -345,6 +349,11 @@ public:
 		MappableOctTree *ret = new (mem) MappableOctTree(dim, root, nodes);
 
 		return ret;
+	}
+
+	static MappableOctTree* createFromGrid(const MGrid& grid)
+	{
+		return create(grid.getDimension(), grid.getResolution(),grid);
 	}
 }__attribute__((__packed__));
 

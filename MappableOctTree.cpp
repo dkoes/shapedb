@@ -1159,3 +1159,30 @@ void MappableOctTree::countLeavesAtDepths(vector<unsigned>& counts) const
 	root.countLeavesAtDepths(tree, 0, counts);
 }
 
+void MappableOctTree::makeGrid(MGrid& grid, float res) const
+{
+	//size
+	float dim = dimension;
+	unsigned max = ceil(dim / res);
+	grid = MGrid(dim, res);
+	float start = -dim/2;
+
+	//now coordinates
+	//definitely not the most efficient way
+	for (unsigned i = 0; i < max; i++)
+	{
+		for (unsigned j = 0; j < max; j++)
+		{
+			for (unsigned k = 0; k < max; k++)
+			{
+				if (root.checkCoord(tree, i, j, k, max))
+				{
+					float x = start+i*res;
+					float y = start+j*res;
+					float z = start+k*res;
+					grid.setPoint(x,y,z);
+				}
+			}
+		}
+	}
+}
