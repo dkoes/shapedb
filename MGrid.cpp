@@ -202,13 +202,12 @@ bool MGrid::isExposedPoint(float x, float y, float z) const
 	return true;
 }
 
-bool MGrid::isRightOutsideBorder(float x, float y, float z) const
+//a point that is all by itself
+bool MGrid::isSolitaryPoint(float x, float y, float z) const
 {
-	if(test(x,y,z))
-		return false;
-	if (test(x + resolution, y, z) || test(x - resolution, y, z)
-			|| test(x, y + resolution, z) || test(x, y - resolution, z)
-			|| test(x, y, z + resolution) || test(x, y, z - resolution))
+	if (!test(x + resolution, y, z) && !test(x - resolution, y, z)
+			&& !test(x, y + resolution, z) && !test(x, y - resolution, z)
+			&& !test(x, y, z + resolution) && !test(x, y, z - resolution))
 		return true;
 	return false;
 }
@@ -232,7 +231,9 @@ void MGrid::shrinkByOne()
 		}
 		++en;
 	}
-	grid -= toRemove;
+
+	if(toRemove != grid) //don't vanish completely
+		grid -= toRemove;
 }
 
 void MGrid::growByOne()
@@ -246,10 +247,22 @@ void MGrid::growByOne()
 		unsigned g = *en;
 		double x, y, z;
 		gridToPoint(g, x, y, z);
-		if (isRightOutsideBorder(x, y, z))
-		{
-			toAdd.set(g);
-		}
+
+		if (!test(x+resolution,y,z))
+			toAdd.set(pointToGrid(x+resolution,y,z));
+		if (!test(x-resolution,y,z))
+			toAdd.set(pointToGrid(x-resolution,y,z));
+
+		if (!test(x,y+resolution,z))
+			toAdd.set(pointToGrid(x,y+resolution,z));
+		if (!test(x,y-resolution,z))
+			toAdd.set(pointToGrid(x,y-resolution,z));
+
+		if (!test(x,y,z+resolution))
+			toAdd.set(pointToGrid(x,y,z+resolution));
+		if (!test(x,y,z-resolution))
+			toAdd.set(pointToGrid(x,y,z-resolution));
+
 		++en;
 	}
 	grid |= toAdd;

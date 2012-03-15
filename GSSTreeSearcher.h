@@ -113,10 +113,14 @@ public:
 			float smallShrink, float bigShrink, bool invertBig, bool loadObjs,
 			vector<Object>& res);
 
+	//return everything with a shape between smallTree and bigTree
+	void dc_search(const MappableOctTree* smallTree,
+			const MappableOctTree* bigTree, bool loadObjs, vector<Object>& res);
+
 	//linear scan
-	void dc_scan_search(const Object& smallObj, const Object& bigObj,
-			float smallShrink, float bigShrink, bool invertBig, bool loadObjs,
-			vector<Object>& res);
+	void dc_scan_search(const MappableOctTree* smallTree,
+			const MappableOctTree* bigTree, bool loadObjs, vector<Object>& res);
+
 
 	//return k objects closest to obj
 	void nn_search(const Object& obj, unsigned k, bool loadObjs,

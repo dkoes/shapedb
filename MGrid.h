@@ -9,6 +9,7 @@
 #ifndef MGRID_H_
 #define MGRID_H_
 
+#include <cassert>
 #include <bm/bm.h>
 #include "Cube.h"
 
@@ -66,13 +67,29 @@ public:
 
 	bool isInteriorPoint(float x, float y, float z) const;
 	bool isExposedPoint(float x, float y, float z) const;
-	bool isRightOutsideBorder(float x, float y, float z) const;
+	bool isSolitaryPoint(float x, float y, float z) const;
 
 	//return true if at least part of the sphere fits in the grid
 	bool sphereInGrid(float x, float y, float z, float r) const;
 	void shrink(double amount);
 	void grow(double amount);
 
+	void operator&=(MGrid& rhs)
+	{
+		assert(dimension == rhs.dimension && resolution == rhs.resolution);
+		grid &= rhs.grid;
+	}
+
+	void operator|=(MGrid& rhs)
+	{
+		assert(dimension == rhs.dimension && resolution == rhs.resolution);
+		grid |= rhs.grid;
+	}
+
+	void clear()
+	{
+		grid.clear();
+	}
 };
 
 #endif /* MGRID_H_ */

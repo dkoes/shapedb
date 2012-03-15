@@ -101,10 +101,26 @@ cl::opt<double> MaxDimension("max-dim", cl::desc("Maximum dimension."),
 cl::opt<double> Resolution("resolution",
 		cl::desc("Best resolution for shape database creation."), cl::init(.5));
 
-cl::opt<string> IncludeMol("incmol",
+cl::opt<string> IncludeMol("ligand",
 		cl::desc("Molecule to use for minimum included volume"));
-cl::opt<string> ExcludeMol("exmol",
+cl::opt<string> ExcludeMol("receptor",
 		cl::desc("Molecule to use for excluded volume"));
+
+cl::opt<bool> useInteractionPoints("use-interaction-points",
+		cl::desc(
+				"Analyze the ligand-receptor complex and generate a minimum shape centered around different interaction points."),
+		cl::init(false));
+cl::opt<double> interactionPointRadius("interaction-point-radius",
+		cl::desc("Amount to grow interaction points into ligand shape."),
+		cl::init(0));
+cl::opt<double> interactionDistance("interaction-distance",
+		cl::desc(
+				"Distance between ligand/receptor atom centers that are considered interacting"),
+		cl::init(6));
+cl::opt<double> interactionMinCluster("interaction-min-cluster",
+		cl::desc("Minimum size of interaction point cluster."), cl::init(3));
+cl::opt<double> interactionMaxClusterDist("interaction-max-cluster-dist",
+		cl::desc("Maximum span of interaction point cluster."), cl::init(4));
 
 cl::opt<unsigned> KCenters("kcenters",
 		cl::desc("number of centers for ksample-split"), cl::init(8));
@@ -180,16 +196,62 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 			KeepHydrogens, ProbeRadius);
 	Molecule exMol = *exmolitr;
 
+	//create trees
+
+	//resize receptor constraint
+	MappableOctTree *bigTree = MappableOctTree::create(dimension, resolution,
+			exMol);
+
+	if (more > 0)
+	{
+		MGrid grid;
+		bigTree->makeGrid(grid, resolution);
+		grid.shrink(more);
+		free(bigTree);
+		bigTree = MappableOctTree::createFromGrid(grid);
+	}
+	//exmol is the receptor, so must invert
+	bigTree->invert();
+
+	//use the full shape of the ligand
+	MappableOctTree *smallTree = MappableOctTree::create(dimension, resolution,
+			inMol);
+
+	//shrink if requested
+	if (less > 0)
+	{
+		MGrid grid;
+		smallTree->makeGrid(grid, resolution);
+		grid.shrink(less);
+		free(smallTree);
+		smallTree = MappableOctTree::createFromGrid(grid);
+	}
+
+	if(useInteractionPoints)
+	{
+		//change small tree to just be interaction points
+		MGrid igrid(MaxDimension, Resolution);
+		inMol.computeInteractionGridPoints(exMol, igrid,
+				interactionDistance, interactionMaxClusterDist,
+				interactionMinCluster, interactionPointRadius);
+
+		MGrid lgrid;
+		smallTree->makeGrid(lgrid, Resolution);
+		lgrid &= igrid;
+		free(smallTree);
+		smallTree = MappableOctTree::createFromGrid(lgrid);
+	}
+
 	vector<Molecule> res;
 
 	//search
 	if (!ScanOnly)
-		gss.dc_search(inMol, exMol, less, more, true, output.size() > 0, res);
+		gss.dc_search(smallTree, bigTree, output.size() > 0, res);
 
 	if (ScanCheck || ScanOnly)
 	{
 		vector<Molecule> res2;
-		gss.dc_scan_search(inMol, exMol, less, more, true, output.size() > 0,
+		gss.dc_scan_search(smallTree, bigTree, output.size() > 0,
 				res2);
 		if (res2.size() != res.size())
 		{
@@ -203,6 +265,9 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 		for (unsigned i = 0, n = res.size(); i < n; i++)
 			outmols.write(res[i]);
 	}
+
+	free(smallTree);
+	free(bigTree);
 
 }
 
@@ -250,6 +315,31 @@ struct QInfo
 	{
 	}
 };
+
+static void dumpTree(MappableOctTree *tree, ostream& out)
+{
+
+	cout << "Size of tree " << tree->bytes() << "\n";
+	cout << "Volume of tree " << tree->volume() << "\n";
+	cout << "Nodes of tree " << tree->nodes() << "\n";
+	vector<unsigned> cnts;
+	tree->countLeavesAtDepths(cnts);
+	for (unsigned i = 0, n = cnts.size(); i < n; i++)
+	{
+		cout << i << " : " << cnts[i] << "\n";
+	}
+	if (out)
+	{
+		if (filesystem::extension(Output.c_str()) == ".raw")
+			tree->dumpRawGrid(out, Resolution);
+		else if (filesystem::extension(Output.c_str()) == ".mira")
+			tree->dumpMiraGrid(out, Resolution);
+		else if (filesystem::extension(Output.c_str()) == ".csv")
+			tree->dumpSproxelGrid(out, Resolution, SproxelColor);
+		else
+			tree->dumpGrid(out, Resolution);
+	}
+}
 
 int main(int argc, char *argv[])
 {
@@ -346,20 +436,36 @@ int main(int argc, char *argv[])
 			{
 				vector<Molecule> res;
 				//search
+				MappableOctTree* tree = MappableOctTree::create(dimension, resolution, *inmols);
+				MGrid lgrid(dimension,resolution);
+				tree->makeGrid(lgrid, resolution);
+				free(tree);
+
+				MGrid lgrid2(lgrid);
+
+				//resize
+				lgrid.shrink(LessDist);
+				lgrid2.grow(MoreDist);
+
+				//create bounding trees
+				MappableOctTree *smallTree = MappableOctTree::createFromGrid(lgrid);
+				MappableOctTree *bigTree = MappableOctTree::createFromGrid(lgrid2);
+
 				if (!ScanOnly)
-					gss.dc_search(*inmols, *inmols, LessDist, MoreDist, false,
-							Output.size() > 1, res);
+					gss.dc_search(smallTree, bigTree, Output.size() > 1, res);
 
 				if (ScanCheck || ScanOnly)
 				{
 					vector<Molecule> res2;
-					gss.dc_scan_search(*inmols, *inmols, LessDist, MoreDist,
-							false, Output.size() > 1, res2);
+					gss.dc_scan_search(smallTree,bigTree, Output.size() > 1, res2);
 					if (res2.size() != res.size())
 					{
 						cerr << "Scanning found different number\n";
 					}
 				}
+
+				free(smallTree);
+				free(bigTree);
 
 				Molecule::molostream outmols(Output);
 				for (unsigned i = 0, n = res.size(); i < n; i++)
@@ -564,44 +670,62 @@ int main(int argc, char *argv[])
 	{
 		ofstream out(Output.c_str());
 
-		for (Molecule::iterator mitr(Input, MaxDimension, Resolution,
-				KeepHydrogens, ProbeRadius); mitr; ++mitr)
+		if (useInteractionPoints)
 		{
+			if (IncludeMol.size() == 0 || ExcludeMol.size() == 0)
+			{
+				cerr
+						<< "Need both ligand and receptor for interaction points.\n";
+				exit(-1);
+			}
+			Molecule::iterator imolitr(IncludeMol, MaxDimension, Resolution,
+					KeepHydrogens, ProbeRadius);
+			Molecule ligand = *imolitr;
+
+			Molecule::iterator exmolitr(ExcludeMol, MaxDimension, Resolution,
+					KeepHydrogens, ProbeRadius);
+			Molecule receptor = *exmolitr;
+
+			MGrid igrid(MaxDimension, Resolution);
+			ligand.computeInteractionGridPoints(receptor, igrid,
+					interactionDistance, interactionMaxClusterDist,
+					interactionMinCluster, interactionPointRadius);
+
 			MappableOctTree *tree = MappableOctTree::create(MaxDimension,
-					Resolution, *mitr);
+					Resolution, ligand);
+			MGrid lgrid;
+			tree->makeGrid(lgrid, Resolution);
+			lgrid.shrink(LessDist);
 
-			if(LessDist >= 0)
-			{
-				MGrid grid;
-				tree->makeGrid(grid, Resolution);
+			lgrid &= igrid;
 
-				grid.shrink(LessDist);
-				free(tree);
-				tree = MappableOctTree::createFromGrid(grid);
-			}
-
-			cout << "Size of tree " << tree->bytes() << "\n";
-			cout << "Volume of tree " << tree->volume() << "\n";
-			cout << "Nodes of tree " << tree->nodes() << "\n";
-
-			vector<unsigned> cnts;
-			tree->countLeavesAtDepths(cnts);
-			for (unsigned i = 0, n = cnts.size(); i < n; i++)
-			{
-				cout << i << " : " << cnts[i] << "\n";
-			}
-			if (out)
-			{
-				if (filesystem::extension(Output.c_str()) == ".raw")
-					tree->dumpRawGrid(out, Resolution);
-				else if (filesystem::extension(Output.c_str()) == ".mira")
-					tree->dumpMiraGrid(out, Resolution);
-				else if (filesystem::extension(Output.c_str()) == ".csv")
-					tree->dumpSproxelGrid(out, Resolution, SproxelColor);
-				else
-					tree->dumpGrid(out, Resolution);
-			}
 			free(tree);
+			tree = MappableOctTree::createFromGrid(lgrid);
+
+			dumpTree(tree, out);
+			free(tree);
+		}
+		else
+		{
+			for (Molecule::iterator mitr(Input, MaxDimension, Resolution,
+					KeepHydrogens, ProbeRadius); mitr; ++mitr)
+			{
+				MappableOctTree *tree = MappableOctTree::create(MaxDimension,
+						Resolution, *mitr);
+
+				if (LessDist >= 0)
+				{
+					MGrid grid;
+					tree->makeGrid(grid, Resolution);
+
+					grid.shrink(LessDist);
+					free(tree);
+					tree = MappableOctTree::createFromGrid(grid);
+				}
+
+				dumpTree(tree, out);
+				free(tree);
+			}
 		}
 		break;
 	}

@@ -55,11 +55,14 @@ class TriChecker
 	}
 
 public:
-	double height() const { return h_ijk; }
+	double height() const
+	{
+		return h_ijk;
+	}
 	TriChecker(const MolSphere& a, const MolSphere& b, const MolSphere& c,
 			float p)
 	{
-		probeSq = p*p;
+		probeSq = p * p;
 		//calculate position of two spheres that touch a, b and c
 		//take these calculations from connely
 		vector3 a_i(a.x, a.y, a.z);
@@ -75,18 +78,20 @@ public:
 		vector3 u_ik = (a_k - a_i) / d_ik;
 
 		//torus center
-		vector3 t_ij = .5 * (a_i + a_j) + .5 * (a_j - a_i)
-				* ((a.r + p) * (a.r + p) - (b.r + p) * (b.r + p))
+		vector3 t_ij = .5 * (a_i + a_j)
+				+ .5 * (a_j - a_i)
+						* ((a.r + p) * (a.r + p) - (b.r + p) * (b.r + p))
 						/ (d_ij * d_ij);
-		vector3 t_ik = .5 * (a_i + a_k) + .5 * (a_k - a_i)
-				* ((a.r + p) * (a.r + p) - (c.r + p) * (c.r + p))
+		vector3 t_ik = .5 * (a_i + a_k)
+				+ .5 * (a_k - a_i)
+						* ((a.r + p) * (a.r + p) - (c.r + p) * (c.r + p))
 						/ (d_ik * d_ik);
 
 		//base triangle angle
 		double w_ijk = acos(dot(u_ij, u_ik));
 
 		//base plane normal vector
-		vector3 u_ijk = cross(u_ij,  u_ik)/sin(w_ijk);
+		vector3 u_ijk = cross(u_ij, u_ik) / sin(w_ijk);
 
 		//torus base point unit vector
 		vector3 u_tb = cross(u_ijk, u_ij);
@@ -120,7 +125,7 @@ public:
 		//make absolutely sure signs are correct
 		for (unsigned i = 0; i < 6; i++)
 		{
-			unsigned index = (i+4)%6; //opposite
+			unsigned index = (i + 4) % 6; //opposite
 			vector3 opppt = points[index];
 			double val = dot(opppt - points[i], normals[i]);
 			if (val < 0)
@@ -132,10 +137,10 @@ public:
 
 	bool isValid() const
 	{
-		if(isfinite(h_ijk))
+		if (isfinite(h_ijk))
 		{
 			//ignore cusps where the sasa isn't connected
-			if(height()*height() < probeSq)
+			if (height() * height() < probeSq)
 				return false;
 			return true;
 		}
@@ -172,25 +177,24 @@ public:
 	bool containsPoint(float x, float y, float z) const
 	{
 		//can't be within the probe
-		float d1 = distSq(x,y,z,pc1.x(), pc1.y(), pc1.z());
-		if(d1 < probeSq)
+		float d1 = distSq(x, y, z, pc1.x(), pc1.y(), pc1.z());
+		if (d1 < probeSq)
 			return false;
-		float d2 = distSq(x,y,z,pc2.x(), pc2.y(), pc2.z());
-		if(d2 < probeSq)
+		float d2 = distSq(x, y, z, pc2.x(), pc2.y(), pc2.z());
+		if (d2 < probeSq)
 			return false;
 
 		//if it is within the double pyramid, then contained
-		vector3 pt(x,y,z);
-		for(unsigned i = 0; i < 6; i++)
+		vector3 pt(x, y, z);
+		for (unsigned i = 0; i < 6; i++)
 		{
-			double val = dot(pt-points[i],normals[i]);
-			if(val < 0)
+			double val = dot(pt - points[i], normals[i]);
+			if (val < 0)
 				return false;
 		}
 
 		return true;
 	}
-
 
 };
 
@@ -307,30 +311,29 @@ public:
 		return d < r;
 	}
 
-
 	friend void swap(ToroidChecker& a, ToroidChecker& b)
 	{
 		using std::swap;
 		// bring in swap for built-in types
-		swap(a.a,b.a);
-		swap(a.b,b.b);
-		swap(a.probe,b.probe);
-		swap(a.smallSq,b.smallSq);
-		swap(a.largeSq,b.largeSq);
+		swap(a.a, b.a);
+		swap(a.b, b.b);
+		swap(a.probe, b.probe);
+		swap(a.smallSq, b.smallSq);
+		swap(a.largeSq, b.largeSq);
 
-		swap(a.AminxSq,b.AminxSq);
-		swap(a.AmaxxSq,b.AmaxxSq);
-		swap(a.BminxSq,b.BminxSq);
-		swap(a.BmaxxSq,b.BmaxxSq);
-		swap(a.probecY,b.probecY);
-		swap(a.probecX,b.probecX);
+		swap(a.AminxSq, b.AminxSq);
+		swap(a.AmaxxSq, b.AmaxxSq);
+		swap(a.BminxSq, b.BminxSq);
+		swap(a.BmaxxSq, b.BmaxxSq);
+		swap(a.probecY, b.probecY);
+		swap(a.probecX, b.probecX);
 
-		swap(a.asq,b.asq);
-		swap(a.bsq,b.bsq);
+		swap(a.asq, b.asq);
+		swap(a.bsq, b.bsq);
 
-		swap(a.AcheckR,b.AcheckR);
+		swap(a.AcheckR, b.AcheckR);
 
-		swap(a.tricheckers,b.tricheckers);
+		swap(a.tricheckers, b.tricheckers);
 	}
 
 	ToroidChecker(const MolSphere& x, const MolSphere& y, float p) :
@@ -384,13 +387,13 @@ public:
 
 	bool containsPoint(float x, float y, float z) const
 	{
-		if(toroidContainsPoint(x,y,z))
+		if (toroidContainsPoint(x, y, z))
 			return true;
 
 		//check tri-points
-		for(unsigned i = 0, n = tricheckers.size(); i < n; i++)
+		for (unsigned i = 0, n = tricheckers.size(); i < n; i++)
 		{
-			if(tricheckers[i].containsPoint(x,y,z))
+			if (tricheckers[i].containsPoint(x, y, z))
 			{
 				return true;
 			}
@@ -402,12 +405,12 @@ public:
 	void addNeighbors(const vector<MolSphere>& spheres, unsigned start,
 			float probe)
 	{
-		for(unsigned i = start, n = spheres.size(); i < n; i++)
+		for (unsigned i = start, n = spheres.size(); i < n; i++)
 		{
-			if(TriChecker::isNonTrivial(a,b,spheres[i],probe))
+			if (TriChecker::isNonTrivial(a, b, spheres[i], probe))
 			{
-				TriChecker check(a,b,spheres[i],probe);
-				if(check.isValid())
+				TriChecker check(a, b, spheres[i], probe);
+				if (check.isValid())
 				{
 					tricheckers.push_back(check);
 				}
@@ -457,7 +460,7 @@ public:
 				if (checkR > sphere.r)
 					sphere.r = checkR;
 
-				toroids.back().addNeighbors(spheres,i+1,probe);
+				toroids.back().addNeighbors(spheres, i + 1, probe);
 			}
 		}
 	}
@@ -519,10 +522,7 @@ class OBAMolecule
 		{
 			OBAtom* atom = *aitr;
 			spheres.push_back(
-					MolSphere(
-							atom->x(),
-							atom->y(),
-							atom->z(),
+					MolSphere(atom->x(), atom->y(), atom->z(),
 							etab.GetVdwRad(atom->GetAtomicNum())
 									- adjustAmount));
 		}
@@ -532,7 +532,7 @@ class OBAMolecule
 		for (unsigned i = 0, n = spheres.size(); i < n; i++)
 		{
 			checkers.push_back(SphereChecker(spheres[i]));
-			checkers.back().addNeighbors(spheres, i+1, probe);
+			checkers.back().addNeighbors(spheres, i + 1, probe);
 		}
 
 		reverse(checkers.begin(), checkers.end());
@@ -572,12 +572,6 @@ public:
 		//don't bother with spheres
 	}
 
-	//mutate small to be smaller/larger
-	void adjust(float dimension, float resolution, float probe)
-	{
-		set(mol, dimension, resolution, probe, 0);
-	}
-
 	bool intersects(const Cube& cube) const
 	{
 		for (unsigned i = 0, n = checkers.size(); i < n; i++)
@@ -608,6 +602,12 @@ public:
 
 		return false;
 	}
+
+	//computes a set of solitary grid points that represent the interaction between
+	//this ligand and the provided receptor in some way
+	void computeInteractionGridPoints(OBAMolecule& receptor, MGrid& grid,
+			double interactionDist, double maxClusterDist,
+			unsigned minClusterPoints, double interactionPointRadius);
 
 	void write(ostream& out) const
 	{
@@ -641,17 +641,24 @@ class OBAMolIterator
 	void readOne()
 	{
 		valid = inconv.Read(&mol);
-		if(!keepHydrogens)
+		if (!keepHydrogens)
 			mol.DeleteHydrogens();
 		currmolecule.set(mol, dimension, resolution, probe);
 	}
 public:
-	OBAMolIterator(const string& fname, float dim, float res, bool keepH, float prb) :
-			valid(true), keepHydrogens(keepH), dimension(dim), resolution(res), probe(prb)
+	OBAMolIterator(const string& fname, float dim, float res, bool keepH,
+			float prb) :
+			valid(true), keepHydrogens(keepH), dimension(dim), resolution(res), probe(
+					prb)
 	{
+		if (fname.size() == 0)
+		{
+			valid = false;
+			return;
+		}
 		inconv.SetInFormat(inconv.FormatFromExt(fname));
 		valid = inconv.ReadFile(&mol, fname);
-		if(!keepHydrogens)
+		if (!keepHydrogens)
 			mol.DeleteHydrogens();
 		mol.SetHybridizationPerceived(); //otherwise segfault trying to gethyb
 		currmolecule.set(mol, dimension, resolution, probe);
