@@ -23,6 +23,7 @@
 #include "MolSphere.h"
 #include "Cube.h"
 #include "MGrid.h"
+#include "PMol.h"
 
 using namespace OpenBabel;
 using namespace std;
@@ -543,7 +544,6 @@ class OBAMolecule
 
 public:
 	typedef OBAMolIterator iterator;
-	typedef OBAMolOutput molostream;
 
 	OBAMolecule() :
 			adjustAmount(0), probe(0)
@@ -551,25 +551,6 @@ public:
 	}
 	~OBAMolecule()
 	{
-	}
-
-	OBAMolecule(const char *data) :
-			adjustAmount(0), probe(0)
-	{
-		OBConversion conv;
-		conv.SetInAndOutFormats("SDF", "SDF");
-		conv.SetOptions("z", OBConversion::INOPTIONS);
-		conv.SetOptions("z", OBConversion::GENOPTIONS);
-
-		unsigned n = 0;
-		memcpy(&n, data, sizeof(unsigned));
-		const char* mdata = (const char*) data + sizeof(unsigned);
-
-		string mstr(mdata, n);
-
-		conv.ReadString((OBBase*) &mol, mstr);
-
-		//don't bother with spheres
 	}
 
 	bool intersects(const Cube& cube) const
@@ -611,17 +592,9 @@ public:
 
 	void write(ostream& out) const
 	{
-		OBConversion conv;
-		conv.SetInAndOutFormats("SDF", "SDF");
-		conv.SetOptions("z", OBConversion::OUTOPTIONS);
-		conv.SetOptions("z", OBConversion::GENOPTIONS);
-
-		OBMol copy = mol; //because OB doesn't have a const version
-		string mstr = conv.WriteString(&copy);
-
-		unsigned n = mstr.length();
-		out.write((char*) &n, sizeof(unsigned));
-		out.write(mstr.c_str(), n);
+		OBMol m(mol);
+		PMolCreator pmol(m, true);
+		pmol.writeBinary(out);
 	}
 
 };
@@ -683,24 +656,5 @@ public:
 
 };
 
-//output molecules to a file
-class OBAMolOutput
-{
-	OBConversion outconv;
-	ofstream out;
-public:
-	//open file for output
-	OBAMolOutput(const string& fname)
-	{
-		outconv.SetOutFormat(outconv.FormatFromExt(fname.c_str()));
-		out.open(fname.c_str());
-		outconv.SetOutStream(&out);
-	}
-
-	bool write(OBAMolecule& mol)
-	{
-		return outconv.Write(&mol.getMol());
-	}
-};
 
 #endif /* OBMOLECULEA_H_ */

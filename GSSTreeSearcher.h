@@ -14,6 +14,7 @@
 #include "molecules/Molecule.h"
 #include "MemMapped.h"
 #include "MappableOctTree.h"
+#include "molecules/ResultMolecules.h"
 
 using namespace boost;
 using namespace std;
@@ -111,20 +112,20 @@ public:
 	//return everything with a shape between smallObj and bigObj
 	void dc_search(const Object& smallObj, const Object& bigObj,
 			float smallShrink, float bigShrink, bool invertBig, bool loadObjs,
-			vector<Object>& res);
+			ResultMolecules& res);
 
 	//return everything with a shape between smallTree and bigTree
 	void dc_search(const MappableOctTree* smallTree,
-			const MappableOctTree* bigTree, bool loadObjs, vector<Object>& res);
+			const MappableOctTree* bigTree, bool loadObjs, ResultMolecules& res);
 
 	//linear scan
 	void dc_scan_search(const MappableOctTree* smallTree,
-			const MappableOctTree* bigTree, bool loadObjs, vector<Object>& res);
+			const MappableOctTree* bigTree, bool loadObjs, ResultMolecules& res);
 
 
 	//return k objects closest to obj
 	void nn_search(const Object& obj, unsigned k, bool loadObjs,
-			vector<Object>& res);
+			ResultMolecules& res);
 
 	float getDimension() const
 	{

@@ -58,7 +58,7 @@ GSSTreeSearcher::~GSSTreeSearcher()
 //find all the shapes in the database that lie bewtween smallObj and bigObj
 //if invertBig is set, than treat as an excluded volume
 void GSSTreeSearcher::dc_search(const MappableOctTree* smallTree,
-		const MappableOctTree* bigTree, bool loadObjs, vector<Object>& res)
+		const MappableOctTree* bigTree, bool loadObjs, ResultMolecules& res)
 {
 	res.clear();
 
@@ -89,7 +89,7 @@ void GSSTreeSearcher::dc_search(const MappableOctTree* smallTree,
 		for (unsigned i = 0, n = respos.size(); i < n; i++)
 		{
 			const char * addr = objects.begin() + respos[i];
-			res.push_back(Object(addr));
+			res.add(addr);
 		}
 	}
 
@@ -112,7 +112,7 @@ void GSSTreeSearcher::dc_search(const MappableOctTree* smallTree,
 //if invertBig is set, than treat as an excluded volume
 void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
 		float smallShrink, float bigShrink, bool invertBig, bool loadObjs,
-		vector<Object>& res)
+		ResultMolecules& res)
 {
 	MappableOctTree *smallTree = MappableOctTree::create(dimension, resolution,
 			smallObj);
@@ -276,7 +276,7 @@ void GSSTreeSearcher::findNearest(const GSSLeaf* node,
 }
 
 void GSSTreeSearcher::nn_search(const Object& obj, unsigned k, bool loadObjs,
-		vector<Object>& res)
+		ResultMolecules& res)
 {
 	const MappableOctTree *objTree = MappableOctTree::create(dimension,
 			resolution, obj);
@@ -312,7 +312,7 @@ void GSSTreeSearcher::nn_search(const Object& obj, unsigned k, bool loadObjs,
 				cout << i << " " << ret[i].dist << "\n";
 			}
 			const char * addr = objects.begin() + ret[i].objpos;
-			res.push_back(Object(addr));
+			res.add(addr);
 		}
 	}
 
@@ -350,7 +350,7 @@ bool GSSTreeSearcher::fitsInbetween(const MappableOctTree *MIV,
 
 //find everyting between small and big using linear scan
 void GSSTreeSearcher::dc_scan_search(const MappableOctTree* smallTree,
-		const MappableOctTree* bigTree, bool loadObjs, vector<Object>& res)
+		const MappableOctTree* bigTree, bool loadObjs, ResultMolecules& res)
 {
 	res.clear();
 
@@ -370,10 +370,11 @@ void GSSTreeSearcher::dc_scan_search(const MappableOctTree* smallTree,
 	{
 		//extract objects in sequential order
 		sort(respos.begin(), respos.end());
+		res.reserve(respos.size());
 		for (unsigned i = 0, n = respos.size(); i < n; i++)
 		{
 			const char * addr = objects.begin() + respos[i];
-			res.push_back(Object(addr));
+			res.add(addr);
 		}
 	}
 

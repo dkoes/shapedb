@@ -242,7 +242,7 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 		smallTree = MappableOctTree::createFromGrid(lgrid);
 	}
 
-	vector<Molecule> res;
+	ResultMolecules res;
 
 	//search
 	if (!ScanOnly)
@@ -250,7 +250,7 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 
 	if (ScanCheck || ScanOnly)
 	{
-		vector<Molecule> res2;
+		ResultMolecules res2;
 		gss.dc_scan_search(smallTree, bigTree, output.size() > 0,
 				res2);
 		if (res2.size() != res.size())
@@ -261,9 +261,9 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 
 	if (output.size() > 0)
 	{
-		Molecule::molostream outmols(output);
+		ofstream outmols(output.c_str());
 		for (unsigned i = 0, n = res.size(); i < n; i++)
-			outmols.write(res[i]);
+			res.writeSDF(outmols, i);
 	}
 
 	free(smallTree);
@@ -275,7 +275,7 @@ void do_nnsearch(GSSTreeSearcher& gss, const string& input,
 		const string& output, unsigned k)
 {
 	//read query molecule(s)
-	vector<Molecule> res;
+	ResultMolecules res;
 	Molecule::iterator molitr(input, gss.getDimension(), gss.getResolution(),
 			KeepHydrogens, ProbeRadius);
 	for (; molitr; ++molitr)
@@ -284,10 +284,9 @@ void do_nnsearch(GSSTreeSearcher& gss, const string& input,
 		gss.nn_search(mol, k, output.size() > 0, res);
 	}
 
-	Molecule::molostream outmols(output);
-
+	ofstream out(output.c_str());
 	for (unsigned i = 0, n = res.size(); i < n; i++)
-		outmols.write(res[i]);
+		res.writeSDF(out, i);
 }
 
 struct QInfo
@@ -434,7 +433,7 @@ int main(int argc, char *argv[])
 			for (Molecule::iterator inmols(Input, dimension, resolution,
 					KeepHydrogens, ProbeRadius); inmols; ++inmols)
 			{
-				vector<Molecule> res;
+				ResultMolecules res;
 				//search
 				MappableOctTree* tree = MappableOctTree::create(dimension, resolution, *inmols);
 				MGrid lgrid(dimension,resolution);
@@ -456,7 +455,7 @@ int main(int argc, char *argv[])
 
 				if (ScanCheck || ScanOnly)
 				{
-					vector<Molecule> res2;
+					ResultMolecules res2;
 					gss.dc_scan_search(smallTree,bigTree, Output.size() > 1, res2);
 					if (res2.size() != res.size())
 					{
@@ -467,9 +466,9 @@ int main(int argc, char *argv[])
 				free(smallTree);
 				free(bigTree);
 
-				Molecule::molostream outmols(Output);
+				ofstream outmols(Output.c_str());
 				for (unsigned i = 0, n = res.size(); i < n; i++)
-					outmols.write(res[i]);
+					res.writeSDF(outmols, i);
 			}
 		}
 	}
@@ -648,7 +647,7 @@ int main(int argc, char *argv[])
 				exit(-1);
 			}
 
-			vector<Molecule> res;
+			ResultMolecules res;
 			for (unsigned i = 0, n = qinfos.size(); i < n; i++)
 			{
 				cout << line << " " << qinfos[i].str << "\n";

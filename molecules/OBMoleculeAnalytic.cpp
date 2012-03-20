@@ -87,9 +87,9 @@ struct AtomPoint
 
 };
 
-typedef pair<unsigned, vector<unsigned> > AdjList;
+typedef pair<unsigned, vector<unsigned> > ClusterAdjList;
 
-static bool neighSorter(const AdjList& lhs, const AdjList& rhs)
+static bool neighSorter(const ClusterAdjList& lhs, const ClusterAdjList& rhs)
 {
 	return lhs.second.size() < rhs.second.size();
 }
@@ -116,7 +116,7 @@ static void clusterPoints(const vector<AtomPoint>& points,
 	multi_array<double, 2> distances(extents[N][N]);
 
 	//compute distances array and count close neighbors
-	vector<AdjList> closeNeighbors(N);
+	vector<ClusterAdjList> closeNeighbors(N);
 	double maxdistSq = maxClusterDist * maxClusterDist;
 
 	for (unsigned i = 0; i < N; i++)
