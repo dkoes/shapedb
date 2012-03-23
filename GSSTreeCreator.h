@@ -124,6 +124,12 @@ public:
 	}
 	~GSSTreeCreator()
 	{
+		//workfiles must be explicitly cleared
+		objects.clear();
+		for(unsigned i = 0, n = nodes.size(); i < n; i++)
+		{
+			nodes[i].clear();
+		}
 	}
 
 	bool create(filesystem::path dir, Object::iterator& itr, float dim,

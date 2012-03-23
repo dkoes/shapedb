@@ -124,6 +124,8 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr,
 	{
 		nodes[i].clear();
 	}
+	nexttrees.clear();
+	currenttrees.clear();
 	return true;
 }
 

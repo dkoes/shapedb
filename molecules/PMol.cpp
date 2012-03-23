@@ -180,7 +180,6 @@ bool PMolCreator::writeBinary(ostream& out) const
 			+ sizeof(unsigned char) * nDsts + sizeof(char) * (name.size() + 1);
 	unsigned check = 0;
 	out.write((char*) &size, sizeof(unsigned short));
-
 	header.nAtoms = numAtoms;
 	header.nAtomTypes = atoms.size();
 	header.nCHG = chg.size();
