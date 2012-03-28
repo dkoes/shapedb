@@ -239,7 +239,6 @@ void OBAMolecule::computeInteractionGridPoints(OBAMolecule& receptor,
 			double zave = ztot / (double) npts;
 
 			grid.setPoint(xave, yave, zave);
-
 			if(interactionPointRadius > 0)
 			{
 				grid.markXYZSphere(xave,yave,zave,interactionPointRadius);

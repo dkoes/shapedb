@@ -90,6 +90,11 @@ public:
 	{
 		grid.clear();
 	}
+
+	unsigned numSet() const
+	{
+		return grid.count();
+	}
 };
 
 #endif /* MGRID_H_ */
