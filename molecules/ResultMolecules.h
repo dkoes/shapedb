@@ -12,6 +12,7 @@
 
 #include <iostream>
 #include <vector>
+#include <boost/lexical_cast.hpp>
 #include "PMol.h"
 using namespace std;
 
@@ -19,7 +20,7 @@ class ResultMolecules
 {
 	PMolReaderMalloc reader;
 	vector<PMol*> mols;
-
+	vector<double> scores;
 public:
 	ResultMolecules()
 	{
@@ -40,9 +41,11 @@ public:
 	}
 
 	//add a molecule to the result set; written in pmolf format at data
-	void add(const char *data)
+	//support a single sddata entry for the goodness of the result
+	void add(const char *data, double score)
 	{
 		mols.push_back((PMol*)reader.readPMol(data));
+		scores.push_back(score);
 	}
 
 	void reserve(unsigned n)
@@ -60,7 +63,9 @@ public:
 	void writeSDF(ostream& out, unsigned i) const
 	{
 		assert(i < mols.size());
-		mols[i]->writeSDF(out);
+		vector<ASDDataItem> data;
+		data.push_back(ASDDataItem("score",boost::lexical_cast<string>(scores[i])));
+		mols[i]->writeSDF(out, data);
 	}
 
 };

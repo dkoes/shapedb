@@ -178,10 +178,11 @@ cl::opt<string> SproxelColor("sproxel-color",
 cl::opt<bool> KeepHydrogens("h",
 		cl::desc("Retain hydrogens in input molecules"), cl::init(false));
 
-//do search between include and exclude
-static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
-		const string& excludeMol, const string& output, double less,
-		double more)
+//create min and max trees from molecular data
+//caller takes owner ship of tree memory
+static void create_trees(GSSTreeSearcher& gss, const string& includeMol,
+		const string& excludeMol,double less,
+		double more, MappableOctTree*& smallTree, MappableOctTree*& bigTree)
 {
 	double dimension = gss.getDimension();
 	double resolution = gss.getResolution();
@@ -199,7 +200,7 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 	//create trees
 
 	//resize receptor constraint
-	MappableOctTree *bigTree = MappableOctTree::create(dimension, resolution,
+	bigTree = MappableOctTree::create(dimension, resolution,
 			exMol);
 
 	if (more > 0)
@@ -214,7 +215,7 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 	bigTree->invert();
 
 	//use the full shape of the ligand
-	MappableOctTree *smallTree = MappableOctTree::create(dimension, resolution,
+	smallTree = MappableOctTree::create(dimension, resolution,
 			inMol);
 
 	//shrink if requested
@@ -242,6 +243,11 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 		smallTree = MappableOctTree::createFromGrid(lgrid);
 	}
 
+}
+
+//do search between include and exclude
+static void do_dcsearch(GSSTreeSearcher& gss, const MappableOctTree* smallTree, const MappableOctTree* bigTree, const string& output)
+{
 	ResultMolecules res;
 
 	//search
@@ -265,9 +271,6 @@ static void do_dcsearch(GSSTreeSearcher& gss, const string& includeMol,
 		for (unsigned i = 0, n = res.size(); i < n; i++)
 			res.writeSDF(outmols, i);
 	}
-
-	free(smallTree);
-	free(bigTree);
 
 }
 
@@ -405,7 +408,20 @@ int main(int argc, char *argv[])
 			exit(-1);
 		}
 
-		do_nnsearch(gss, Input, Output, K);
+		if(ExcludeMol.size() == 0)
+		{
+			do_nnsearch(gss, IncludeMol, Output, K);
+		}
+		else
+		{
+			ResultMolecules res;
+			MappableOctTree *smallTree = NULL, *bigTree = NULL;
+			create_trees(gss, IncludeMol, ExcludeMol, LessDist, MoreDist, smallTree, bigTree);
+			gss.nn_search(smallTree, bigTree, K, true, res);
+			ofstream out(Output.c_str());
+			for (unsigned i = 0, n = res.size(); i < n; i++)
+				res.writeSDF(out, i);
+		}
 	}
 		break;
 	case DCSearch:
@@ -425,8 +441,11 @@ int main(int argc, char *argv[])
 		//read query molecule(s)
 		if (IncludeMol.size() > 0 || ExcludeMol.size() > 0)
 		{
-			do_dcsearch(gss, IncludeMol, ExcludeMol, Output, LessDist,
-					MoreDist);
+			MappableOctTree *smallTree = NULL, *bigTree = NULL;
+			create_trees(gss, IncludeMol, ExcludeMol, LessDist, MoreDist, smallTree, bigTree);
+			do_dcsearch(gss, smallTree, bigTree, Output);
+			free(smallTree);
+			free(bigTree);
 		}
 		else // range from single molecules
 		{
@@ -536,7 +555,10 @@ int main(int argc, char *argv[])
 
 				if (cmd == "DCSearch")
 				{
-					do_dcsearch(gss, ligand, receptor, output, less, more);
+					MappableOctTree *smallTree = NULL, *bigTree = NULL;
+					create_trees(gss, ligand, receptor, less, more, smallTree, bigTree);
+					do_dcsearch(gss, smallTree, bigTree, output);
+					free(smallTree); free(bigTree);
 				}
 				else if (cmd == "NNSearch")
 				{

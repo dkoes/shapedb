@@ -225,6 +225,12 @@ public:
 	void writeSDF(ostream& out, const vector<ASDDataItem>& sddata,
 			const RMSDResult& rms);
 
+	void writeSDF(ostream& out, const vector<ASDDataItem>& sddata)
+	{
+		RMSDResult rdummy;
+		writeSDF(out, sddata, rdummy);
+	}
+
 	void writeSDF(ostream& out)
 	{
 		vector<ASDDataItem> dummy;

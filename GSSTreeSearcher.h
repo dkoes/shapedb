@@ -33,10 +33,10 @@ class GSSTreeSearcher
 	float resolution;
 
 	void findTweeners(const GSSInternalNode* node, const MappableOctTree* min,
-			const MappableOctTree* max, vector<file_index>& res,
-			unsigned level);
+			const MappableOctTree* max, vector<result_info>& res,
+			unsigned level, bool computeDist);
 	void findTweeners(const GSSLeaf* node, const MappableOctTree* min,
-			const MappableOctTree* max, vector<file_index>& res);
+			const MappableOctTree* max, vector<result_info>& res, bool computeDist);
 
 	struct ObjDist
 	{
@@ -78,11 +78,17 @@ class GSSTreeSearcher
 		{
 			return objs[i];
 		}
+
 	};
 
 	void findNearest(const GSSInternalNode* node, const MappableOctTree* obj,
 			TopKObj& res, unsigned level);
 	void findNearest(const GSSLeaf* node, const MappableOctTree* obj,
+			TopKObj& res);
+
+	void findNearest(const GSSInternalNode* node, const MappableOctTree* minobj, const MappableOctTree* maxobj,
+			TopKObj& res, unsigned level);
+	void findNearest(const GSSLeaf* node, const MappableOctTree* minobj, const MappableOctTree* maxobj,
 			TopKObj& res);
 
 	unsigned fitsCheck;
@@ -125,6 +131,11 @@ public:
 
 	//return k objects closest to obj
 	void nn_search(const Object& obj, unsigned k, bool loadObjs,
+			ResultMolecules& res);
+
+	//return k objects closes to small/big obj using shapeDistance
+	void nn_search(const MappableOctTree* smallTree,
+			const MappableOctTree* bigTree, unsigned k, bool loadObjs,
 			ResultMolecules& res);
 
 	float getDimension() const

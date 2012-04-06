@@ -20,6 +20,21 @@ using namespace boost;
 
 typedef unsigned long file_index;
 
+struct result_info
+{
+	file_index pos; //position of result
+	double val; //some measure of goodness of result
+
+	result_info(): pos(0), val(0) {}
+	result_info(file_index p, double v): pos(p), val(v) {}
+
+	//sort by position for better access
+	bool operator<(const result_info& rhs) const
+	{
+		return pos < rhs.pos;
+	}
+};
+
 class DataViewer;
 struct Cluster;
 

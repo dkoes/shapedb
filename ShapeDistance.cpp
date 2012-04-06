@@ -114,7 +114,7 @@ void setDistance(DistanceFunction df, float dim)
 }
 
 //return a "distance" between obj and MIV/MSV; the lower the distance
-//the higher the more likely a node should be searched
+//the  more likely a node should be searched
 //min and max should bookend the ultimate leaf volume distances
 float searchVolumeDist(const MappableOctTree* obj, const MappableOctTree* MIV,
 		const MappableOctTree* MSV, float& min, float& max)
