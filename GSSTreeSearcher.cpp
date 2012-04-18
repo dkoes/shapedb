@@ -354,6 +354,64 @@ void GSSTreeSearcher::nn_search(const MappableOctTree* smallTree,
 	}
 }
 
+void GSSTreeSearcher::nn_scan(const MappableOctTree* smallTree,
+		const MappableOctTree* bigTree,
+		bool loadObjs,
+		ResultMolecules& res)
+{
+	res.clear();
+
+	const GSSLeaf* leaf = (GSSLeaf*) leaves.begin();
+	const GSSLeaf* end = (GSSLeaf*) leaves.end();
+
+	Timer t;
+	fitsCheck = 0;
+	fullLeaves = 0;
+	nodesVisited = 0;
+	leavesVisited = 0;
+	levelCnts.clear();
+	vector<result_info> respos;
+	respos.reserve(size());
+	for (; leaf != end; leaf = (const GSSLeaf*) ((char*) leaf + leaf->bytes()))
+	{
+		leavesVisited++;
+		for (unsigned i = 0, n = leaf->size(); i < n; i++)
+		{
+			const GSSLeaf::Child *child = leaf->getChild(i);
+			double dist = shapeDistance(&child->tree, &child->tree, smallTree, bigTree);
+			fitsCheck++;
+			respos.push_back(result_info(child->object_pos, dist));
+		}
+	}
+
+	Timer objload;
+
+	if (loadObjs)
+	{
+		//extract objects in sequential order
+		sort(respos.begin(), respos.end());
+		res.reserve(respos.size());
+		for (unsigned i = 0, n = respos.size(); i < n; i++)
+		{
+			const char * addr = objects.begin() + respos[i].pos;
+			res.add(addr,respos[i].val);
+		}
+	}
+
+	if (verbose)
+	{
+		cout << "Scanned " << respos.size() << " objects out of " << total << " in "
+				<< t.elapsed() << "s (" << objload.elapsed()
+				<< " objload) with " << fitsCheck << " checks " << nodesVisited
+				<< " nodes " << leavesVisited << " leaves " << fullLeaves
+				<< " full leaves\n";
+		for (unsigned i = 0, n = levelCnts.size(); i < n; i++)
+		{
+			cout << " level " << i << ": " << levelCnts[i] << " "
+					<< maxlevelCnts[i] << " " << usefulLevelCnts[i] << "\n";
+		}
+	}
+}
 
 void GSSTreeSearcher::nn_search(const Object& obj, unsigned k, bool loadObjs,
 		ResultMolecules& res)
@@ -399,6 +457,67 @@ void GSSTreeSearcher::nn_search(const Object& obj, unsigned k, bool loadObjs,
 	if (verbose)
 	{
 		cout << "Found " << ret.size() << " objects out of " << total << " in "
+				<< t.elapsed() << "s (" << objload.elapsed()
+				<< " objload) with " << fitsCheck << " checks " << nodesVisited
+				<< " nodes " << leavesVisited << " leaves " << fullLeaves
+				<< " full leaves\n";
+		for (unsigned i = 0, n = levelCnts.size(); i < n; i++)
+		{
+			cout << " level " << i << ": " << levelCnts[i] << " "
+					<< maxlevelCnts[i] << " " << usefulLevelCnts[i] << "\n";
+		}
+	}
+	delete objTree;
+}
+
+void GSSTreeSearcher::nn_scan(const Object& obj, bool loadObjs,
+		ResultMolecules& res)
+{
+	const MappableOctTree *objTree = MappableOctTree::create(dimension,
+			resolution, obj);
+
+	res.clear();
+
+	const GSSLeaf* leaf = (GSSLeaf*) leaves.begin();
+	const GSSLeaf* end = (GSSLeaf*) leaves.end();
+
+	Timer t;
+	fitsCheck = 0;
+	fullLeaves = 0;
+	nodesVisited = 0;
+	leavesVisited = 0;
+	levelCnts.clear();
+	vector<result_info> respos;
+	respos.reserve(size());
+	for (; leaf != end; leaf = (const GSSLeaf*) ((char*) leaf + leaf->bytes()))
+	{
+		leavesVisited++;
+		for (unsigned i = 0, n = leaf->size(); i < n; i++)
+		{
+			const GSSLeaf::Child *child = leaf->getChild(i);
+			double dist = volumeDist(objTree, &child->tree);
+			fitsCheck++;
+			respos.push_back(result_info(child->object_pos, dist));
+		}
+	}
+
+	Timer objload;
+
+	if (loadObjs)
+	{
+		//extract objects in sequential order
+		sort(respos.begin(), respos.end());
+		res.reserve(respos.size());
+		for (unsigned i = 0, n = respos.size(); i < n; i++)
+		{
+			const char * addr = objects.begin() + respos[i].pos;
+			res.add(addr,respos[i].val);
+		}
+	}
+
+	if (verbose)
+	{
+		cout << "Scanned " << respos.size() << " objects out of " << total << " in "
 				<< t.elapsed() << "s (" << objload.elapsed()
 				<< " objload) with " << fitsCheck << " checks " << nodesVisited
 				<< " nodes " << leavesVisited << " leaves " << fullLeaves

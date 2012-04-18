@@ -133,9 +133,18 @@ public:
 	void nn_search(const Object& obj, unsigned k, bool loadObjs,
 			ResultMolecules& res);
 
+	//compute scores for all molecules in database
+	void nn_scan(const Object& obj, bool loadObjs,
+			ResultMolecules& res);
+
 	//return k objects closes to small/big obj using shapeDistance
 	void nn_search(const MappableOctTree* smallTree,
 			const MappableOctTree* bigTree, unsigned k, bool loadObjs,
+			ResultMolecules& res);
+
+	//same as above, but evaluate entire database
+	void nn_scan(const MappableOctTree* smallTree,
+			const MappableOctTree* bigTree, bool loadObjs,
 			ResultMolecules& res);
 
 	float getDimension() const

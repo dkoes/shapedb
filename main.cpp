@@ -284,7 +284,14 @@ void do_nnsearch(GSSTreeSearcher& gss, const string& input,
 	for (; molitr; ++molitr)
 	{
 		const Molecule& mol = *molitr;
-		gss.nn_search(mol, k, output.size() > 0, res);
+		if(k < 1) //scan
+		{
+			gss.nn_scan(mol, output.size() > 0, res);
+		}
+		else
+		{
+			gss.nn_search(mol, k, output.size() > 0, res);
+		}
 	}
 
 	ofstream out(output.c_str());
@@ -417,10 +424,20 @@ int main(int argc, char *argv[])
 			ResultMolecules res;
 			MappableOctTree *smallTree = NULL, *bigTree = NULL;
 			create_trees(gss, IncludeMol, ExcludeMol, LessDist, MoreDist, smallTree, bigTree);
-			gss.nn_search(smallTree, bigTree, K, true, res);
-			ofstream out(Output.c_str());
-			for (unsigned i = 0, n = res.size(); i < n; i++)
-				res.writeSDF(out, i);
+			if(K < 1) //scan
+			{
+				gss.nn_scan(smallTree, bigTree, Output.size() > 0, res);
+			}
+			else
+			{
+				gss.nn_search(smallTree, bigTree, K, Output.size() > 0, res);
+			}
+			if(Output.size() > 0)
+			{
+				ofstream out(Output.c_str());
+				for (unsigned i = 0, n = res.size(); i < n; i++)
+					res.writeSDF(out, i);
+			}
 		}
 	}
 		break;
