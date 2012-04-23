@@ -232,8 +232,7 @@ void MGrid::shrinkByOne()
 		++en;
 	}
 
-	if(toRemove != grid) //don't vanish completely
-		grid -= toRemove;
+	grid -= toRemove;
 }
 
 void MGrid::growByOne()
@@ -276,6 +275,8 @@ void MGrid::shrink(double amount)
 	for (unsigned i = 0; i < num; i++)
 	{
 		shrinkByOne();
+		if(grid.count() == 0)
+			break;
 	}
 
 }
