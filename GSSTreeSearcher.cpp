@@ -360,7 +360,6 @@ void GSSTreeSearcher::nn_scan(const MappableOctTree* smallTree,
 		ResultMolecules& res)
 {
 	res.clear();
-printf("smallvol %f  bigvol %f\n",smallTree->volume(),bigTree->volume());
 	const GSSLeaf* leaf = (GSSLeaf*) leaves.begin();
 	const GSSLeaf* end = (GSSLeaf*) leaves.end();
 
