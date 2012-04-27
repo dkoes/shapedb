@@ -242,7 +242,6 @@ static void create_trees(GSSTreeSearcher& gss, const string& includeMol,
 		free(smallTree);
 		smallTree = MappableOctTree::createFromGrid(lgrid);
 	}
-
 }
 
 //do search between include and exclude

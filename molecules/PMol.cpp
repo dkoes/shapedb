@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <openbabel/data.h>
 #include <openbabel/mol.h>
 #include "boost/foreach.hpp"
+#include <boost/lexical_cast.hpp>
 #include <iomanip>
 
 //copy data needed to write out pmol from obmol
@@ -452,7 +453,7 @@ void PMol::writeSDF(ostream& out, const vector<ASDDataItem>& sddata,
 	//output sd data
 	BOOST_FOREACH(const ASDDataItem& data, sddata)
 	{	out << "> <" << data.tag << ">\n";
-	out << data.value << "\n\n";
+	out << boost::lexical_cast<string>(data.value) << "\n\n";
 	}
 	out << "$$$$" << endl;
 }
