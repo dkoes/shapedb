@@ -518,14 +518,25 @@ class OBAMolecule
 		probe = prb;
 		vector<MolSphere> spheres;
 		spheres.reserve(mol.NumAtoms());
+		float mind = -dimension/2;
+		float maxd = dimension/2;
 		for (OBAtomIterator aitr = mol.BeginAtoms(); aitr != mol.EndAtoms();
 				++aitr)
 		{
 			OBAtom* atom = *aitr;
-			spheres.push_back(
-					MolSphere(atom->x(), atom->y(), atom->z(),
-							etab.GetVdwRad(atom->GetAtomicNum())
-									- adjustAmount));
+			float r = etab.GetVdwRad(atom->GetAtomicNum())
+											- adjustAmount;
+			float x = atom->x();
+			float y = atom->y();
+			float z = atom->z();
+			//omit sphere's outside of grid range; this may introduce
+			//some very small artifacts at the edge of the grid
+			if(x > mind-r && x < maxd+r &&
+					y > mind - r && y < maxd+r &&
+					z > mind - r && z > maxd+r)
+			{
+				spheres.push_back(MolSphere(x,y,z,r));
+			}
 		}
 
 		checkers.clear();

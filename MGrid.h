@@ -11,6 +11,7 @@
 
 #include <cassert>
 #include <bm/bm.h>
+#include <vector>
 #include "Cube.h"
 
 typedef bm::bvector<bm::standard_allocator> bvect;
@@ -29,6 +30,14 @@ class MGrid
 	double resolution; //size of each grid cube
 	bvect grid;
 public:
+
+	struct Point
+	{
+		float x, y, z;
+		Point(): x(0), y(0), z(0) {}
+		Point(float X, float Y, float Z): x(X), y(Y), z(Z) {}
+	};
+
 	MGrid() {}
 	MGrid(float d, float r): dimension(d), resolution(r) {}
 	~MGrid() {}
@@ -95,6 +104,8 @@ public:
 	{
 		return grid.count();
 	}
+
+	void getSetPoints(std::vector<Point>& points) const;
 };
 
 #endif /* MGRID_H_ */

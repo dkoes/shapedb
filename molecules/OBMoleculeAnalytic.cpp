@@ -7,7 +7,9 @@
 
 #include "OBMoleculeAnalytic.h"
 #include <boost/multi_array.hpp>
+#include "CommandLine2/CommandLine.h"
 
+extern cl::opt<bool> Verbose;
 using namespace boost;
 //maintain a bounding box
 struct BoundingBox
@@ -242,6 +244,10 @@ void OBAMolecule::computeInteractionGridPoints(OBAMolecule& receptor,
 			if(interactionPointRadius > 0)
 			{
 				grid.markXYZSphere(xave,yave,zave,interactionPointRadius);
+			}
+			if(Verbose)
+			{
+				cout << "pseudoatom InteractionPoints, pos=(" << xave << "," << yave << "," << zave << ")\n";
 			}
 		}
 	}

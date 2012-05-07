@@ -289,5 +289,21 @@ void MGrid::grow(double amount)
 	{
 		growByOne();
 	}
+}
+
+//return all set points in vector
+void MGrid::getSetPoints(vector<MGrid::Point>& points) const
+{
+	points.clear();
+	bvect::enumerator en = grid.first();
+	bvect::enumerator en_end = grid.end();
+	while (en < en_end)
+	{
+		unsigned g = *en;
+		double x, y, z;
+		gridToPoint(g, x, y, z);
+		points.push_back(Point(x,y,z));
+		++en;
+	}
 
 }
