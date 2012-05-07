@@ -788,7 +788,6 @@ int main(int argc, char *argv[])
 		{
 			lgrid.shrink(less);
 		}
-
 		//compute interaction points as single zero-radius points
 		MGrid igrid(dimension, resolution);
 		inMol.computeInteractionGridPoints(exMol, igrid, interactionDistance,
