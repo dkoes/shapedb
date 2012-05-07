@@ -37,7 +37,13 @@ typedef shared_ptr<Packer> PackerPtr;
 
 enum CommandEnum
 {
-	Create, NNSearch, DCSearch, MolGrid, BatchSearch, BatchDB
+	Create,
+	NNSearch,
+	DCSearch,
+	MolGrid,
+	BatchSearch,
+	BatchDB,
+	SearchAllPointCombos
 };
 
 cl::opt<CommandEnum> Command(cl::desc("Operation to perform:"), cl::Required,
@@ -47,6 +53,7 @@ cl::opt<CommandEnum> Command(cl::desc("Operation to perform:"), cl::Required,
 				clEnumVal(MolGrid, "Generate molecule grid and debug output"),
 				clEnumVal(BatchSearch, "Read in a jobs file for batch processing"),
 				clEnumVal(BatchDB, "Read in a jobs file for batch processing of a list of directories"),
+				clEnumVal(SearchAllPointCombos, "Search using all possible subsets of interaction points"),
 				clEnumValEnd));
 
 enum PackerEnum
@@ -181,8 +188,8 @@ cl::opt<bool> KeepHydrogens("h",
 //create min and max trees from molecular data
 //caller takes owner ship of tree memory
 static void create_trees(GSSTreeSearcher& gss, const string& includeMol,
-		const string& excludeMol,double less,
-		double more, MappableOctTree*& smallTree, MappableOctTree*& bigTree)
+		const string& excludeMol, double less, double more,
+		MappableOctTree*& smallTree, MappableOctTree*& bigTree)
 {
 	double dimension = gss.getDimension();
 	double resolution = gss.getResolution();
@@ -200,8 +207,7 @@ static void create_trees(GSSTreeSearcher& gss, const string& includeMol,
 	//create trees
 
 	//resize receptor constraint
-	bigTree = MappableOctTree::create(dimension, resolution,
-			exMol);
+	bigTree = MappableOctTree::create(dimension, resolution, exMol);
 
 	if (more > 0)
 	{
@@ -215,8 +221,7 @@ static void create_trees(GSSTreeSearcher& gss, const string& includeMol,
 	bigTree->invert();
 
 	//use the full shape of the ligand
-	smallTree = MappableOctTree::create(dimension, resolution,
-			inMol);
+	smallTree = MappableOctTree::create(dimension, resolution, inMol);
 
 	//shrink if requested
 	if (less > 0)
@@ -228,16 +233,16 @@ static void create_trees(GSSTreeSearcher& gss, const string& includeMol,
 		smallTree = MappableOctTree::createFromGrid(grid);
 	}
 
-	if(useInteractionPoints)
+	if (useInteractionPoints)
 	{
 		//change small tree to just be interaction points
-		MGrid igrid(MaxDimension, Resolution);
-		inMol.computeInteractionGridPoints(exMol, igrid,
-				interactionDistance, interactionMaxClusterDist,
-				interactionMinCluster, interactionPointRadius);
+		MGrid igrid(dimension, resolution);
+		inMol.computeInteractionGridPoints(exMol, igrid, interactionDistance,
+				interactionMaxClusterDist, interactionMinCluster,
+				interactionPointRadius);
 
 		MGrid lgrid;
-		smallTree->makeGrid(lgrid, Resolution);
+		smallTree->makeGrid(lgrid, resolution);
 		lgrid &= igrid;
 		free(smallTree);
 		smallTree = MappableOctTree::createFromGrid(lgrid);
@@ -245,7 +250,8 @@ static void create_trees(GSSTreeSearcher& gss, const string& includeMol,
 }
 
 //do search between include and exclude
-static void do_dcsearch(GSSTreeSearcher& gss, const MappableOctTree* smallTree, const MappableOctTree* bigTree, const string& output)
+static void do_dcsearch(GSSTreeSearcher& gss, const MappableOctTree* smallTree,
+		const MappableOctTree* bigTree, const string& output)
 {
 	ResultMolecules res;
 
@@ -256,8 +262,7 @@ static void do_dcsearch(GSSTreeSearcher& gss, const MappableOctTree* smallTree, 
 	if (ScanCheck || ScanOnly)
 	{
 		ResultMolecules res2;
-		gss.dc_scan_search(smallTree, bigTree, output.size() > 0,
-				res2);
+		gss.dc_scan_search(smallTree, bigTree, output.size() > 0, res2);
 		if (res2.size() != res.size())
 		{
 			cerr << "Scanning found different number: " << res2.size() << "\n";
@@ -283,7 +288,7 @@ void do_nnsearch(GSSTreeSearcher& gss, const string& input,
 	for (; molitr; ++molitr)
 	{
 		const Molecule& mol = *molitr;
-		if(k < 1) //scan
+		if (k < 1) //scan
 		{
 			gss.nn_scan(mol, output.size() > 0, res);
 		}
@@ -414,7 +419,7 @@ int main(int argc, char *argv[])
 			exit(-1);
 		}
 
-		if(ExcludeMol.size() == 0)
+		if (ExcludeMol.size() == 0)
 		{
 			do_nnsearch(gss, IncludeMol, Output, K);
 		}
@@ -422,8 +427,9 @@ int main(int argc, char *argv[])
 		{
 			ResultMolecules res;
 			MappableOctTree *smallTree = NULL, *bigTree = NULL;
-			create_trees(gss, IncludeMol, ExcludeMol, LessDist, MoreDist, smallTree, bigTree);
-			if(K < 1) //scan
+			create_trees(gss, IncludeMol, ExcludeMol, LessDist, MoreDist,
+					smallTree, bigTree);
+			if (K < 1) //scan
 			{
 				gss.nn_scan(smallTree, bigTree, Output.size() > 0, res);
 			}
@@ -431,7 +437,7 @@ int main(int argc, char *argv[])
 			{
 				gss.nn_search(smallTree, bigTree, K, Output.size() > 0, res);
 			}
-			if(Output.size() > 0)
+			if (Output.size() > 0)
 			{
 				ofstream out(Output.c_str());
 				for (unsigned i = 0, n = res.size(); i < n; i++)
@@ -458,7 +464,8 @@ int main(int argc, char *argv[])
 		if (IncludeMol.size() > 0 || ExcludeMol.size() > 0)
 		{
 			MappableOctTree *smallTree = NULL, *bigTree = NULL;
-			create_trees(gss, IncludeMol, ExcludeMol, LessDist, MoreDist, smallTree, bigTree);
+			create_trees(gss, IncludeMol, ExcludeMol, LessDist, MoreDist,
+					smallTree, bigTree);
 			do_dcsearch(gss, smallTree, bigTree, Output);
 			free(smallTree);
 			free(bigTree);
@@ -470,8 +477,9 @@ int main(int argc, char *argv[])
 			{
 				ResultMolecules res;
 				//search
-				MappableOctTree* tree = MappableOctTree::create(dimension, resolution, *inmols);
-				MGrid lgrid(dimension,resolution);
+				MappableOctTree* tree = MappableOctTree::create(dimension,
+						resolution, *inmols);
+				MGrid lgrid(dimension, resolution);
 				tree->makeGrid(lgrid, resolution);
 				free(tree);
 
@@ -482,8 +490,10 @@ int main(int argc, char *argv[])
 				lgrid2.grow(MoreDist);
 
 				//create bounding trees
-				MappableOctTree *smallTree = MappableOctTree::createFromGrid(lgrid);
-				MappableOctTree *bigTree = MappableOctTree::createFromGrid(lgrid2);
+				MappableOctTree *smallTree = MappableOctTree::createFromGrid(
+						lgrid);
+				MappableOctTree *bigTree = MappableOctTree::createFromGrid(
+						lgrid2);
 
 				if (!ScanOnly)
 					gss.dc_search(smallTree, bigTree, Output.size() > 1, res);
@@ -491,7 +501,8 @@ int main(int argc, char *argv[])
 				if (ScanCheck || ScanOnly)
 				{
 					ResultMolecules res2;
-					gss.dc_scan_search(smallTree,bigTree, Output.size() > 1, res2);
+					gss.dc_scan_search(smallTree, bigTree, Output.size() > 1,
+							res2);
 					if (res2.size() != res.size())
 					{
 						cerr << "Scanning found different number\n";
@@ -572,9 +583,11 @@ int main(int argc, char *argv[])
 				if (cmd == "DCSearch")
 				{
 					MappableOctTree *smallTree = NULL, *bigTree = NULL;
-					create_trees(gss, ligand, receptor, less, more, smallTree, bigTree);
+					create_trees(gss, ligand, receptor, less, more, smallTree,
+							bigTree);
 					do_dcsearch(gss, smallTree, bigTree, output);
-					free(smallTree); free(bigTree);
+					free(smallTree);
+					free(bigTree);
 				}
 				else if (cmd == "NNSearch")
 				{
@@ -703,6 +716,122 @@ int main(int argc, char *argv[])
 
 	}
 		break;
+	case SearchAllPointCombos:
+	{
+		//this will output a ton of files - it searches all 2^n combinations
+		//of n interaction points using both DCSearch and NNSearch scanning
+
+		//read in database
+		filesystem::path dbfile(Database.c_str());
+		GSSTreeSearcher gss(Verbose);
+
+		if (!gss.load(dbfile))
+		{
+			cerr << "Could not read database " << Database << "\n";
+			exit(-1);
+		}
+
+		double dimension = gss.getDimension();
+		double resolution = gss.getResolution();
+		//read query molecule(s) - must have both ligand and receptor
+		if (IncludeMol.size() == 0 || ExcludeMol.size() == 0)
+		{
+			cerr << "SearchAllPointCombos requires both ligand and receptor\n";
+			exit(-1);
+
+		}
+
+		if (!useInteractionPoints)
+		{
+			cerr << "SearchAllPointCombos requires interaction points\n";
+			exit(-1);
+		}
+		double more = MoreDist;
+		double less = LessDist;
+
+		//read query molecule(s)
+		Molecule::iterator imolitr(IncludeMol, dimension, resolution,
+				KeepHydrogens, ProbeRadius);
+		Molecule inMol = *imolitr;
+
+		Molecule::iterator exmolitr(ExcludeMol, dimension, resolution,
+				KeepHydrogens, ProbeRadius);
+		Molecule exMol = *exmolitr;
+
+		//create receptor tree
+
+		//resize receptor constraint
+		MappableOctTree *bigTree = MappableOctTree::create(dimension,
+				resolution, exMol);
+
+		if (more > 0)
+		{
+			MGrid grid;
+			bigTree->makeGrid(grid, resolution);
+			grid.shrink(more);
+			free(bigTree);
+			bigTree = MappableOctTree::createFromGrid(grid);
+		}
+		//exmol is the receptor, so must invert
+		bigTree->invert();
+
+		//get the full shape of the ligand
+		MappableOctTree *ligTree = MappableOctTree::create(dimension,
+				resolution, inMol);
+		MGrid lgrid;
+		ligTree->makeGrid(lgrid, resolution);
+		free(ligTree);
+		ligTree = NULL;
+
+		//shrink if requested
+		if (less > 0)
+		{
+			lgrid.shrink(less);
+		}
+
+		//compute interaction points as single zero-radius points
+		MGrid igrid(dimension, resolution);
+		inMol.computeInteractionGridPoints(exMol, igrid, interactionDistance,
+				interactionMaxClusterDist, interactionMinCluster, 0);
+
+		vector<MGrid::Point> ipts;
+		igrid.getSetPoints(ipts);
+		unsigned max = 1<<ipts.size();
+
+		//for each subset of interaction points (even empty - receptor only)
+		for(unsigned i = 0; i < max; i++)
+		{
+			//compute small tree
+			MGrid igrid(dimension, resolution);
+			for(unsigned p = 0, np = ipts.size(); p < np; p++)
+			{
+				if((1<<p)&i) //use it
+				{
+					igrid.markXYZSphere(ipts[p].x, ipts[p].y, ipts[p].z, interactionPointRadius);
+				}
+			}
+			igrid &= lgrid;
+			MappableOctTree *smallTree = MappableOctTree::createFromGrid(igrid);
+
+			//do a scan for nn ranking
+			ResultMolecules res;
+			gss.nn_scan(smallTree, bigTree, true, res);
+			stringstream outname;
+			outname << Output << "_nn_" << i << ".sdf";
+			ofstream out(outname.str().c_str());
+			for (unsigned r = 0, n = res.size(); r < n; r++)
+				res.writeSDF(out, r);
+
+			//do a filter with DC
+			stringstream dcoutname;
+			dcoutname << Output << "_dc_" << i << ".sdf";
+			do_dcsearch(gss, smallTree, bigTree, dcoutname.str());
+
+			free(smallTree);
+		}
+		free(bigTree);
+	}
+	break;
 	case MolGrid:
 	{
 		ofstream out(Output.c_str());
