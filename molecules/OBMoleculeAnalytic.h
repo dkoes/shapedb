@@ -531,9 +531,9 @@ class OBAMolecule
 			float z = atom->z();
 			//omit sphere's outside of grid range; this may introduce
 			//some very small artifacts at the edge of the grid
-			if((x > mind-r && x < maxd+r &&
+			if(x > mind-r && x < maxd+r &&
 					y > mind - r && y < maxd+r &&
-					z > mind - r && z < maxd+r))
+					z > mind - r && z < maxd+r)
 			{
 				spheres.push_back(MolSphere(x,y,z,r));
 			}
