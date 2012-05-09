@@ -821,6 +821,12 @@ int main(int argc, char *argv[])
 			for (unsigned r = 0, n = res.size(); r < n; r++)
 				res.writeSDF(out, r);
 
+			out.close();
+			//gzip output
+			stringstream cmd;
+			cmd << "gzip " << outname.str();
+			::system(cmd.str().c_str());
+
 			//do a filter with DC
 			stringstream dcoutname;
 			dcoutname << Output << "_dc_" << i << ".sdf";
