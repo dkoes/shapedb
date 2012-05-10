@@ -56,6 +56,11 @@ cl::opt<CommandEnum> Command(cl::desc("Operation to perform:"), cl::Required,
 				clEnumVal(SearchAllPointCombos, "Search using all possible subsets of interaction points"),
 				clEnumValEnd));
 
+cl::opt<bool> NNSearchAll("nn-search-all",
+		cl::desc(
+				"Perform exhaustive interaction point search with NNSearch as well as DCSearch"),
+		cl::init(false));
+
 enum PackerEnum
 {
 	FullMerge, Spectral, GreedyMerge, MatchPack
@@ -795,37 +800,41 @@ int main(int argc, char *argv[])
 
 		vector<MGrid::Point> ipts;
 		igrid.getSetPoints(ipts);
-		unsigned max = 1<<ipts.size();
+		unsigned max = 1 << ipts.size();
 
 		//for each subset of interaction points (even empty - receptor only)
-		for(unsigned i = 0; i < max; i++)
+		for (unsigned i = 0; i < max; i++)
 		{
 			//compute small tree
 			MGrid igrid(dimension, resolution);
-			for(unsigned p = 0, np = ipts.size(); p < np; p++)
+			for (unsigned p = 0, np = ipts.size(); p < np; p++)
 			{
-				if((1<<p)&i) //use it
+				if ((1 << p) & i) //use it
 				{
-					igrid.markXYZSphere(ipts[p].x, ipts[p].y, ipts[p].z, interactionPointRadius);
+					igrid.markXYZSphere(ipts[p].x, ipts[p].y, ipts[p].z,
+							interactionPointRadius);
 				}
 			}
 			igrid &= lgrid;
 			MappableOctTree *smallTree = MappableOctTree::createFromGrid(igrid);
 
 			//do a scan for nn ranking
-			ResultMolecules res;
-			gss.nn_scan(smallTree, bigTree, true, res);
-			stringstream outname;
-			outname << Output << "_nn_" << i << ".sdf";
-			ofstream out(outname.str().c_str());
-			for (unsigned r = 0, n = res.size(); r < n; r++)
-				res.writeSDF(out, r);
+			if (NNSearchAll)
+			{
+				ResultMolecules res;
+				gss.nn_scan(smallTree, bigTree, true, res);
+				stringstream outname;
+				outname << Output << "_nn_" << i << ".sdf";
+				ofstream out(outname.str().c_str());
+				for (unsigned r = 0, n = res.size(); r < n; r++)
+					res.writeSDF(out, r);
 
-			out.close();
-			//gzip output
-			stringstream cmd;
-			cmd << "gzip " << outname.str();
-			::system(cmd.str().c_str());
+				out.close();
+				//gzip output
+				stringstream cmd;
+				cmd << "gzip " << outname.str();
+				::system(cmd.str().c_str());
+			}
 
 			//do a filter with DC
 			stringstream dcoutname;
@@ -836,7 +845,7 @@ int main(int argc, char *argv[])
 		}
 		free(bigTree);
 	}
-	break;
+		break;
 	case MolGrid:
 	{
 		ofstream out(Output.c_str());
