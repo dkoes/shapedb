@@ -23,6 +23,17 @@ float averageRelVolume(const MappableOctTree* leftMIV, const MappableOctTree* le
 	return leftMIV->relativeVolumeDistance(rightMIV) + leftMSV->relativeVolumeDistance(rightMSV);
 }
 
+float includeExcudeDist(const MappableOctTree* leftMIV, const MappableOctTree* leftMSV,
+		const MappableOctTree* rightMIV, const MappableOctTree* rightMSV)
+{
+	//only applies to comparing a single shape with MIV/MSV
+	assert(leftMIV == leftMSV);
+
+	//relative dist with MIV, but divide intersection with MSV by volume of shape
+	return leftMIV->relativeVolumeDistance(rightMIV) + leftMSV->intersectVolume(rightMSV)/leftMSV->volume();
+}
+
+
 //this combines MIV/MSV similarity with the tightness of the resulting MIV/MSV
 float tripleRelative(const MappableOctTree* leftMIV, const MappableOctTree* leftMSV,
 		const MappableOctTree* rightMIV, const MappableOctTree* rightMSV)
@@ -109,6 +120,9 @@ void setDistance(DistanceFunction df, float dim)
 		break;
 	case AbsoluteTriple:
 		shapeDistance = tripleAbsolute;
+		break;
+	case IncludeExclude:
+		shapeDistance = includeExcudeDist;
 		break;
 	}
 }
