@@ -168,6 +168,7 @@ cl::opt<DistanceFunction> ShapeDist(
 				clEnumValN(Hausdorff,"hausdorff", "Hausdorff distance"),
 				clEnumValN(RelativeTriple, "rel-triple", "Triple including selectivity"),
 				clEnumValN(AbsoluteTriple, "abs-triple", "Triple including selectivity (absolute)"),
+				clEnumValN(IncludeExclude, "include-exclude","For comparing with include/exclude constraints"),
 				clEnumValEnd), cl::init(RelativeVolume));
 
 cl::opt<unsigned> SuperNodeDepth("superdepth",
