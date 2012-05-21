@@ -125,7 +125,7 @@ bool Packer::KNNSlice::update(const IndDist& item, unsigned k)
 
 	for (unsigned i = 0, n = neighbors.size(); i < n; i++)
 	{
-		if (neighbors[i].j == item.j && neighbors[i].dist != item.dist)
+		if (neighbors[i].j == item.j && fabs(neighbors[i].dist - item.dist) < FLT_EPSILON)
 			abort();
 	}
 	if (k > 0 && (pos - neighbors.begin()) >= k)
