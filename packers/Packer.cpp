@@ -123,11 +123,6 @@ bool Packer::KNNSlice::update(const IndDist& item, unsigned k)
 	vector<IndDist>::iterator pos = lower_bound(neighbors.begin(),
 			neighbors.end(), item);
 
-	for (unsigned i = 0, n = neighbors.size(); i < n; i++)
-	{
-		if (neighbors[i].j == item.j && fabs(neighbors[i].dist - item.dist) < FLT_EPSILON)
-			abort();
-	}
 	if (k > 0 && (pos - neighbors.begin()) >= k)
 		return false;
 
