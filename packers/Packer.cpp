@@ -118,8 +118,23 @@ static void reverse(const vector<vector<unsigned> >& F,
 }
 
 //insert in sorted order, make K items, no limit if 0
-bool Packer::KNNSlice::update(const IndDist& item, unsigned k)
+bool Packer::KNNSlice::update(const IndDist& origitem, unsigned k)
 {
+	IndDist item(origitem);
+	for (unsigned i = 0, n = neighbors.size(); i < n; i++)
+	{
+		if (neighbors[i].j == item.j && neighbors[i].dist != item.dist)
+		{
+			//honestly, have no idea how this happens, only seems to happen with
+			//very small (more than 10 sig figs) differences in distances
+			//but in attempt at a slap-dash bugfix, always go with
+			//what's already in the neighbors array; otherwise may get duplicates
+			fprintf(stderr,"Inconsistent distances: %.12f %.12f\n",neighbors[i].dist, item.dist);
+			item = neighbors[i];
+//			abort();
+		}
+	}
+
 	vector<IndDist>::iterator pos = lower_bound(neighbors.begin(),
 			neighbors.end(), item);
 
