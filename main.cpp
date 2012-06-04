@@ -43,11 +43,15 @@ enum CommandEnum
 	MolGrid,
 	BatchSearch,
 	BatchDB,
-	SearchAllPointCombos
+	SearchAllPointCombos,
+	CreateTrees,
+	CreateFromTrees
 };
 
 cl::opt<CommandEnum> Command(cl::desc("Operation to perform:"), cl::Required,
 		cl::values(clEnumVal(Create, "Create a molecule shape index."),
+				clEnumVal(CreateTrees,"Create only the shapes with no index."),
+				clEnumVal(CreateFromTrees,"Create an index from already created shapes."),
 				clEnumVal(NNSearch, "Nearest neighbor search"),
 				clEnumVal(DCSearch, "Distance constraint search"),
 				clEnumVal(MolGrid, "Generate molecule grid and debug output"),
@@ -367,6 +371,7 @@ int main(int argc, char *argv[])
 	switch (Command)
 	{
 	case Create:
+	case CreateFromTrees:
 	{
 		//read in all the molecules and calculate the max bounding box
 		KSamplePartitioner topdown(KCenters, KSampleMult,
@@ -401,16 +406,58 @@ int main(int argc, char *argv[])
 		GSSTreeCreator creator(&leveler, SuperNodeDepth);
 
 		filesystem::path dbpath(Database.c_str());
+
+		if (Command == Create)
+		{
+			Molecule::iterator molitr(Input, MaxDimension, Resolution,
+					KeepHydrogens, ProbeRadius);
+			if (!creator.create(dbpath, molitr, MaxDimension, Resolution))
+			{
+				cerr << "Error creating database\n";
+				exit(1);
+			}
+		}
+		else //trees already created
+		{
+			filesystem::path treedir(Input.c_str());
+			if (!creator.create(dbpath, treedir, MaxDimension, Resolution))
+			{
+				cerr << "Error creating database\n";
+				exit(1);
+			}
+		}
+
+		if (Verbose)
+			creator.printStats(cout);
+
+	}
+		break;
+	case CreateTrees:
+	{
+		//read in all the molecules and calculate the max bounding box
+		KSamplePartitioner topdown(KCenters, KSampleMult,
+				KSamplePartitioner::AveCenter, SwitchToPack);
+
+		PackerPtr packer = PackerPtr(
+					new MatcherPacker(Pack, Knn, Sentinals, ClusterDist));
+
+
+		setDistance(ShapeDist, MaxDimension);
+
+		GSSLevelCreator leveler(&topdown, packer.get(), SwitchToPack,
+				SwitchToPack);
+
+		GSSTreeCreator creator(&leveler, SuperNodeDepth);
+
+		filesystem::path dbpath(Database.c_str());
 		Molecule::iterator molitr(Input, MaxDimension, Resolution,
 				KeepHydrogens, ProbeRadius);
-		if (!creator.create(dbpath, molitr, MaxDimension, Resolution))
+		if (!creator.createTreesOnly(dbpath, molitr, MaxDimension, Resolution))
 		{
 			cerr << "Error creating database\n";
 			exit(1);
 		}
 
-		if (Verbose)
-			creator.printStats(cout);
 
 	}
 		break;

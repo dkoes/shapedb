@@ -117,6 +117,8 @@ class GSSTreeCreator
 			vector<GSSInternalNode*>& newroots, unsigned curlevel,
 			unsigned stoplevel);
 
+	bool createIndex(vector<file_index>& objindices, vector<file_index>& treeindices, WorkFile& currenttrees);
+
 public:
 	GSSTreeCreator(GSSLevelCreator *l, unsigned sdepth=3) :
 			leveler(l), dimension(0), resolution(0), superNodeDepth(sdepth)
@@ -133,6 +135,12 @@ public:
 	}
 
 	bool create(filesystem::path dir, Object::iterator& itr, float dim,
+			float res);
+
+	bool create(filesystem::path dir, filesystem::path treedir, float dim,
+			float res);
+
+	bool createTreesOnly(filesystem::path dir, Object::iterator& itr, float dim,
 			float res);
 
 	void printStats(ostream& out) const;

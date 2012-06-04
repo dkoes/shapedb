@@ -18,14 +18,14 @@ static string nextString(filesystem::path p, const char *base, unsigned i)
 	return filesystem::path(p / str.str()).string();
 }
 
-//return true if successful
-bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr,
-		float dim, float res)
+//write out the object trees to the specified directory, with the object file
+//and also indices for reading back in later to save having to regenerate trees
+bool GSSTreeCreator::createTreesOnly(filesystem::path dir, Object::iterator& itr, float dim,
+		float res)
 {
 	dimension = dim;
 	resolution = res;
 	WorkFile currenttrees;
-	WorkFile nexttrees;
 	//create directory
 	if (filesystem::exists(dir))
 	{
@@ -41,31 +41,48 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr,
 
 	filesystem::path objfile = dbpath / "objs";
 	string curtreesfile = filesystem::path(dbpath / "trees").string();
-	string nexttreesfile = filesystem::path(dbpath / "nexttrees").string();
+	string tipath = filesystem::path(dbpath / "treeindices").string();
+	string oipath = filesystem::path(dbpath / "objindices").string();
 
 	Timer t;
 	//write out objects and trees
 	objects.set(objfile.string().c_str());
 	currenttrees.set(curtreesfile.c_str());
-	vector<file_index> treeindices;
-	vector<file_index> objindices;
+
+	ofstream treeindices(tipath.c_str());
+	ofstream objindices(oipath.c_str());
+
+	if(!treeindices || !objindices)
+		return false;
+
 	unsigned cnt = 0;
 	for (; itr; ++itr)
 	{
 		const Object& obj = *itr;
-		objindices.push_back((file_index) objects.file->tellp());
+		file_index objindex = (file_index) objects.file->tellp();
+		objindices.write((char*)&objindex,sizeof(file_index));
 		obj.write(*objects.file);
 
 		//leaf object
-		treeindices.push_back((file_index) currenttrees.file->tellp());
+		file_index treeindex = (file_index) currenttrees.file->tellp();
+		treeindices.write((char*)&treeindex, sizeof(file_index));
 		MappableOctTree *tree = MappableOctTree::create(dim, res, obj);
 		tree->write(*currenttrees.file);
 		delete tree;
 		cnt++;
 	}
-
+	currenttrees.clear();
 	cout << "Create/write trees\t" << t.elapsed() << "\n";
-	t.restart();
+	return true;
+}
+
+//creates the shape index, give that the objs and first level of trees have been created
+bool GSSTreeCreator::createIndex(vector<file_index>& objindices, vector<file_index>& treeindices, WorkFile& currenttrees)
+{
+	Timer t;
+	WorkFile nexttrees;
+	string nexttreesfile = filesystem::path(dbpath / "nexttrees").string();
+
 	//partition leaves into bottom level
 	//setup level
 	nodes.push_back(
@@ -117,7 +134,7 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr,
 	//output general info
 	filesystem::path infoname = dbpath / "info";
 	ofstream info(infoname.string().c_str());
-	info << dim << " " << res << " " << nodes.size() << " " << cnt << "\n";
+	info << dimension << " " << resolution << " " << nodes.size() << " " << objindices.size() << "\n";
 
 	//clear workfile memory
 	for (unsigned i = 0, n = nodes.size(); i < n; i++)
@@ -127,6 +144,136 @@ bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr,
 	nexttrees.clear();
 	currenttrees.clear();
 	return true;
+}
+
+//create index from existing trees, which are copied over
+bool GSSTreeCreator::create(filesystem::path dir, filesystem::path treedir, float dim,
+		float res)
+{
+	dimension = dim;
+	resolution = res;
+	WorkFile currenttrees;
+	//create directory
+	if (filesystem::exists(dir))
+	{
+		cerr << dir << " already exists.  Exiting\n";
+		return false;
+	}
+	if (!filesystem::create_directory(dir))
+	{
+		cerr << "Unable to create database directory ";
+		return false;
+	}
+	dbpath = dir;
+
+	filesystem::path objfile = dbpath / "objs";
+	string curtreesfile = filesystem::path(dbpath / "trees").string();
+
+	Timer t;
+	//write out objects and trees
+	objects.set(objfile.string().c_str());
+	currenttrees.set(curtreesfile.c_str());
+
+	const int MAXBUF = 8192;
+	char buffer[MAXBUF];
+	//read in trees
+	filesystem::path srctreesname = treedir / "trees";
+	ifstream srctrees(srctreesname.string().c_str());
+	if(!srctrees)
+		return false;
+	streamsize sz = 0;
+	while((sz = srctrees.readsome(buffer,MAXBUF)) > 0)
+	{
+		currenttrees.file->write(buffer, sz);
+	}
+
+	//read in objs
+	filesystem::path srcobjsname = treedir / "objs";
+	ifstream srcobjs(srcobjsname.string().c_str());
+	if(!srcobjs)
+		return false;
+	while((sz = srcobjs.readsome(buffer,MAXBUF)) > 0)
+	{
+		objects.file->write(buffer, sz);
+	}
+
+	//read in treeindices
+	vector<file_index> treeindices;
+	filesystem::path srctiname = treedir / "treeindices";
+	ifstream srcti(srctiname.string().c_str());
+	if(!srcti)
+		return false;
+	file_index ind;
+	while(srcti.read((char*)&ind,sizeof(file_index)))
+	{
+		treeindices.push_back(ind);
+	}
+
+	//read in objindices
+	vector<file_index> objindices;
+	filesystem::path srcoiname = treedir / "objindices";
+	ifstream srcoi(srcoiname.string().c_str());
+	if(!srcoi)
+		return false;
+	while(srcoi.read((char*)&ind,sizeof(file_index)))
+	{
+		objindices.push_back(ind);
+	}
+	cout << "Read/write trees\t" << t.elapsed() << "\n";
+	t.restart();
+
+	return createIndex(objindices, treeindices, currenttrees);
+
+}
+
+//return true if successful
+bool GSSTreeCreator::create(filesystem::path dir, Object::iterator& itr,
+		float dim, float res)
+{
+	dimension = dim;
+	resolution = res;
+	WorkFile currenttrees;
+	//create directory
+	if (filesystem::exists(dir))
+	{
+		cerr << dir << " already exists.  Exiting\n";
+		return false;
+	}
+	if (!filesystem::create_directory(dir))
+	{
+		cerr << "Unable to create database directory ";
+		return false;
+	}
+	dbpath = dir;
+
+	filesystem::path objfile = dbpath / "objs";
+	string curtreesfile = filesystem::path(dbpath / "trees").string();
+
+	Timer t;
+	//write out objects and trees
+	objects.set(objfile.string().c_str());
+	currenttrees.set(curtreesfile.c_str());
+	vector<file_index> treeindices;
+	vector<file_index> objindices;
+	unsigned cnt = 0;
+	for (; itr; ++itr)
+	{
+		const Object& obj = *itr;
+		objindices.push_back((file_index) objects.file->tellp());
+		obj.write(*objects.file);
+
+		//leaf object
+		treeindices.push_back((file_index) currenttrees.file->tellp());
+		MappableOctTree *tree = MappableOctTree::create(dim, res, obj);
+		tree->write(*currenttrees.file);
+		delete tree;
+		cnt++;
+	}
+
+	cout << "Create/write trees\t" << t.elapsed() << "\n";
+	t.restart();
+
+	return createIndex(objindices, treeindices, currenttrees);
 }
 
 //recursive helper for optimizing level output
