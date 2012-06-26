@@ -148,7 +148,7 @@ cl::opt<unsigned> SwitchToPack("switch-to-pack",
 		cl::init(32768));
 
 cl::opt<unsigned> Pack("pack", cl::desc("Maximum quantities per a node"),
-		cl::init(8));
+		cl::init(16));
 
 cl::opt<bool> Verbose("v", cl::desc("Verbose output"));
 cl::opt<bool> UseUnnorm("use-unnorm",
