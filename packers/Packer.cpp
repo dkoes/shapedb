@@ -127,10 +127,9 @@ bool Packer::KNNSlice::update(const IndDist& origitem, unsigned k)
 		{
 			//honestly, have no idea how this happens, only seems to happen with
 			//very small (more than 10 sig figs) differences in distances
-			//but in attempt at a slap-dash bugfix, always go with
-			//what's already in the neighbors array; otherwise may get duplicates
+			//but in attempt at a slap-dash bugfix, always return false
 			fprintf(stderr,"Inconsistent distances: %.12f %.12f\n",neighbors[i].dist, item.dist);
-			item = neighbors[i];
+			return false;
 //			abort();
 		}
 	}
