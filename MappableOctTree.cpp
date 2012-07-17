@@ -602,7 +602,8 @@ float MappableOctTree::relativeVolumeDistance(const MappableOctTree * rhs) const
 
 	root.intersectUnionVolume(tree, rhs->root, rhs->tree,
 			dimension * dimension * dimension, ival, uval);
-
+	if(uval == 0) //possible when don't have anchored shapes
+		return 1.0;
 	return 1 - ival / uval;
 }
 

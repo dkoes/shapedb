@@ -121,8 +121,11 @@ static void reverse(const vector<vector<unsigned> >& F,
 bool Packer::KNNSlice::update(const IndDist& origitem, unsigned k)
 {
 	IndDist item(origitem);
+
 	for (unsigned i = 0, n = neighbors.size(); i < n; i++)
 	{
+		if(!isfinite(item.dist))
+			abort();
 		if (neighbors[i].j == item.j && neighbors[i].dist != item.dist)
 		{
 			//honestly, have no idea how this happens, only seems to happen with
