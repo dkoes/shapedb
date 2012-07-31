@@ -13,16 +13,21 @@
 #include <iostream>
 #include <vector>
 #include <boost/lexical_cast.hpp>
+#include <boost/unordered_map.hpp>
 #include "PMol.h"
 using namespace std;
+using namespace boost;
 
 class ResultMolecules
 {
 	PMolReaderMalloc reader;
 	vector<PMol*> mols;
 	vector<double> scores;
+
+	bool uniqueify; //true if should only grab one conformer
+	unordered_map<string, unsigned > seen; //map titles to position for uniquification
 public:
-	ResultMolecules()
+	ResultMolecules(bool uniq=false): uniqueify(uniq)
 	{
 
 	}
@@ -44,8 +49,38 @@ public:
 	//support a single sddata entry for the goodness of the result
 	void add(const char *data, double score)
 	{
-		mols.push_back((PMol*)reader.readPMol(data));
-		scores.push_back(score);
+		PMol *mol = (PMol*)reader.readPMol(data);
+
+		if(uniqueify)
+		{
+			string title = mol->getTitle();
+			if(seen.count(title) == 0)
+			{
+				seen[title] = mols.size();
+				mols.push_back(mol);
+				scores.push_back(score);
+			}
+			else
+			{
+				//update to keep lowest score
+				unsigned pos = seen[title];
+				if(score < scores[pos])
+				{
+					free(mols[pos]);
+					mols[pos] = mol;
+					scores[pos] = score;
+				}
+				else //delete this one
+				{
+					free(mol);
+				}
+			}
+		}
+		else
+		{
+			mols.push_back(mol);
+			scores.push_back(score);
+		}
 	}
 
 	void reserve(unsigned n)

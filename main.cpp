@@ -96,6 +96,8 @@ cl::opt<bool> ScanCheck("scancheck",
 cl::opt<bool> ScanOnly("scanonly", cl::desc("Search using only a scan"),
 		cl::Hidden);
 
+cl::opt<bool> SingleConformer("single-conformer","Output the single best conformer",cl::init(false));
+
 cl::opt<string> Input("in", cl::desc("Input file"));
 cl::opt<string> Output("out", cl::desc("Output file"));
 cl::opt<string> Database("db", cl::desc("Database file"));
@@ -263,7 +265,7 @@ static void create_trees(GSSTreeSearcher& gss, const string& includeMol,
 static void do_dcsearch(GSSTreeSearcher& gss, const MappableOctTree* smallTree,
 		const MappableOctTree* bigTree, const string& output)
 {
-	ResultMolecules res;
+	ResultMolecules res(SingleConformer);
 
 	//search
 	if (!ScanOnly)
@@ -271,7 +273,7 @@ static void do_dcsearch(GSSTreeSearcher& gss, const MappableOctTree* smallTree,
 
 	if (ScanCheck || ScanOnly)
 	{
-		ResultMolecules res2;
+		ResultMolecules res2(SingleConformer);
 		gss.dc_scan_search(smallTree, bigTree, output.size() > 0, res2);
 		if (res2.size() != res.size())
 		{
@@ -292,7 +294,7 @@ void do_nnsearch(GSSTreeSearcher& gss, const string& input,
 		const string& output, unsigned k)
 {
 	//read query molecule(s)
-	ResultMolecules res;
+	ResultMolecules res(SingleConformer);
 	Molecule::iterator molitr(input, gss.getDimension(), gss.getResolution(),
 			KeepHydrogens, ProbeRadius);
 	for (; molitr; ++molitr)
@@ -478,7 +480,7 @@ int main(int argc, char *argv[])
 		}
 		else
 		{
-			ResultMolecules res;
+			ResultMolecules res(SingleConformer);
 			MappableOctTree *smallTree = NULL, *bigTree = NULL;
 			create_trees(gss, IncludeMol, ExcludeMol, LessDist, MoreDist,
 					smallTree, bigTree);
@@ -528,7 +530,7 @@ int main(int argc, char *argv[])
 			for (Molecule::iterator inmols(Input, dimension, resolution,
 					KeepHydrogens, ProbeRadius); inmols; ++inmols)
 			{
-				ResultMolecules res;
+				ResultMolecules res(SingleConformer);
 				//search
 				MappableOctTree* tree = MappableOctTree::create(dimension,
 						resolution, *inmols);
@@ -553,7 +555,7 @@ int main(int argc, char *argv[])
 
 				if (ScanCheck || ScanOnly)
 				{
-					ResultMolecules res2;
+					ResultMolecules res2(SingleConformer);
 					gss.dc_scan_search(smallTree, bigTree, Output.size() > 1,
 							res2);
 					if (res2.size() != res.size())
@@ -751,7 +753,7 @@ int main(int argc, char *argv[])
 				exit(-1);
 			}
 
-			ResultMolecules res;
+			ResultMolecules res(SingleConformer);
 			for (unsigned i = 0, n = qinfos.size(); i < n; i++)
 			{
 				cout << line << " " << qinfos[i].str << "\n";
@@ -869,7 +871,7 @@ int main(int argc, char *argv[])
 			//do a scan for nn ranking
 			if (NNSearchAll)
 			{
-				ResultMolecules res;
+				ResultMolecules res(SingleConformer);
 				gss.nn_scan(smallTree, bigTree, true, res);
 				stringstream outname;
 				outname << Output << "_nn_" << i << ".sdf";

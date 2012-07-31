@@ -20,6 +20,7 @@ using namespace boost;
 using namespace std;
 
 typedef Molecule Object; //eventually template this
+typedef ResultMolecules Results; //ditto
 
 class GSSTreeSearcher
 {
@@ -118,7 +119,7 @@ public:
 	//return everything with a shape between smallObj and bigObj
 	void dc_search(const Object& smallObj, const Object& bigObj,
 			float smallShrink, float bigShrink, bool invertBig, bool loadObjs,
-			ResultMolecules& res);
+			Results& res);
 
 	//return everything with a shape between smallTree and bigTree
 	void dc_search(const MappableOctTree* smallTree,
@@ -131,21 +132,21 @@ public:
 
 	//return k objects closest to obj
 	void nn_search(const Object& obj, unsigned k, bool loadObjs,
-			ResultMolecules& res);
+			Results& res);
 
 	//compute scores for all molecules in database
 	void nn_scan(const Object& obj, bool loadObjs,
-			ResultMolecules& res);
+			Results& res);
 
 	//return k objects closes to small/big obj using shapeDistance
 	void nn_search(const MappableOctTree* smallTree,
 			const MappableOctTree* bigTree, unsigned k, bool loadObjs,
-			ResultMolecules& res);
+			Results& res);
 
 	//same as above, but evaluate entire database
 	void nn_scan(const MappableOctTree* smallTree,
 			const MappableOctTree* bigTree, bool loadObjs,
-			ResultMolecules& res);
+			Results& res);
 
 	float getDimension() const
 	{

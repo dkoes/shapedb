@@ -59,7 +59,7 @@ GSSTreeSearcher::~GSSTreeSearcher()
 //find all the shapes in the database that lie bewtween smallObj and bigObj
 //if invertBig is set, than treat as an excluded volume
 void GSSTreeSearcher::dc_search(const MappableOctTree* smallTree,
-		const MappableOctTree* bigTree, bool loadObjs, ResultMolecules& res)
+		const MappableOctTree* bigTree, bool loadObjs, Results& res)
 {
 	res.clear();
 
@@ -113,7 +113,7 @@ void GSSTreeSearcher::dc_search(const MappableOctTree* smallTree,
 //if invertBig is set, than treat as an excluded volume
 void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
 		float smallShrink, float bigShrink, bool invertBig, bool loadObjs,
-		ResultMolecules& res)
+		Results& res)
 {
 	MappableOctTree *smallTree = MappableOctTree::create(dimension, resolution,
 			smallObj);
@@ -308,7 +308,7 @@ void GSSTreeSearcher::findNearest(const GSSLeaf* node,
 void GSSTreeSearcher::nn_search(const MappableOctTree* smallTree,
 		const MappableOctTree* bigTree,  unsigned k,
 		bool loadObjs,
-		ResultMolecules& res)
+		Results& res)
 {
 	res.clear();
 	TopKObj ret(k);
@@ -357,7 +357,7 @@ void GSSTreeSearcher::nn_search(const MappableOctTree* smallTree,
 void GSSTreeSearcher::nn_scan(const MappableOctTree* smallTree,
 		const MappableOctTree* bigTree,
 		bool loadObjs,
-		ResultMolecules& res)
+		Results& res)
 {
 	res.clear();
 	const GSSLeaf* leaf = (GSSLeaf*) leaves.begin();
@@ -413,7 +413,7 @@ void GSSTreeSearcher::nn_scan(const MappableOctTree* smallTree,
 }
 
 void GSSTreeSearcher::nn_search(const Object& obj, unsigned k, bool loadObjs,
-		ResultMolecules& res)
+		Results& res)
 {
 	const MappableOctTree *objTree = MappableOctTree::create(dimension,
 			resolution, obj);
@@ -470,7 +470,7 @@ void GSSTreeSearcher::nn_search(const Object& obj, unsigned k, bool loadObjs,
 }
 
 void GSSTreeSearcher::nn_scan(const Object& obj, bool loadObjs,
-		ResultMolecules& res)
+		Results& res)
 {
 	const MappableOctTree *objTree = MappableOctTree::create(dimension,
 			resolution, obj);
@@ -548,7 +548,7 @@ bool GSSTreeSearcher::fitsInbetween(const MappableOctTree *MIV,
 
 //find everyting between small and big using linear scan
 void GSSTreeSearcher::dc_scan_search(const MappableOctTree* smallTree,
-		const MappableOctTree* bigTree, bool loadObjs, ResultMolecules& res)
+		const MappableOctTree* bigTree, bool loadObjs, Results& res)
 {
 	res.clear();
 
