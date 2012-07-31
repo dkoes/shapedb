@@ -96,7 +96,7 @@ cl::opt<bool> ScanCheck("scancheck",
 cl::opt<bool> ScanOnly("scanonly", cl::desc("Search using only a scan"),
 		cl::Hidden);
 
-cl::opt<bool> SingleConformer("single-conformer","Output the single best conformer",cl::init(false));
+cl::opt<bool> SingleConformer("single-conformer",cl::desc("Output the single best conformer"),cl::init(false));
 
 cl::opt<string> Input("in", cl::desc("Input file"));
 cl::opt<string> Output("out", cl::desc("Output file"));
