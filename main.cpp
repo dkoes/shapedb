@@ -804,6 +804,7 @@ int main(int argc, char *argv[])
 		double more = MoreDist;
 		double less = LessDist;
 
+
 		//read query molecule(s)
 		Molecule::iterator imolitr(IncludeMol, dimension, resolution,
 				KeepHydrogens, ProbeRadius);
@@ -861,8 +862,15 @@ int main(int argc, char *argv[])
 			{
 				if ((1 << p) & i) //use it
 				{
-					igrid.markXYZSphere(ipts[p].x, ipts[p].y, ipts[p].z,
+					if(interactionPointRadius == 0)
+					{
+						igrid.setPoint(ipts[p].x, ipts[p].y, ipts[p].z);
+					}
+					else
+					{
+						igrid.markXYZSphere(ipts[p].x, ipts[p].y, ipts[p].z,
 							interactionPointRadius);
+					}
 				}
 			}
 			igrid &= lgrid;
