@@ -23,6 +23,8 @@ float averageRelVolume(const MappableOctTree* leftMIV, const MappableOctTree* le
 	return leftMIV->relativeVolumeDistance(rightMIV) + leftMSV->relativeVolumeDistance(rightMSV);
 }
 
+//this is not reflexive - assume right is larger constraint
+//penalizes left for exceeding bounds of right
 float includeExcudeDist(const MappableOctTree* leftMIV, const MappableOctTree* leftMSV,
 		const MappableOctTree* rightMIV, const MappableOctTree* rightMSV)
 {
@@ -30,7 +32,11 @@ float includeExcudeDist(const MappableOctTree* leftMIV, const MappableOctTree* l
 	assert(leftMIV == leftMSV);
 
 	//relative dist with MIV, but divide intersection with MSV by volume of shape
-	return leftMIV->relativeVolumeDistance(rightMIV) + leftMSV->intersectVolume(rightMSV)/leftMSV->volume();
+	float mivdist = leftMIV->relativeVolumeDistance(rightMIV);
+	float msvdist = 0;
+	if(leftMIV->volume() > 0)
+		msvdist = 1-(leftMIV->intersectVolume(rightMSV)/leftMIV->volume());
+	return mivdist+msvdist;
 }
 
 
