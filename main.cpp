@@ -477,7 +477,7 @@ int main(int argc, char *argv[])
 
 		setDistance(ShapeDist, gss.getDimension());
 
-		if (ExcludeMol.size() == 0)
+		if (ExcludeMol.size() == 0 && K > 0)
 		{
 			//actually do a nearest neighbor search intelligently
 			//using cutoffs within the tree search - this requires
