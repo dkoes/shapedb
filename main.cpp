@@ -474,6 +474,8 @@ int main(int argc, char *argv[])
 			exit(-1);
 		}
 
+		setDistance(ShapeDist, gss.getDimension());
+
 		if (ExcludeMol.size() == 0)
 		{
 			do_nnsearch(gss, IncludeMol, Output, K);
@@ -512,6 +514,7 @@ int main(int argc, char *argv[])
 			cerr << "Could not read database " << Database << "\n";
 			exit(-1);
 		}
+		setDistance(ShapeDist, gss.getDimension());
 
 		double dimension = gss.getDimension();
 		double resolution = gss.getResolution();
@@ -585,6 +588,7 @@ int main(int argc, char *argv[])
 			cerr << "Could not read database " << Database << "\n";
 			exit(-1);
 		}
+		setDistance(ShapeDist, gss.getDimension());
 
 		//read in each line of the batch file which should be
 		//cmd in_ligand in_receptor(for DC Search)
@@ -745,6 +749,7 @@ int main(int argc, char *argv[])
 				cerr << "Could not read database " << line << "\n";
 				exit(-1);
 			}
+			setDistance(ShapeDist, gss.getDimension());
 
 			if (gss.getResolution() != Resolution
 					|| gss.getDimension() != MaxDimension)
@@ -785,6 +790,7 @@ int main(int argc, char *argv[])
 			cerr << "Could not read database " << Database << "\n";
 			exit(-1);
 		}
+		setDistance(ShapeDist, gss.getDimension());
 
 		double dimension = gss.getDimension();
 		double resolution = gss.getResolution();
