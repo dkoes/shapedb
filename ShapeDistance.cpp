@@ -25,7 +25,27 @@ float averageRelVolume(const MappableOctTree* leftMIV, const MappableOctTree* le
 
 //this is not reflexive - assume right is larger constraint
 //penalizes left for exceeding bounds of right
+//miv gets best score if fully included within right
 float includeExcudeDist(const MappableOctTree* leftMIV, const MappableOctTree* leftMSV,
+		const MappableOctTree* rightMIV, const MappableOctTree* rightMSV)
+{
+	//only applies to comparing a single shape with MIV/MSV
+	assert(leftMIV == leftMSV);
+
+	//relative dist with MIV, but divide intersection with MSV by volume of shape
+	float mivdist = 0;
+	if(rightMIV->volume() > 0)
+		mivdist = 1-(leftMSV->intersectVolume(rightMIV)/rightMIV->volume());
+	float msvdist = 0;
+	if(leftMIV->volume() > 0)
+		msvdist = 1-(leftMIV->intersectVolume(rightMSV)/leftMIV->volume());
+	return mivdist+msvdist;
+}
+
+//this is not reflexive - assume right is larger constraint
+//penalizes left for exceeding bounds of right
+//miv is jsut volume different
+float volrelExcludeDist(const MappableOctTree* leftMIV, const MappableOctTree* leftMSV,
 		const MappableOctTree* rightMIV, const MappableOctTree* rightMSV)
 {
 	//only applies to comparing a single shape with MIV/MSV
@@ -129,6 +149,9 @@ void setDistance(DistanceFunction df, float dim)
 		break;
 	case IncludeExclude:
 		shapeDistance = includeExcudeDist;
+		break;
+	case RelVolExclude:
+		shapeDistance = volrelExcludeDist;
 		break;
 	}
 }

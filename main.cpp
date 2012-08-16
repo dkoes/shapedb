@@ -175,6 +175,7 @@ cl::opt<DistanceFunction> ShapeDist(
 				clEnumValN(RelativeTriple, "rel-triple", "Triple including selectivity"),
 				clEnumValN(AbsoluteTriple, "abs-triple", "Triple including selectivity (absolute)"),
 				clEnumValN(IncludeExclude, "include-exclude","For comparing with include/exclude constraints"),
+				clEnumValN(RelVolExclude, "relvol-exclude","Volume comparison of ligand, exclusion comparison of receptor"),
 				clEnumValEnd), cl::init(RelativeVolume));
 
 cl::opt<unsigned> SuperNodeDepth("superdepth",
