@@ -477,12 +477,16 @@ int main(int argc, char *argv[])
 
 		setDistance(ShapeDist, gss.getDimension());
 
-		if (ExcludeMol.size() == 0)
+		if (ExcludeMol.size() == 0 && K > 0)
 		{
+			//actually do a nearest neighbor search intelligently
+			//using cutoffs within the tree search - this requires
+			//a backed-in distance funciton (ignores shapedist)
 			do_nnsearch(gss, IncludeMol, Output, K);
 		}
 		else
 		{
+			//do a scan with shapedistance
 			ResultMolecules res(SingleConformer);
 			MappableOctTree *smallTree = NULL, *bigTree = NULL;
 			create_trees(gss, IncludeMol, ExcludeMol, LessDist, MoreDist,
@@ -491,7 +495,7 @@ int main(int argc, char *argv[])
 			{
 				gss.nn_scan(smallTree, bigTree, Output.size() > 0, res);
 			}
-			else
+			else //actually, also a scan
 			{
 				gss.nn_search(smallTree, bigTree, K, Output.size() > 0, res);
 			}
