@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<?fileVersion 4.0.0?>
-
-<cproject storage_type_id="org.eclipse.cdt.core.XmlProjectDescriptionStorage">
+<?fileVersion 4.0.0?><cproject storage_type_id="org.eclipse.cdt.core.XmlProjectDescriptionStorage">
 	<storageModule moduleId="org.eclipse.cdt.core.settings">
 		<cconfiguration id="cdt.managedbuild.config.gnu.exe.debug.1896873541">
 			<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="cdt.managedbuild.config.gnu.exe.debug.1896873541" moduleId="org.eclipse.cdt.core.settings" name="Debug">
@@ -26,7 +24,6 @@
 								<option id="gnu.cpp.compiler.exe.debug.option.optimization.level.1724155353" name="Optimization Level" superClass="gnu.cpp.compiler.exe.debug.option.optimization.level" value="gnu.cpp.compiler.optimization.level.none" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.exe.debug.option.debugging.level.1462956469" name="Debug Level" superClass="gnu.cpp.compiler.exe.debug.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.1797101193" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="/usr0/local/openeye/toolkits/include"/>
 									<listOptionValue builtIn="false" value="/usr/local/include/openbabel-2.0"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
 								</option>
@@ -40,41 +37,21 @@
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.exe.debug.1008561145" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.exe.debug"/>
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug.1035050897" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug">
 								<option id="gnu.cpp.link.option.libs.1769803431" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
-									<listOptionValue builtIn="false" value="oeszybki"/>
 									<listOptionValue builtIn="false" value="glpk"/>
 									<listOptionValue builtIn="false" value="emon"/>
 									<listOptionValue builtIn="false" value="openbabel"/>
 									<listOptionValue builtIn="false" value="ann"/>
 									<listOptionValue builtIn="false" value="newmat"/>
 									<listOptionValue builtIn="false" value="boost_iostreams"/>
-									<listOptionValue builtIn="false" value="oebio"/>
-									<listOptionValue builtIn="false" value="oemmff"/>
-									<listOptionValue builtIn="false" value="oemolpotential"/>
-									<listOptionValue builtIn="false" value="oesheffield"/>
-									<listOptionValue builtIn="false" value="oeshape"/>
-									<listOptionValue builtIn="false" value="oeam1"/>
-									<listOptionValue builtIn="false" value="oeam1bcc"/>
-									<listOptionValue builtIn="false" value="oedepict"/>
-									<listOptionValue builtIn="false" value="oeopt"/>
-									<listOptionValue builtIn="false" value="oequacpac"/>
-									<listOptionValue builtIn="false" value="oespicoli"/>
-									<listOptionValue builtIn="false" value="oezap"/>
-									<listOptionValue builtIn="false" value="oegrid"/>
-									<listOptionValue builtIn="false" value="oefizzchem"/>
 									<listOptionValue builtIn="false" value="boost_system"/>
 									<listOptionValue builtIn="false" value="boost_program_options"/>
 									<listOptionValue builtIn="false" value="boost_thread"/>
 									<listOptionValue builtIn="false" value="boost_filesystem"/>
-									<listOptionValue builtIn="false" value="oechem"/>
-									<listOptionValue builtIn="false" value="oesystem"/>
-									<listOptionValue builtIn="false" value="oeplatform"/>
 									<listOptionValue builtIn="false" value="z"/>
 									<listOptionValue builtIn="false" value="pthread"/>
 									<listOptionValue builtIn="false" value="m"/>
-									<listOptionValue builtIn="false" value="tcmalloc_minimal"/>
 								</option>
 								<option id="gnu.cpp.link.option.paths.1815957130" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
-									<listOptionValue builtIn="false" value="/usr0/local/openeye/toolkits/lib"/>
 									<listOptionValue builtIn="false" value="/usr/local/lib"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.424376227" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
@@ -114,9 +91,8 @@
 							<tool id="cdt.managedbuild.tool.gnu.archiver.base.98085514" name="GCC Archiver" superClass="cdt.managedbuild.tool.gnu.archiver.base"/>
 							<tool command="g++" commandLinePattern="${COMMAND} ${FLAGS} ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT} ${INPUTS}" id="cdt.managedbuild.tool.gnu.cpp.compiler.exe.release.499569146" name="GCC C++ Compiler" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.exe.release">
 								<option id="gnu.cpp.compiler.exe.release.option.optimization.level.1417829218" name="Optimization Level" superClass="gnu.cpp.compiler.exe.release.option.optimization.level" value="gnu.cpp.compiler.optimization.level.most" valueType="enumerated"/>
-								<option id="gnu.cpp.compiler.exe.release.option.debugging.level.399790278" name="Debug Level" superClass="gnu.cpp.compiler.exe.release.option.debugging.level" value="gnu.cpp.compiler.debugging.level.none" valueType="enumerated"/>
+								<option id="gnu.cpp.compiler.exe.release.option.debugging.level.399790278" name="Debug Level" superClass="gnu.cpp.compiler.exe.release.option.debugging.level" value="gnu.cpp.compiler.debugging.level.default" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.1365754053" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="/usr0/local/openeye/toolkits/include"/>
 									<listOptionValue builtIn="false" value="/usr/local/include/openbabel-2.0"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
 								</option>
@@ -124,47 +100,28 @@
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.c.compiler.exe.release.235983073" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.exe.release">
 								<option defaultValue="gnu.c.optimization.level.most" id="gnu.c.compiler.exe.release.option.optimization.level.616899304" name="Optimization Level" superClass="gnu.c.compiler.exe.release.option.optimization.level" valueType="enumerated"/>
-								<option id="gnu.c.compiler.exe.release.option.debugging.level.317608801" name="Debug Level" superClass="gnu.c.compiler.exe.release.option.debugging.level" value="gnu.c.debugging.level.none" valueType="enumerated"/>
+								<option id="gnu.c.compiler.exe.release.option.debugging.level.317608801" name="Debug Level" superClass="gnu.c.compiler.exe.release.option.debugging.level" value="gnu.c.debugging.level.default" valueType="enumerated"/>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.989655705" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.exe.release.294402736" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.exe.release"/>
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.release.1621250117" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.release">
 								<option id="gnu.cpp.link.option.libs.236000983" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
-									<listOptionValue builtIn="false" value="oeszybki"/>
 									<listOptionValue builtIn="false" value="glpk"/>
+									<listOptionValue builtIn="false" value="tcmalloc_minimal"/>
 									<listOptionValue builtIn="false" value="emon"/>
 									<listOptionValue builtIn="false" value="openbabel"/>
 									<listOptionValue builtIn="false" value="ann"/>
 									<listOptionValue builtIn="false" value="newmat"/>
 									<listOptionValue builtIn="false" value="boost_iostreams"/>
-									<listOptionValue builtIn="false" value="oebio"/>
-									<listOptionValue builtIn="false" value="oemmff"/>
-									<listOptionValue builtIn="false" value="oemolpotential"/>
-									<listOptionValue builtIn="false" value="oesheffield"/>
-									<listOptionValue builtIn="false" value="oeshape"/>
-									<listOptionValue builtIn="false" value="oeam1"/>
-									<listOptionValue builtIn="false" value="oeam1bcc"/>
-									<listOptionValue builtIn="false" value="oedepict"/>
-									<listOptionValue builtIn="false" value="oeopt"/>
-									<listOptionValue builtIn="false" value="oequacpac"/>
-									<listOptionValue builtIn="false" value="oespicoli"/>
-									<listOptionValue builtIn="false" value="oezap"/>
-									<listOptionValue builtIn="false" value="oegrid"/>
-									<listOptionValue builtIn="false" value="oefizzchem"/>
 									<listOptionValue builtIn="false" value="boost_system"/>
 									<listOptionValue builtIn="false" value="boost_program_options"/>
 									<listOptionValue builtIn="false" value="boost_thread"/>
 									<listOptionValue builtIn="false" value="boost_filesystem"/>
-									<listOptionValue builtIn="false" value="oechem"/>
-									<listOptionValue builtIn="false" value="oesystem"/>
-									<listOptionValue builtIn="false" value="oeplatform"/>
 									<listOptionValue builtIn="false" value="z"/>
 									<listOptionValue builtIn="false" value="pthread"/>
 									<listOptionValue builtIn="false" value="m"/>
-									<listOptionValue builtIn="false" value="tcmalloc_minimal"/>
 								</option>
 								<option id="gnu.cpp.link.option.paths.311058408" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
-									<listOptionValue builtIn="false" value="/usr0/local/openeye/toolkits/lib"/>
 									<listOptionValue builtIn="false" value="/usr/local/lib"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.965161860" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
@@ -206,7 +163,6 @@
 								<option id="gnu.cpp.compiler.exe.debug.option.optimization.level.522738796" name="Optimization Level" superClass="gnu.cpp.compiler.exe.debug.option.optimization.level" value="gnu.cpp.compiler.optimization.level.none" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.exe.debug.option.debugging.level.1589953070" name="Debug Level" superClass="gnu.cpp.compiler.exe.debug.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.743915848" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="/usr0/local/openeye/toolkits/include"/>
 									<listOptionValue builtIn="false" value="/usr/local/include/openbabel-2.0"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
 								</option>
@@ -224,41 +180,22 @@
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.exe.debug.184558929" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.exe.debug"/>
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug.2061418021" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug">
 								<option id="gnu.cpp.link.option.libs.1267507203" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
-									<listOptionValue builtIn="false" value="oeszybki"/>
 									<listOptionValue builtIn="false" value="glpk"/>
 									<listOptionValue builtIn="false" value="emon"/>
 									<listOptionValue builtIn="false" value="openbabel"/>
 									<listOptionValue builtIn="false" value="ann"/>
 									<listOptionValue builtIn="false" value="newmat"/>
 									<listOptionValue builtIn="false" value="boost_iostreams"/>
-									<listOptionValue builtIn="false" value="oebio"/>
-									<listOptionValue builtIn="false" value="oemmff"/>
-									<listOptionValue builtIn="false" value="oemolpotential"/>
-									<listOptionValue builtIn="false" value="oesheffield"/>
-									<listOptionValue builtIn="false" value="oeshape"/>
-									<listOptionValue builtIn="false" value="oeam1"/>
-									<listOptionValue builtIn="false" value="oeam1bcc"/>
-									<listOptionValue builtIn="false" value="oedepict"/>
-									<listOptionValue builtIn="false" value="oeopt"/>
-									<listOptionValue builtIn="false" value="oequacpac"/>
-									<listOptionValue builtIn="false" value="oespicoli"/>
-									<listOptionValue builtIn="false" value="oezap"/>
-									<listOptionValue builtIn="false" value="oegrid"/>
-									<listOptionValue builtIn="false" value="oefizzchem"/>
 									<listOptionValue builtIn="false" value="boost_system"/>
 									<listOptionValue builtIn="false" value="boost_program_options"/>
 									<listOptionValue builtIn="false" value="boost_thread"/>
 									<listOptionValue builtIn="false" value="boost_filesystem"/>
-									<listOptionValue builtIn="false" value="oechem"/>
-									<listOptionValue builtIn="false" value="oesystem"/>
-									<listOptionValue builtIn="false" value="oeplatform"/>
 									<listOptionValue builtIn="false" value="z"/>
 									<listOptionValue builtIn="false" value="pthread"/>
 									<listOptionValue builtIn="false" value="m"/>
 									<listOptionValue builtIn="false" value="tcmalloc_minimal"/>
 								</option>
 								<option id="gnu.cpp.link.option.paths.581059665" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
-									<listOptionValue builtIn="false" value="/usr0/local/openeye/toolkits/lib"/>
 									<listOptionValue builtIn="false" value="/usr/local/lib"/>
 								</option>
 								<option id="gnu.cpp.link.option.debugging.prof.1131740751" name="Generate prof information (-p)" superClass="gnu.cpp.link.option.debugging.prof" value="true" valueType="boolean"/>
@@ -283,8 +220,16 @@
 	<storageModule moduleId="cdtBuildSystem" version="4.0.0">
 		<project id="ShapeDB.cdt.managedbuild.target.gnu.exe.242483351" name="Executable" projectType="cdt.managedbuild.target.gnu.exe"/>
 	</storageModule>
-	<storageModule moduleId="refreshScope" versionNumber="1">
-		<resource resourceType="PROJECT" workspacePath="/ShapeDB"/>
+	<storageModule moduleId="refreshScope" versionNumber="2">
+		<configuration configurationName="Release">
+			<resource resourceType="PROJECT" workspacePath="/ShapeDB"/>
+		</configuration>
+		<configuration configurationName="Profile">
+			<resource resourceType="PROJECT" workspacePath="/ShapeDB"/>
+		</configuration>
+		<configuration configurationName="Debug">
+			<resource resourceType="PROJECT" workspacePath="/ShapeDB"/>
+		</configuration>
 	</storageModule>
 	<storageModule moduleId="scannerConfiguration">
 		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
@@ -307,4 +252,5 @@
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="org.eclipse.cdt.managedbuilder.core.GCCManagedMakePerProjectProfileC"/>
 		</scannerConfigBuildInfo>
 	</storageModule>
+	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
 </cproject>

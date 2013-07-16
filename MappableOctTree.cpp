@@ -6,9 +6,11 @@
  */
 
 #include "MappableOctTree.h"
+#include "MiraObject.h"
 #include <cstring>
 #include <cassert>
 #include <boost/multi_array.hpp>
+
 using namespace boost;
 
 MappableOctTree* MappableOctTree::clone() const
@@ -22,7 +24,7 @@ MappableOctTree* MappableOctTree::clone() const
 //return volume of this node given that the full volume of the cube is dim3
 //to save space while keeping most performance, volume is cached in octnodes
 float MChildNode::volume(const MOctNode* tree, float dim3) const
-{
+		{
 	if (isLeaf)
 	{
 		return leaf.numbits * dim3 / 8;
@@ -35,7 +37,7 @@ float MChildNode::volume(const MOctNode* tree, float dim3) const
 
 //volume version for tree under construction
 float MChildNode::volume(const vector<MOctNode>& tree, float dim3) const
-{
+		{
 	if (isLeaf)
 	{
 		return leaf.numbits * dim3 / 8;
@@ -121,7 +123,8 @@ MChildNode MappableOctTree::createFrom_r(unsigned N, MChildNode* nodes,
 					pat = 0;
 				nextnodes[cnt] = MChildNode(pat, pat ? 8 : 0);
 				cnt++;
-			}assert(cnt == n);
+			}
+			assert(cnt == n);
 
 			MChildNode nchild = createFrom_r(n, nextnodes, nexttrees, newtree,
 					isUnion, bitvol);
@@ -156,7 +159,7 @@ void MappableOctTree::invert()
 	float cubeVol = dimension * dimension * dimension;
 	float expectedV = cubeVol - root.volume(tree, cubeVol);
 	root.invert(tree, cubeVol);
-	assert(root.volume(tree,cubeVol) == expectedV);
+	assert(root.volume(tree, cubeVol) == expectedV);
 }
 
 MappableOctTree* MappableOctTree::newFromVector(const vector<MOctNode>& newtree,
@@ -407,7 +410,7 @@ MappableOctTree* MappableOctTree::createFromIntersection(unsigned N,
 
 MChildNode MappableOctTree::createTruncated_r(const MChildNode& node, float res,
 		bool fillIn, vector<MOctNode>& newtree, float cubeVol) const
-{
+		{
 	if (cubeVol <= res * res * res) //at level that needs to be truncated to a leaf
 	{
 		if (fillIn && node.volume(tree, cubeVol) != 0)
@@ -460,7 +463,7 @@ MChildNode MappableOctTree::createTruncated_r(const MChildNode& node, float res,
 }
 
 MappableOctTree* MappableOctTree::createTruncated(float res, bool fillIn) const
-{
+		{
 	vector<MOctNode> newtree;
 	MChildNode newroot = createTruncated_r(root, res, fillIn, newtree,
 			dimension * dimension * dimension);
@@ -471,7 +474,7 @@ MappableOctTree* MappableOctTree::createTruncated(float res, bool fillIn) const
 MChildNode MappableOctTree::createRounded_r(const MChildNode& node,
 		float volcutoff, bool fillIn, vector<MOctNode>& newtree,
 		float maxvol) const
-{
+		{
 	float vol = node.volume(tree, maxvol);
 	float empty = maxvol - vol;
 
@@ -525,7 +528,7 @@ MChildNode MappableOctTree::createRounded_r(const MChildNode& node,
 }
 
 MappableOctTree* MappableOctTree::createRounded(float vol, bool fillIn) const
-{
+		{
 	vector<MOctNode> newtree;
 	MChildNode newroot = createRounded_r(root, vol, fillIn, newtree,
 			dimension * dimension * dimension);
@@ -535,7 +538,7 @@ MappableOctTree* MappableOctTree::createRounded(float vol, bool fillIn) const
 
 //volume calculations that don't require creating a tmp tree
 float MappableOctTree::intersectVolume(const MappableOctTree * rhs) const
-{
+		{
 	float ival = 0, uval = 0;
 	assert(dimension == rhs->dimension);
 	root.intersectUnionVolume(tree, rhs->root, rhs->tree,
@@ -544,7 +547,7 @@ float MappableOctTree::intersectVolume(const MappableOctTree * rhs) const
 }
 
 float MappableOctTree::unionVolume(const MappableOctTree *rhs) const
-{
+		{
 	float ival = 0, uval = 0;
 	assert(dimension == rhs->dimension);
 	root.intersectUnionVolume(tree, rhs->root, rhs->tree,
@@ -554,7 +557,7 @@ float MappableOctTree::unionVolume(const MappableOctTree *rhs) const
 
 void MappableOctTree::intersectUnionVolume(const MappableOctTree *rhs,
 		float& ival, float& uval) const
-{
+		{
 	ival = 0;
 	uval = 0;
 	assert(dimension == rhs->dimension);
@@ -564,7 +567,7 @@ void MappableOctTree::intersectUnionVolume(const MappableOctTree *rhs,
 }
 
 bool MappableOctTree::containedIn(const MappableOctTree *rhs) const
-{
+		{
 	return root.containedIn(tree, rhs->root, rhs->tree);
 }
 
@@ -590,25 +593,25 @@ unsigned MappableOctTree::leaves() const
 }
 
 void MappableOctTree::write(ostream& out) const
-{
+		{
 	unsigned sz = sizeof(MappableOctTree) + N * sizeof(MOctNode);
 	out.write((char*) this, sz);
 }
 
 float MappableOctTree::relativeVolumeDistance(const MappableOctTree * rhs) const
-{
+		{
 	float ival = 0, uval = 0;
 	assert(dimension == rhs->dimension);
 
 	root.intersectUnionVolume(tree, rhs->root, rhs->tree,
 			dimension * dimension * dimension, ival, uval);
-	if(uval == 0) //possible when don't have anchored shapes
+	if (uval == 0) //possible when don't have anchored shapes
 		return 1.0;
 	return 1 - ival / uval;
 }
 
 float MappableOctTree::absoluteVolumeDistance(const MappableOctTree * rhs) const
-{
+		{
 	float ival = 0, uval = 0;
 	assert(dimension == rhs->dimension);
 
@@ -641,7 +644,7 @@ void MChildNode::invert(MOctNode* tree, float maxvol)
 void MChildNode::intersectUnionVolume(const MOctNode* tree,
 		const MChildNode& rhs, const MOctNode* rtree, float cubeVol,
 		float& intersectval, float& unionval) const
-{
+		{
 	float bitv = cubeVol / 8;
 	if (rhs.isLeaf && isLeaf)
 	{
@@ -734,7 +737,7 @@ void MChildNode::intersectUnionVolume(const MOctNode* tree,
 //return true if this is contained in rhs - short circuit eval
 bool MChildNode::containedIn(const MOctNode* tree, const MChildNode& rhs,
 		const MOctNode* rtree) const
-{
+		{
 	if (rhs.isLeaf && isLeaf)
 	{
 		return (leaf.pattern & rhs.leaf.pattern) == leaf.pattern;
@@ -824,7 +827,7 @@ static void addVertices(vector<Vertex>& vertices, Cube box)
 //append vertices of this child to vertices, this child's box is provided
 void MChildNode::collectVertices(vector<Vertex>& vertices, Cube box,
 		const MOctNode* tree) const
-{
+		{
 	if (isLeaf)
 	{
 		if (leaf.pattern == 0)
@@ -892,10 +895,10 @@ static void uniqueRemove8ify(vector<Vertex>& V)
 //TODO: make this efficient if it turns out to be worthwhile, right now
 //do the easiest implimentation: collect all leaf corner coordinates, sort,
 //remove completely buried (8 versions), compute all pairs distances
-float MappableOctTree::hausdorffDistance(const MappableOctTree* B,
-		float dim) const
+float MappableOctTree::hausdorffDistance(const MappableOctTree* B) const
 {
 	vector<Vertex> Av, Bv;
+	float dim = dimension;
 
 	Cube box(dim, -dim / 2, -dim / 2, -dim / 2);
 	root.collectVertices(Av, box, tree);
@@ -930,7 +933,7 @@ float MappableOctTree::hausdorffDistance(const MappableOctTree* B,
 
 bool MChildNode::equals(const MOctNode* tree, const MChildNode& rhs,
 		const MOctNode* rtree) const
-{
+		{
 	if (isLeaf)
 	{
 		if (rhs.isLeaf)
@@ -961,7 +964,7 @@ bool MChildNode::equals(const MOctNode* tree, const MChildNode& rhs,
 }
 
 bool MappableOctTree::equals(const MappableOctTree* rhs) const
-{
+		{
 	return root.equals(tree, rhs->root, rhs->tree);
 }
 
@@ -969,7 +972,7 @@ bool MappableOctTree::equals(const MappableOctTree* rhs) const
 //max is the integral dimension of this node
 bool MChildNode::checkCoord(const MOctNode *tree, unsigned i, unsigned j,
 		unsigned k, unsigned max) const
-{
+		{
 	//first compute the octant identified by i,j,k
 	unsigned half = max / 2;
 	unsigned oct = 0;
@@ -1001,7 +1004,7 @@ bool MChildNode::checkCoord(const MOctNode *tree, unsigned i, unsigned j,
 
 //dump an mmp formated grid
 void MappableOctTree::dumpGrid(ostream& out, float res) const
-{
+		{
 	//size
 	float dim = dimension;
 	out << "header\n";
@@ -1033,7 +1036,7 @@ void MappableOctTree::dumpGrid(ostream& out, float res) const
 
 //no header, just binary output
 void MappableOctTree::dumpRawGrid(ostream& out, float res) const
-{
+		{
 	char one = 0xff;
 	char zero = 0;
 	unsigned max = ceil(dimension / res);
@@ -1058,8 +1061,9 @@ void MappableOctTree::dumpRawGrid(ostream& out, float res) const
 #include <arpa/inet.h>
 
 //sproxel csv format, voxelValue is the string to specify voxels occupied by the object
-void MappableOctTree::dumpSproxelGrid(ostream& out, float res,  const string& voxelValue) const
-{
+void MappableOctTree::dumpSproxelGrid(ostream& out, float res,
+		const string& voxelValue) const
+		{
 	unsigned short max = ceil(dimension / res);
 	out << max << "," << max << "," << max << "\n";
 
@@ -1070,7 +1074,7 @@ void MappableOctTree::dumpSproxelGrid(ostream& out, float res,  const string& vo
 		{
 			for (unsigned k = 0; k < max; k++)
 			{
-				if(k != 0)
+				if (k != 0)
 					out << ",";
 				if (root.checkCoord(tree, i, j, k, max))
 					out << voxelValue;
@@ -1085,34 +1089,24 @@ void MappableOctTree::dumpSproxelGrid(ostream& out, float res,  const string& vo
 
 //mira grid format
 void MappableOctTree::dumpMiraGrid(ostream& out, float res) const
-{
+		{
 	unsigned short max = ceil(dimension / res);
 
-	struct
-	{
-		char fileid[5]; // must be VOXEL
-		unsigned char control_z; // must be 26 (0x1a)
-		unsigned short version; // must be 1 (?)
-		unsigned short xres;
-		unsigned short yres;
-		unsigned short zres;
-		unsigned short flag; // 0x4 if RGB data, 0x8 if RGBA data, 0 = byte data
-		unsigned int map_offset; // must be 256
-		unsigned int voxel_offset; // equal to 256 + (xres + yres + zres) * sizeof(double)
-		unsigned char unused[104];
-		char text[128]; // information text
-	} fileheader = { {'V','O','X','E','L'}, 26, 1, htons(max), htons(max), htons(max), 0, 256, (256+3*max*sizeof(double)) };
+	MiraHeader fileheader =
+			{
+					{ 'V', 'O', 'X', 'E', 'L' }, 26, 1, htons(max), htons(max), htons(
+							max), 0, 256, (256 + 3 * max * sizeof(double)) };
 
 	char one = 0xff;
 	char zero = 0;
 
-	out.write((char*)&fileheader, sizeof(fileheader));
-	for(unsigned i = 0; i < 3; i++)
+	out.write((char*) &fileheader, sizeof(fileheader));
+	for (unsigned i = 0; i < 3; i++)
 	{
 		double pos = 0;
-		for(unsigned j = 0; j < max; j++)
+		for (unsigned j = 0; j < max; j++)
 		{
-			out.write((char*)&pos, sizeof(double));
+			out.write((char*) &pos, sizeof(double));
 			pos += res;
 		}
 	}
@@ -1136,7 +1130,7 @@ void MappableOctTree::dumpMiraGrid(ostream& out, float res) const
 
 void MChildNode::countLeavesAtDepths(const MOctNode* tree, unsigned depth,
 		vector<unsigned>& counts) const
-{
+		{
 	if (counts.size() <= depth)
 		counts.resize(depth + 1, 0);
 
@@ -1155,18 +1149,18 @@ void MChildNode::countLeavesAtDepths(const MOctNode* tree, unsigned depth,
 }
 
 void MappableOctTree::countLeavesAtDepths(vector<unsigned>& counts) const
-{
+		{
 	counts.clear();
 	root.countLeavesAtDepths(tree, 0, counts);
 }
 
 void MappableOctTree::makeGrid(MGrid& grid, float res) const
-{
+		{
 	//size
 	float dim = dimension;
 	unsigned max = ceil(dim / res);
 	grid = MGrid(dim, res);
-	float start = -dim/2;
+	float start = -dim / 2;
 
 	//now coordinates
 	//definitely not the most efficient way
@@ -1178,10 +1172,10 @@ void MappableOctTree::makeGrid(MGrid& grid, float res) const
 			{
 				if (root.checkCoord(tree, i, j, k, max))
 				{
-					float x = start+i*res;
-					float y = start+j*res;
-					float z = start+k*res;
-					grid.setPoint(x,y,z);
+					float x = start + i * res;
+					float y = start + j * res;
+					float z = start + k * res;
+					grid.setPoint(x, y, z);
 				}
 			}
 		}

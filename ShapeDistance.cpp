@@ -113,21 +113,20 @@ float averageAbsVolume(const MappableOctTree* leftMIV, const MappableOctTree* le
 }
 
 
-static float dimension = 64; //yuck
 float hausdorffDist(const MappableOctTree* leftMIV, const MappableOctTree* leftMSV,
 		const MappableOctTree* rightMIV, const MappableOctTree* rightMSV)
 {
 	if(leftMIV == leftMSV && rightMIV == rightMSV)
 	{
-		return leftMIV->hausdorffDistance(rightMIV, dimension);
+		return leftMIV->hausdorffDistance(rightMIV);
 	}
 
-	return leftMIV->hausdorffDistance(rightMIV, dimension) + leftMSV->hausdorffDistance(rightMSV, dimension);
+	return leftMIV->hausdorffDistance(rightMIV) + leftMSV->hausdorffDistance(rightMSV);
 }
 
 shapeMetricFn shapeDistance = averageRelVolume;
 
-void setDistance(DistanceFunction df, float dim)
+void setDistance(DistanceFunction df)
 {
 	switch(df)
 	{
@@ -138,7 +137,6 @@ void setDistance(DistanceFunction df, float dim)
 		 shapeDistance = averageAbsVolume;
 		 break;
 	case Hausdorff:
-		dimension = dim;
 		shapeDistance = hausdorffDist;
 		break;
 	case RelativeTriple:
@@ -172,6 +170,6 @@ float searchVolumeDist(const MappableOctTree* obj, const MappableOctTree* MIV,
 //a nearest neighbors distance, should match up with bounds of searchVolumeDist
 float volumeDist(const MappableOctTree* x, const MappableOctTree* y)
 {
-	return 1 - x->intersectVolume(y)/x->unionVolume(y);
+	return x->relativeVolumeDistance(y);
 }
 

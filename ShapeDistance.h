@@ -19,7 +19,7 @@ extern shapeMetricFn shapeDistance;
 enum DistanceFunction {RelativeVolume, AbsVolume, Hausdorff,RelativeTriple, AbsoluteTriple,IncludeExclude,RelVolExclude};
 
 //set shapedistance to the requested function, hausdoff needs the dim
-extern void setDistance(DistanceFunction df, float dim);
+extern void setDistance(DistanceFunction df);
 
 float searchVolumeDist(const MappableOctTree* obj, const MappableOctTree* MIV,
 		const MappableOctTree* MSV, float& min, float& max);

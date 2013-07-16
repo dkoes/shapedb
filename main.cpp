@@ -45,6 +45,7 @@
 #include "packers/Packers.h"
 #include <boost/shared_ptr.hpp>
 #include "Timer.h"
+#include "MiraObject.h"
 
 using namespace std;
 using namespace boost;
@@ -54,24 +55,34 @@ typedef shared_ptr<Packer> PackerPtr;
 enum CommandEnum
 {
 	Create,
+	MiraSearch,
+	DCMiraSearch,
 	NNSearch,
 	DCSearch,
 	MolGrid,
+	MergeMira,
 	BatchSearch,
+	BatchMiraSearch,
 	BatchDB,
 	SearchAllPointCombos,
 	CreateTrees,
-	CreateFromTrees
+	CreateFromTrees,
+	CreateFromMira
 };
 
 cl::opt<CommandEnum> Command(cl::desc("Operation to perform:"), cl::Required,
 		cl::values(clEnumVal(Create, "Create a molecule shape index."),
 				clEnumVal(CreateTrees,"Create only the shapes with no index."),
 				clEnumVal(CreateFromTrees,"Create an index from already created shapes."),
+				clEnumVal(CreateFromMira,"Create an index from already created shapes."),
+				clEnumVal(MiraSearch, "Nearest neighbor searching of mira objects"),
+				clEnumVal(DCMiraSearch, "Distance constraint searching of mira objects"),
 				clEnumVal(NNSearch, "Nearest neighbor search"),
 				clEnumVal(DCSearch, "Distance constraint search"),
 				clEnumVal(MolGrid, "Generate molecule grid and debug output"),
+				clEnumVal(MergeMira, "Merge mira files into MIV/MSV"),
 				clEnumVal(BatchSearch, "Read in a jobs file for batch processing"),
+				clEnumVal(BatchMiraSearch, "Read in a mira jobs file for batch processing"),
 				clEnumVal(BatchDB, "Read in a jobs file for batch processing of a list of directories"),
 				clEnumVal(SearchAllPointCombos, "Search using all possible subsets of interaction points"),
 				clEnumValEnd));
@@ -112,11 +123,14 @@ cl::opt<bool> ScanCheck("scancheck",
 cl::opt<bool> ScanOnly("scanonly", cl::desc("Search using only a scan"),
 		cl::Hidden);
 
-cl::opt<bool> SingleConformer("single-conformer",cl::desc("Output the single best conformer"),cl::init(false));
+cl::opt<bool> SingleConformer("single-conformer",
+		cl::desc("Output the single best conformer"), cl::init(false));
 
 cl::opt<string> Input("in", cl::desc("Input file"));
 cl::opt<string> Output("out", cl::desc("Output file"));
 cl::opt<string> Database("db", cl::desc("Database file"));
+
+cl::list<string> Files("files",cl::desc("Files for MiraMerge"));
 
 cl::opt<double> LessDist("less",
 		cl::desc(
@@ -139,6 +153,9 @@ cl::opt<string> IncludeMol("ligand",
 		cl::desc("Molecule to use for minimum included volume"));
 cl::opt<string> ExcludeMol("receptor",
 		cl::desc("Molecule to use for excluded volume"));
+
+cl::opt<string> MIVShape("mira-miv", cl::desc("Mira shape to use for minimum included volume"));
+cl::opt<string> MSVShape("mira-msv", cl::desc("Mira shape to use for maximum surrounding volume"));
 
 cl::opt<bool> useInteractionPoints("use-interaction-points",
 		cl::desc(
@@ -214,14 +231,17 @@ cl::opt<string> SproxelColor("sproxel-color",
 cl::opt<bool> KeepHydrogens("h",
 		cl::desc("Retain hydrogens in input molecules"), cl::init(false));
 
+typedef GSSTreeSearcher::ObjectTree ObjectTree;
 //create min and max trees from molecular data
 //caller takes owner ship of tree memory
 static void create_trees(GSSTreeSearcher& gss, const string& includeMol,
 		const string& excludeMol, double less, double more,
-		MappableOctTree*& smallTree, MappableOctTree*& bigTree)
+		GSSTreeSearcher::ObjectTree& smallTree,
+		GSSTreeSearcher::ObjectTree& bigTree)
 {
 	double dimension = gss.getDimension();
 	double resolution = gss.getResolution();
+
 	//read query molecule(s)
 
 	//use explicit volumes
@@ -234,33 +254,11 @@ static void create_trees(GSSTreeSearcher& gss, const string& includeMol,
 	Molecule exMol = *exmolitr;
 
 	//create trees
-
-	//resize receptor constraint
-	bigTree = MappableOctTree::create(dimension, resolution, exMol);
-
-	if (more > 0)
-	{
-		MGrid grid;
-		bigTree->makeGrid(grid, resolution);
-		grid.shrink(more);
-		free(bigTree);
-		bigTree = MappableOctTree::createFromGrid(grid);
-	}
-	//exmol is the receptor, so must invert
-	bigTree->invert();
+	//receptor constraint, shrink by more and invert
+	bigTree = gss.createTreeFromObject(exMol, more, true);
 
 	//use the full shape of the ligand
-	smallTree = MappableOctTree::create(dimension, resolution, inMol);
-
-	//shrink if requested
-	if (less > 0)
-	{
-		MGrid grid;
-		smallTree->makeGrid(grid, resolution);
-		grid.shrink(less);
-		free(smallTree);
-		smallTree = MappableOctTree::createFromGrid(grid);
-	}
+	smallTree = gss.createTreeFromObject(inMol, less);
 
 	if (useInteractionPoints)
 	{
@@ -273,25 +271,25 @@ static void create_trees(GSSTreeSearcher& gss, const string& includeMol,
 		MGrid lgrid;
 		smallTree->makeGrid(lgrid, resolution);
 		lgrid &= igrid;
-		free(smallTree);
-		smallTree = MappableOctTree::createFromGrid(lgrid);
+		smallTree = shared_ptr<const MappableOctTree>(
+				MappableOctTree::createFromGrid(lgrid), free);
 	}
 }
 
 //do search between include and exclude
-static void do_dcsearch(GSSTreeSearcher& gss, const MappableOctTree* smallTree,
-		const MappableOctTree* bigTree, const string& output)
+static void do_dcsearch(GSSTreeSearcher& gss, ObjectTree smallTree,
+		ObjectTree bigTree, const string& output)
 {
 	ResultMolecules res(SingleConformer);
 
 	//search
 	if (!ScanOnly)
-		gss.dc_search(smallTree, bigTree, output.size() > 0, res);
+		gss.dc_search(smallTree, bigTree, ObjectTree(), output.size() > 0, res);
 
 	if (ScanCheck || ScanOnly)
 	{
 		ResultMolecules res2(SingleConformer);
-		gss.dc_scan_search(smallTree, bigTree, output.size() > 0, res2);
+		gss.dc_scan_search(smallTree, bigTree, ObjectTree(), output.size() > 0, res2);
 		if (res2.size() != res.size())
 		{
 			cerr << "Scanning found different number: " << res2.size() << "\n";
@@ -317,13 +315,14 @@ void do_nnsearch(GSSTreeSearcher& gss, const string& input,
 	for (; molitr; ++molitr)
 	{
 		const Molecule& mol = *molitr;
+		ObjectTree objTree = gss.createTreeFromObject(mol);
 		if (k < 1) //scan
 		{
-			gss.nn_scan(mol, output.size() > 0, res);
+			gss.nn_scan(objTree, output.size() > 0, res);
 		}
 		else
 		{
-			gss.nn_search(mol, k, output.size() > 0, res);
+			gss.nn_search(objTree, k, output.size() > 0, res);
 		}
 	}
 
@@ -390,8 +389,9 @@ int main(int argc, char *argv[])
 	switch (Command)
 	{
 	case Create:
-	case CreateFromTrees:
-	{
+		case CreateFromTrees:
+		case CreateFromMira:
+		{
 		//read in all the molecules and calculate the max bounding box
 		KSamplePartitioner topdown(KCenters, KSampleMult,
 				KSamplePartitioner::AveCenter, SwitchToPack);
@@ -417,7 +417,7 @@ int main(int argc, char *argv[])
 			break;
 		}
 
-		setDistance(ShapeDist, MaxDimension);
+		setDistance(ShapeDist);
 
 		GSSLevelCreator leveler(&topdown, packer.get(), SwitchToPack,
 				SwitchToPack);
@@ -430,13 +430,24 @@ int main(int argc, char *argv[])
 		{
 			Molecule::iterator molitr(Input, MaxDimension, Resolution,
 					KeepHydrogens, ProbeRadius);
-			if (!creator.create(dbpath, molitr, MaxDimension, Resolution))
+			if (!creator.create<Molecule, Molecule::iterator>(dbpath, molitr,
+					MaxDimension, Resolution))
 			{
 				cerr << "Error creating database\n";
 				exit(1);
 			}
 		}
-		else //trees already created
+		else if (Command == CreateFromMira)
+		{
+			MiraObject::iterator miraitr(Input);
+			if (!creator.create<MiraObject, MiraObject::iterator>(dbpath,
+					miraitr, MaxDimension, Resolution))
+			{
+				cerr << "Error creating database\n";
+				exit(1);
+			}
+		}
+		else if (Command == CreateFromTrees) //trees already created
 		{
 			filesystem::path treedir(Input.c_str());
 			if (!creator.create(dbpath, treedir, MaxDimension, Resolution))
@@ -452,16 +463,15 @@ int main(int argc, char *argv[])
 	}
 		break;
 	case CreateTrees:
-	{
+		{
 		//read in all the molecules and calculate the max bounding box
 		KSamplePartitioner topdown(KCenters, KSampleMult,
 				KSamplePartitioner::AveCenter, SwitchToPack);
 
 		PackerPtr packer = PackerPtr(
-					new MatcherPacker(Pack, Knn, Sentinals, ClusterDist));
+				new MatcherPacker(Pack, Knn, Sentinals, ClusterDist));
 
-
-		setDistance(ShapeDist, MaxDimension);
+		setDistance(ShapeDist);
 
 		GSSLevelCreator leveler(&topdown, packer.get(), SwitchToPack,
 				SwitchToPack);
@@ -471,17 +481,17 @@ int main(int argc, char *argv[])
 		filesystem::path dbpath(Database.c_str());
 		Molecule::iterator molitr(Input, MaxDimension, Resolution,
 				KeepHydrogens, ProbeRadius);
-		if (!creator.createTreesOnly(dbpath, molitr, MaxDimension, Resolution))
+		if (!creator.createTreesOnly<Molecule, Molecule::iterator>(dbpath,
+				molitr, MaxDimension, Resolution))
 		{
 			cerr << "Error creating database\n";
 			exit(1);
 		}
 
-
 	}
 		break;
-	case NNSearch:
-	{
+	case MiraSearch:
+		{
 		//read in database
 		filesystem::path dbfile(Database.c_str());
 		GSSTreeSearcher gss(Verbose);
@@ -491,7 +501,245 @@ int main(int argc, char *argv[])
 			exit(-1);
 		}
 
-		setDistance(ShapeDist, gss.getDimension());
+		setDistance(ShapeDist);
+		ifstream mirain(Input.c_str());
+		MiraObject obj;
+		obj.read(mirain);
+
+		StringResults res;
+		ObjectTree objTree = gss.createTreeFromObject(obj);
+
+		if (K < 1) //scan
+		{
+			gss.nn_scan(objTree, true, res);
+		}
+		else
+		{
+			gss.nn_search(objTree, K, true, res);
+		}
+
+		for (unsigned i = 0, n = res.size(); i < n; i++)
+		{
+			cout << i << "\t" << res.getString(i) << "\t" << res.getScore(i)
+					<< "\n";
+		}
+	}
+		break;
+	case DCMiraSearch:
+		{
+		//read in database
+		filesystem::path dbfile(Database.c_str());
+		GSSTreeSearcher gss(Verbose);
+
+		if (!gss.load(dbfile))
+		{
+			cerr << "Could not read database " << Database << "\n";
+			exit(-1);
+		}
+		setDistance(ShapeDist);
+
+		double resolution = gss.getResolution();
+
+		setDistance(ShapeDist);
+
+		StringResults res;
+		ObjectTree objTree;
+		ObjectTree smallTree, bigTree;
+
+		if(Input.size() > 0)
+		{
+			ifstream mirain(Input.c_str());
+			MiraObject obj;
+			obj.read(mirain);
+			objTree = gss.createTreeFromObject(obj);
+		}
+
+		//search with passed shapes, does not invert exclude
+		if (MSVShape.size() > 0 && MIVShape.size() > 0)
+		{
+			MiraObject miv, msv;
+			ifstream mivin(MIVShape.c_str());
+			ifstream msvin(MSVShape.c_str());
+			miv.read(mivin);
+			msv.read(msvin);
+
+			smallTree = gss.createTreeFromObject(miv);
+			bigTree = gss.createTreeFromObject(msv);
+		}
+		else if(MSVShape.size() > 0 || MIVShape.size() > 0)
+		{
+			cerr << "Error, need to specify both MIV and MSV\n";
+			exit(-1);
+		}
+		else //base off of query shape
+		{
+			MGrid smallgrid, biggrid;
+			objTree->makeGrid(smallgrid, resolution);
+			biggrid = smallgrid;
+			smallgrid.shrink(LessDist);
+			biggrid.grow(MoreDist);
+
+			smallTree = ObjectTree(
+					MappableOctTree::createFromGrid(smallgrid));
+			bigTree = ObjectTree(
+					MappableOctTree::createFromGrid(biggrid));
+		}
+
+		if (!ScanOnly)
+			gss.dc_search(smallTree, bigTree, objTree, Output.size() > 1, res);
+
+		if (ScanCheck || ScanOnly)
+		{
+			StringResults res2;
+			gss.dc_scan_search(smallTree, bigTree, objTree, Output.size() > 1,
+					res2);
+			if (res2.size() != res.size())
+			{
+				cerr << "Scanning found different number\n";
+			}
+		}
+		for (unsigned i = 0, n = res.size(); i < n; i++)
+		{
+			cout << i << "\t" << res.getString(i) << "\t" << res.getScore(i)
+					<< "\n";
+		}
+	}
+		break;
+	case BatchMiraSearch:
+		{
+		//read in database
+		filesystem::path dbfile(Database.c_str());
+		GSSTreeSearcher gss(Verbose);
+
+		if (!gss.load(dbfile))
+		{
+			cerr << "Could not read database " << Database << "\n";
+			exit(-1);
+		}
+		double resolution = gss.getResolution();
+
+		setDistance(ShapeDist);
+
+		//read in each line of the batch file which should be
+		//cmd in_ligand in_receptor(for DC Search)
+		ifstream batch(Input.c_str());
+		if (!batch)
+		{
+			cerr << "Could not read batch file " << Input << "\n";
+			exit(-1);
+		}
+
+		string line;
+		while (getline(batch, line))
+		{
+			stringstream toks(line);
+			string cmd, mira;
+			toks >> cmd;
+
+			if (!toks)
+				break;
+
+			double less = 0, more = 0;
+			unsigned k = 1;
+
+			if (cmd == "DCSearch")
+			{
+				toks >> mira;
+				toks >> less;
+				toks >> more;
+			}
+			else if (cmd == "NNSearch")
+			{
+				toks >> mira;
+				toks >> k;
+			}
+
+			vector<double> times;
+
+			if (ClearCacheFirst)
+				std::system("clearfilecache");
+
+			ifstream mirain(mira.c_str());
+			MiraObject obj;
+			obj.read(mirain);
+			ObjectTree objTree = gss.createTreeFromObject(obj);
+			ObjectTree smallTree, bigTree;
+
+			if (cmd == "DCSearch")
+			{
+				MGrid smallgrid, biggrid;
+				objTree->makeGrid(smallgrid, resolution);
+				biggrid = smallgrid;
+				smallgrid.shrink(less);
+				biggrid.grow(more);
+
+				smallTree = ObjectTree(
+						MappableOctTree::createFromGrid(smallgrid));
+				bigTree = ObjectTree(MappableOctTree::createFromGrid(biggrid));
+			}
+
+			for (unsigned i = 0; i < TimeTrials; i++)
+			{
+				if (ClearCache)
+				{
+					std::system("clearfilecache");
+				}
+				StringResults res;
+
+				Timer t;
+
+				if (cmd == "DCSearch")
+				{
+					gss.dc_search(smallTree, bigTree, objTree, Verbose, res);
+				}
+				else if (cmd == "NNSearch")
+				{
+					if (k < 1) //scan
+					{
+						gss.nn_scan(objTree, Verbose, res);
+					}
+					else
+					{
+						gss.nn_search(objTree, k, Verbose, res);
+					}
+				}
+				else
+				{
+					cerr << "Illegal command " << cmd << " in batch file.\n";
+					exit(-1);
+				}
+
+				//if verbose, have results
+				for (unsigned i = 0, n = res.size(); i < n; i++)
+				{
+					cout << "RES " << mira << "\t" << res.getString(i) << "\t" << res.getScore(i)
+							<< "\n";
+				}
+
+				times.push_back(t.elapsed());
+			}
+
+			cout << "Batch " << line;
+			for (unsigned i = 0, n = times.size(); i < n; i++)
+			{
+				cout << " " << times[i];
+			}
+			cout << "\n";
+		}
+	}
+		break;
+	case NNSearch:
+		{
+		//read in database
+		filesystem::path dbfile(Database.c_str());
+		GSSTreeSearcher gss(Verbose);
+		if (!gss.load(dbfile))
+		{
+			cerr << "Could not read database " << Database << "\n";
+			exit(-1);
+		}
+
+		setDistance(ShapeDist);
 
 		if (ExcludeMol.size() == 0 && K > 0)
 		{
@@ -504,7 +752,7 @@ int main(int argc, char *argv[])
 		{
 			//do a scan with shapedistance
 			ResultMolecules res(SingleConformer);
-			MappableOctTree *smallTree = NULL, *bigTree = NULL;
+			ObjectTree smallTree, bigTree;
 			create_trees(gss, IncludeMol, ExcludeMol, LessDist, MoreDist,
 					smallTree, bigTree);
 			if (K < 1) //scan
@@ -525,7 +773,7 @@ int main(int argc, char *argv[])
 	}
 		break;
 	case DCSearch:
-	{
+		{
 		//read in database
 		filesystem::path dbfile(Database.c_str());
 		GSSTreeSearcher gss(Verbose);
@@ -535,19 +783,17 @@ int main(int argc, char *argv[])
 			cerr << "Could not read database " << Database << "\n";
 			exit(-1);
 		}
-		setDistance(ShapeDist, gss.getDimension());
+		setDistance(ShapeDist);
 
 		double dimension = gss.getDimension();
 		double resolution = gss.getResolution();
 		//read query molecule(s)
 		if (IncludeMol.size() > 0 || ExcludeMol.size() > 0)
 		{
-			MappableOctTree *smallTree = NULL, *bigTree = NULL;
+			ObjectTree smallTree, bigTree;
 			create_trees(gss, IncludeMol, ExcludeMol, LessDist, MoreDist,
 					smallTree, bigTree);
 			do_dcsearch(gss, smallTree, bigTree, Output);
-			free(smallTree);
-			free(bigTree);
 		}
 		else // range from single molecules
 		{
@@ -556,40 +802,26 @@ int main(int argc, char *argv[])
 			{
 				ResultMolecules res(SingleConformer);
 				//search
-				MappableOctTree* tree = MappableOctTree::create(dimension,
-						resolution, *inmols);
-				MGrid lgrid(dimension, resolution);
-				tree->makeGrid(lgrid, resolution);
-				free(tree);
-
-				MGrid lgrid2(lgrid);
-
-				//resize
-				lgrid.shrink(LessDist);
-				lgrid2.grow(MoreDist);
-
 				//create bounding trees
-				MappableOctTree *smallTree = MappableOctTree::createFromGrid(
-						lgrid);
-				MappableOctTree *bigTree = MappableOctTree::createFromGrid(
-						lgrid2);
+
+				ObjectTree smallTree = gss.createTreeFromObject(*inmols,
+						LessDist);
+				ObjectTree bigTree = gss.createTreeFromObject(*inmols,
+						-MoreDist);
 
 				if (!ScanOnly)
-					gss.dc_search(smallTree, bigTree, Output.size() > 1, res);
+					gss.dc_search(smallTree, bigTree, ObjectTree(), Output.size() > 1, res);
 
 				if (ScanCheck || ScanOnly)
 				{
 					ResultMolecules res2(SingleConformer);
-					gss.dc_scan_search(smallTree, bigTree, Output.size() > 1,
+					gss.dc_scan_search(smallTree, bigTree, ObjectTree(), Output.size() > 1,
 							res2);
 					if (res2.size() != res.size())
 					{
 						cerr << "Scanning found different number\n";
 					}
 				}
-
-				free(smallTree);
-				free(bigTree);
 
 				ofstream outmols(Output.c_str());
 				for (unsigned i = 0, n = res.size(); i < n; i++)
@@ -599,7 +831,7 @@ int main(int argc, char *argv[])
 	}
 		break;
 	case BatchSearch:
-	{
+		{
 		//read in database
 		filesystem::path dbfile(Database.c_str());
 		GSSTreeSearcher gss(Verbose);
@@ -609,7 +841,7 @@ int main(int argc, char *argv[])
 			cerr << "Could not read database " << Database << "\n";
 			exit(-1);
 		}
-		setDistance(ShapeDist, gss.getDimension());
+		setDistance(ShapeDist);
 
 		//read in each line of the batch file which should be
 		//cmd in_ligand in_receptor(for DC Search)
@@ -662,12 +894,10 @@ int main(int argc, char *argv[])
 
 				if (cmd == "DCSearch")
 				{
-					MappableOctTree *smallTree = NULL, *bigTree = NULL;
+					ObjectTree smallTree, bigTree;
 					create_trees(gss, ligand, receptor, less, more, smallTree,
 							bigTree);
 					do_dcsearch(gss, smallTree, bigTree, output);
-					free(smallTree);
-					free(bigTree);
 				}
 				else if (cmd == "NNSearch")
 				{
@@ -692,7 +922,7 @@ int main(int argc, char *argv[])
 	}
 		break;
 	case BatchDB:
-	{
+		{
 		//setup where we run the same set of queries on a list of databases (provided in Database)
 		//preproccess the queries to load in receptor/ligand structures
 
@@ -770,7 +1000,7 @@ int main(int argc, char *argv[])
 				cerr << "Could not read database " << line << "\n";
 				exit(-1);
 			}
-			setDistance(ShapeDist, gss.getDimension());
+			setDistance(ShapeDist);
 
 			if (gss.getResolution() != Resolution
 					|| gss.getDimension() != MaxDimension)
@@ -785,12 +1015,16 @@ int main(int argc, char *argv[])
 				cout << line << " " << qinfos[i].str << "\n";
 				if (qinfos[i].cmd == NNSearch)
 				{
-					gss.nn_search(qinfos[i].in, qinfos[i].k, false, res);
+					gss.nn_search(gss.createTreeFromObject(qinfos[i].in),
+							qinfos[i].k, false, res);
 				}
 				else
 				{
-					gss.dc_search(qinfos[i].in, qinfos[i].ex, qinfos[i].less,
-							qinfos[i].more, true, false, res);
+					gss.dc_search(
+							gss.createTreeFromObject(qinfos[i].in,
+									qinfos[i].less),
+							gss.createTreeFromObject(qinfos[i].ex,	qinfos[i].more, true),
+							ObjectTree(),false, res);
 				}
 			}
 		}
@@ -798,7 +1032,7 @@ int main(int argc, char *argv[])
 	}
 		break;
 	case SearchAllPointCombos:
-	{
+		{
 		//this will output a ton of files - it searches all 2^n combinations
 		//of n interaction points using both DCSearch and NNSearch scanning
 
@@ -811,7 +1045,7 @@ int main(int argc, char *argv[])
 			cerr << "Could not read database " << Database << "\n";
 			exit(-1);
 		}
-		setDistance(ShapeDist, gss.getDimension());
+		setDistance(ShapeDist);
 
 		double dimension = gss.getDimension();
 		double resolution = gss.getResolution();
@@ -831,7 +1065,6 @@ int main(int argc, char *argv[])
 		double more = MoreDist;
 		double less = LessDist;
 
-
 		//read query molecule(s)
 		Molecule::iterator imolitr(IncludeMol, dimension, resolution,
 				KeepHydrogens, ProbeRadius);
@@ -844,19 +1077,7 @@ int main(int argc, char *argv[])
 		//create receptor tree
 
 		//resize receptor constraint
-		MappableOctTree *bigTree = MappableOctTree::create(dimension,
-				resolution, exMol);
-
-		if (more > 0)
-		{
-			MGrid grid;
-			bigTree->makeGrid(grid, resolution);
-			grid.shrink(more);
-			free(bigTree);
-			bigTree = MappableOctTree::createFromGrid(grid);
-		}
-		//exmol is the receptor, so must invert
-		bigTree->invert();
+		ObjectTree bigTree = gss.createTreeFromObject(exMol, more, true);
 
 		//get the full shape of the ligand
 		MappableOctTree *ligTree = MappableOctTree::create(dimension,
@@ -889,19 +1110,19 @@ int main(int argc, char *argv[])
 			{
 				if ((1 << p) & i) //use it
 				{
-					if(interactionPointRadius == 0)
+					if (interactionPointRadius == 0)
 					{
 						igrid.setPoint(ipts[p].x, ipts[p].y, ipts[p].z);
 					}
 					else
 					{
 						igrid.markXYZSphere(ipts[p].x, ipts[p].y, ipts[p].z,
-							interactionPointRadius);
+								interactionPointRadius);
 					}
 				}
 			}
 			igrid &= lgrid;
-			MappableOctTree *smallTree = MappableOctTree::createFromGrid(igrid);
+			ObjectTree smallTree(MappableOctTree::createFromGrid(igrid), free);
 
 			//do a scan for nn ranking
 			if (NNSearchAll)
@@ -926,13 +1147,44 @@ int main(int argc, char *argv[])
 			dcoutname << Output << "_dc_" << i << ".sdf";
 			do_dcsearch(gss, smallTree, bigTree, dcoutname.str());
 
-			free(smallTree);
 		}
-		free(bigTree);
+	}
+		break;
+	case MergeMira:
+	{
+		//read in a bunch of mira files and output the miv/msv
+		vector<const MappableOctTree*> trees;
+		for(unsigned i = 0, n = Files.size(); i < n; i++)
+		{
+			string file = Files[i];
+			ifstream mirain(file.c_str());
+			MiraObject obj;
+			obj.read(mirain);
+			MappableOctTree *tree = MappableOctTree::create(MaxDimension,
+					Resolution, obj);
+
+			trees.push_back(tree);
+		}
+
+		MappableOctTree *MIV = MappableOctTree::createFromIntersection(trees.size(), &trees[0]);
+		MappableOctTree *MSV = MappableOctTree::createFromUnion(trees.size(), &trees[0]);
+
+		string mivname = Output;
+		mivname += "_miv.mira";
+		string msvname = Output;
+		msvname += "_msv.mira";
+
+		ofstream mivout(mivname.c_str());
+		ofstream msvout(msvname.c_str());
+
+		MIV->dumpMiraGrid(mivout, Resolution);
+		MSV->dumpMiraGrid(msvout, Resolution);
+
+		//I am knowingly leaking memory here because I am lazy and this should not be in a loop
 	}
 		break;
 	case MolGrid:
-	{
+		{
 		ofstream out(Output.c_str());
 
 		if (useInteractionPoints)
@@ -940,7 +1192,7 @@ int main(int argc, char *argv[])
 			if (IncludeMol.size() == 0 || ExcludeMol.size() == 0)
 			{
 				cerr
-						<< "Need both ligand and receptor for interaction points.\n";
+				<< "Need both ligand and receptor for interaction points.\n";
 				exit(-1);
 			}
 			Molecule::iterator imolitr(IncludeMol, MaxDimension, Resolution,
@@ -997,3 +1249,4 @@ int main(int argc, char *argv[])
 	}
 	return 0;
 }
+

@@ -24,7 +24,6 @@ struct result_info
 {
 	file_index pos; //position of result
 	double val; //some measure of goodness of result
-
 	result_info(): pos(0), val(0) {}
 	result_info(file_index p, double v): pos(p), val(v) {}
 

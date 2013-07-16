@@ -15,10 +15,11 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/unordered_map.hpp>
 #include "PMol.h"
+#include "Results.h"
 using namespace std;
 using namespace boost;
 
-class ResultMolecules
+class ResultMolecules: public Results
 {
 	PMolReaderMalloc reader;
 	vector<PMol*> mols;

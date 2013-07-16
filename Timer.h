@@ -53,7 +53,7 @@ public:
 		struct timeval now;
 		gettimeofday(&now, NULL);
 		//round result for pretty printing..
-		return roundf(100*timevalDifF(startwall, now))/100.0;
+		return timevalDifF(startwall, now);
 	}
 
 

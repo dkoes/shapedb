@@ -57,7 +57,7 @@ struct Vertex
 	}
 };
 
-#define MINDEX_BITS 15
+#define MINDEX_BITS 31
 struct MOctNode;
 struct MChildNode
 {
@@ -224,7 +224,7 @@ public:
 
 	void write(ostream& out) const;
 
-	float hausdorffDistance(const MappableOctTree* B, float dim) const;
+	float hausdorffDistance(const MappableOctTree* B) const;
 	float relativeVolumeDistance(const MappableOctTree * B) const;
 	float absoluteVolumeDistance(const MappableOctTree * B) const;
 
@@ -296,7 +296,7 @@ private:
 			unsigned pos = tree.size();
 			ret.node.index = tree.size();
 
-			if (tree.size() >= (1 << MINDEX_BITS))
+			if (tree.size() >= (1U << MINDEX_BITS))
 			{
 				cerr
 						<< "Too many nodes for MINDEX_BITS. Must recompile to support larger octtress.\n";
@@ -356,5 +356,7 @@ public:
 		return create(grid.getDimension(), grid.getResolution(),grid);
 	}
 }__attribute__((__packed__));
+
+
 
 #endif /* MAPPABLEOCTTREE_H_ */

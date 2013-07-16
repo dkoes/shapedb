@@ -55,12 +55,15 @@ GSSTreeSearcher::~GSSTreeSearcher()
 	clear();
 }
 
-
 //find all the shapes in the database that lie bewtween smallObj and bigObj
 //if invertBig is set, than treat as an excluded volume
-void GSSTreeSearcher::dc_search(const MappableOctTree* smallTree,
-		const MappableOctTree* bigTree, bool loadObjs, Results& res)
+//if refobjtree is provided, than compute volume overlap with refobjtree as score
+void GSSTreeSearcher::dc_search(ObjectTree smallobjTree,
+		ObjectTree bigobjTree, ObjectTree refobjTree, bool loadObjs, Results& res)
 {
+	const MappableOctTree* smallTree = smallobjTree.get();
+	const MappableOctTree* bigTree = bigobjTree.get();
+	const MappableOctTree* origTree = refobjTree.get();
 	res.clear();
 
 	Timer t;
@@ -73,13 +76,13 @@ void GSSTreeSearcher::dc_search(const MappableOctTree* smallTree,
 	if (internalNodes.size() > 0)
 	{
 		const GSSInternalNode* root = (GSSInternalNode*) internalNodes.begin();
-		findTweeners(root, smallTree, bigTree, respos, 0, loadObjs);
+		findTweeners(root, smallTree, bigTree, origTree, respos, 0, loadObjs);
 	}
 	else
 	{
 		//very small tree with just a leaf
 		const GSSLeaf* leaf = (GSSLeaf*) leaves.begin();
-		findTweeners(leaf, smallTree, bigTree, respos, loadObjs);
+		findTweeners(leaf, smallTree, bigTree, origTree, respos, loadObjs);
 	}
 
 	Timer objload;
@@ -109,64 +112,10 @@ void GSSTreeSearcher::dc_search(const MappableOctTree* smallTree,
 	}
 }
 
-//find all the shapes in the database that lie bewtween smallObj and bigObj
-//if invertBig is set, than treat as an excluded volume
-void GSSTreeSearcher::dc_search(const Object& smallObj, const Object& bigObj,
-		float smallShrink, float bigShrink, bool invertBig, bool loadObjs,
-		Results& res)
-{
-	MappableOctTree *smallTree = MappableOctTree::create(dimension, resolution,
-			smallObj);
-
-	if (smallShrink > 0)
-	{
-		MGrid grid;
-		smallTree->makeGrid(grid, resolution);
-		grid.shrink(smallShrink);
-		free(smallTree);
-		smallTree = MappableOctTree::createFromGrid(grid);
-	}
-	MappableOctTree *bigTree = MappableOctTree::create(dimension, resolution,
-			bigObj);
-
-	if (invertBig)
-	{
-		if (bigShrink > 0)
-		{
-			MGrid grid;
-			bigTree->makeGrid(grid, resolution);
-			grid.shrink(bigShrink);
-			free(bigTree);
-			bigTree = MappableOctTree::createFromGrid(grid);
-		}
-		bigTree->invert();
-	}
-	else
-	{
-		//not invert, may need to grow
-		if (bigShrink > 0)
-		{
-			if (bigShrink > 0)
-			{
-				MGrid grid;
-				bigTree->makeGrid(grid, resolution);
-				grid.grow(bigShrink);
-				free(bigTree);
-				bigTree = MappableOctTree::createFromGrid(grid);
-			}
-		}
-	}
-
-	dc_search(smallTree, bigTree, loadObjs, res);
-
-	free(smallTree);
-	free(bigTree);
-}
-
 void GSSTreeSearcher::TopKObj::add(file_index pos, double dist)
 {
 	ObjDist x =
-	{ pos, dist };
+			{ pos, dist };
 	objs.insert(lower_bound(objs.begin(), objs.end(), x), x);
 
 	if (objs.size() > k)
@@ -180,7 +129,7 @@ struct ScoredChild
 	double min;
 
 	ScoredChild() :
-			child(NULL), score(HUGE_VAL)
+			child(NULL), score(HUGE_VAL), min(HUGE_VAL)
 	{
 	}
 	ScoredChild(const GSSInternalNode::Child *ch, double s, double m) :
@@ -189,7 +138,7 @@ struct ScoredChild
 	}
 
 	bool operator<(const ScoredChild& rhs) const
-	{
+			{
 		return score < rhs.score;
 	}
 };
@@ -276,17 +225,18 @@ void GSSTreeSearcher::findNearest(const GSSLeaf* node,
 		fullLeaves++;
 }
 
-
 //add nearest neighbors to res if appropriate
 void GSSTreeSearcher::findNearest(const GSSLeaf* node,
-		const MappableOctTree* smallTree, const MappableOctTree* bigTree, TopKObj& res)
+		const MappableOctTree* smallTree, const MappableOctTree* bigTree,
+		TopKObj& res)
 {
 	leavesVisited++;
 	unsigned cnt = 0;
 	for (unsigned i = 0, n = node->size(); i < n; i++)
 	{
 		const GSSLeaf::Child *child = node->getChild(i);
-		double dist = shapeDistance(&child->tree, &child->tree, smallTree, bigTree);
+		double dist = shapeDistance(&child->tree, &child->tree, smallTree,
+				bigTree);
 		fitsCheck++;
 		if (dist < res.worst())
 		{
@@ -298,18 +248,18 @@ void GSSTreeSearcher::findNearest(const GSSLeaf* node,
 		fullLeaves++;
 }
 
-
 //return k objects closes to small/big obj using shapeDistance
 //in order to do this efficiently we need to be able to calculate bounds
 //on the best possible score when we're high up in the tree - since shapeDistance
 //is generic and doesn't provide bounds, this is just implemented as a linear scan
 //if it is determined that a specific shapedistance function combined with nn_search
 //is highly desireable, then we should be smarter
-void GSSTreeSearcher::nn_search(const MappableOctTree* smallTree,
-		const MappableOctTree* bigTree,  unsigned k,
-		bool loadObjs,
-		Results& res)
+void GSSTreeSearcher::nn_search(ObjectTree smallobjTree,
+		ObjectTree bigobjTree, unsigned k,
+		bool loadObjs, Results& res)
 {
+	const MappableOctTree* smallTree = smallobjTree.get();
+	const MappableOctTree* bigTree = bigobjTree.get();
 	res.clear();
 	TopKObj ret(k);
 	Timer t;
@@ -321,7 +271,6 @@ void GSSTreeSearcher::nn_search(const MappableOctTree* smallTree,
 	{
 		findNearest(leaf, smallTree, bigTree, ret);
 	}
-
 
 	Timer objload;
 
@@ -335,14 +284,14 @@ void GSSTreeSearcher::nn_search(const MappableOctTree* smallTree,
 				cout << i << " " << ret[i].dist << "\n";
 			}
 			const char * addr = objects.begin() + ret[i].objpos;
-			res.add(addr,ret[i].dist);
+			res.add(addr, ret[i].dist);
 		}
 	}
 
 	if (verbose)
 	{
 		cout << "Found " << ret.size() << " objects out of " << total << " in "
-				<< t.elapsed() << "s (" << objload.elapsed()
+				<< t.elapsed() << " s (" << objload.elapsed()
 				<< " objload) with " << fitsCheck << " checks " << nodesVisited
 				<< " nodes " << leavesVisited << " leaves " << fullLeaves
 				<< " full leaves\n";
@@ -354,11 +303,13 @@ void GSSTreeSearcher::nn_search(const MappableOctTree* smallTree,
 	}
 }
 
-void GSSTreeSearcher::nn_scan(const MappableOctTree* smallTree,
-		const MappableOctTree* bigTree,
-		bool loadObjs,
-		Results& res)
+void GSSTreeSearcher::nn_scan(ObjectTree smallobjTree, ObjectTree bigobjTree,
+		bool loadObjs, Results& res)
 {
+	//unpack pointers for convenience
+	const MappableOctTree* smallTree = smallobjTree.get();
+	const MappableOctTree* bigTree = bigobjTree.get();
+
 	res.clear();
 	const GSSLeaf* leaf = (GSSLeaf*) leaves.begin();
 	const GSSLeaf* end = (GSSLeaf*) leaves.end();
@@ -377,7 +328,8 @@ void GSSTreeSearcher::nn_scan(const MappableOctTree* smallTree,
 		for (unsigned i = 0, n = leaf->size(); i < n; i++)
 		{
 			const GSSLeaf::Child *child = leaf->getChild(i);
-			double dist = shapeDistance(&child->tree, &child->tree, smallTree, bigTree);
+			double dist = shapeDistance(&child->tree, &child->tree, smallTree,
+					bigTree);
 			fitsCheck++;
 			respos.push_back(result_info(child->object_pos, dist));
 		}
@@ -393,14 +345,15 @@ void GSSTreeSearcher::nn_scan(const MappableOctTree* smallTree,
 		for (unsigned i = 0, n = respos.size(); i < n; i++)
 		{
 			const char * addr = objects.begin() + respos[i].pos;
-			res.add(addr,respos[i].val);
+			res.add(addr, respos[i].val);
 		}
 	}
 
 	if (verbose)
 	{
-		cout << "Scanned " << respos.size() << " objects out of " << total << " in "
-				<< t.elapsed() << "s (" << objload.elapsed()
+		cout << "Scanned " << respos.size() << " objects out of " << total
+				<< " in "
+				<< t.elapsed() << " s (" << objload.elapsed()
 				<< " objload) with " << fitsCheck << " checks " << nodesVisited
 				<< " nodes " << leavesVisited << " leaves " << fullLeaves
 				<< " full leaves\n";
@@ -412,12 +365,10 @@ void GSSTreeSearcher::nn_scan(const MappableOctTree* smallTree,
 	}
 }
 
-void GSSTreeSearcher::nn_search(const Object& obj, unsigned k, bool loadObjs,
+void GSSTreeSearcher::nn_search(ObjectTree objectTree,	unsigned k, bool loadObjs,
 		Results& res)
 {
-	const MappableOctTree *objTree = MappableOctTree::create(dimension,
-			resolution, obj);
-
+	const MappableOctTree* objTree = objectTree.get();
 	TopKObj ret(k);
 	Timer t;
 	fitsCheck = 0;
@@ -449,14 +400,14 @@ void GSSTreeSearcher::nn_search(const Object& obj, unsigned k, bool loadObjs,
 				cout << i << " " << ret[i].dist << "\n";
 			}
 			const char * addr = objects.begin() + ret[i].objpos;
-			res.add(addr,ret[i].dist);
+			res.add(addr, ret[i].dist);
 		}
 	}
 
 	if (verbose)
 	{
 		cout << "Found " << ret.size() << " objects out of " << total << " in "
-				<< t.elapsed() << "s (" << objload.elapsed()
+				<< t.elapsed() << " s (" << objload.elapsed()
 				<< " objload) with " << fitsCheck << " checks " << nodesVisited
 				<< " nodes " << leavesVisited << " leaves " << fullLeaves
 				<< " full leaves\n";
@@ -466,14 +417,11 @@ void GSSTreeSearcher::nn_search(const Object& obj, unsigned k, bool loadObjs,
 					<< maxlevelCnts[i] << " " << usefulLevelCnts[i] << "\n";
 		}
 	}
-	delete objTree;
 }
 
-void GSSTreeSearcher::nn_scan(const Object& obj, bool loadObjs,
-		Results& res)
+void GSSTreeSearcher::nn_scan(ObjectTree objectTree, bool loadObjs, Results& res)
 {
-	const MappableOctTree *objTree = MappableOctTree::create(dimension,
-			resolution, obj);
+	const MappableOctTree* objTree = objectTree.get();
 
 	res.clear();
 
@@ -510,14 +458,15 @@ void GSSTreeSearcher::nn_scan(const Object& obj, bool loadObjs,
 		for (unsigned i = 0, n = respos.size(); i < n; i++)
 		{
 			const char * addr = objects.begin() + respos[i].pos;
-			res.add(addr,respos[i].val);
+			res.add(addr, respos[i].val);
 		}
 	}
 
 	if (verbose)
 	{
-		cout << "Scanned " << respos.size() << " objects out of " << total << " in "
-				<< t.elapsed() << "s (" << objload.elapsed()
+		cout << "Scanned " << respos.size() << " objects out of " << total
+				<< " in "
+				<< t.elapsed() << " s (" << objload.elapsed()
 				<< " objload) with " << fitsCheck << " checks " << nodesVisited
 				<< " nodes " << leavesVisited << " leaves " << fullLeaves
 				<< " full leaves\n";
@@ -527,7 +476,6 @@ void GSSTreeSearcher::nn_scan(const Object& obj, bool loadObjs,
 					<< maxlevelCnts[i] << " " << usefulLevelCnts[i] << "\n";
 		}
 	}
-	delete objTree;
 }
 
 //return true if the object(s) represented by MIV/MSV might fit in between min and max
@@ -547,9 +495,12 @@ bool GSSTreeSearcher::fitsInbetween(const MappableOctTree *MIV,
 }
 
 //find everyting between small and big using linear scan
-void GSSTreeSearcher::dc_scan_search(const MappableOctTree* smallTree,
-		const MappableOctTree* bigTree, bool loadObjs, Results& res)
+void GSSTreeSearcher::dc_scan_search(ObjectTree smallobjTree,
+		ObjectTree bigobjTree, ObjectTree origobjTree, bool loadObjs, Results& res)
 {
+	const MappableOctTree* smallTree = smallobjTree.get();
+	const MappableOctTree* bigTree = bigobjTree.get();
+	const MappableOctTree* origTree = origobjTree.get();
 	res.clear();
 
 	const GSSLeaf* leaf = (GSSLeaf*) leaves.begin();
@@ -559,7 +510,7 @@ void GSSTreeSearcher::dc_scan_search(const MappableOctTree* smallTree,
 	vector<result_info> respos;
 	for (; leaf != end; leaf = (const GSSLeaf*) ((char*) leaf + leaf->bytes()))
 	{
-		findTweeners(leaf, smallTree, bigTree, respos, loadObjs);
+		findTweeners(leaf, smallTree, bigTree, origTree, respos, loadObjs);
 	}
 
 	Timer objload;
@@ -572,22 +523,21 @@ void GSSTreeSearcher::dc_scan_search(const MappableOctTree* smallTree,
 		for (unsigned i = 0, n = respos.size(); i < n; i++)
 		{
 			const char * addr = objects.begin() + respos[i].pos;
-			res.add(addr,respos[i].val);
+			res.add(addr, respos[i].val);
 		}
 	}
 
 	if (verbose)
 	{
 		cout << "Scanned " << respos.size() << " objects out of " << total
-				<< " in " << t.elapsed() << "s (" << objload.elapsed()
+				<< " in " << t.elapsed() << " s (" << objload.elapsed()
 				<< " objload)\n";
 	}
 
 }
 
-
 void GSSTreeSearcher::findTweeners(const GSSInternalNode* node,
-		const MappableOctTree* min, const MappableOctTree* max,
+		const MappableOctTree* min, const MappableOctTree* max, const MappableOctTree* orig,
 		vector<result_info>& respos, unsigned level, bool computeDist)
 {
 	nodesVisited++;
@@ -620,14 +570,14 @@ void GSSTreeSearcher::findTweeners(const GSSInternalNode* node,
 		{
 			const GSSLeaf* next = (const GSSLeaf*) (leaves.begin()
 					+ child->position());
-			findTweeners(next, min, max, respos, computeDist);
+			findTweeners(next, min, max, orig, respos, computeDist);
 		}
 		else
 		{
 			const GSSInternalNode* next =
 					(const GSSInternalNode*) (internalNodes.begin()
 							+ child->position());
-			findTweeners(next, min, max, respos, level + 1, computeDist);
+			findTweeners(next, min, max, orig, respos, level + 1, computeDist);
 		}
 	}
 	if (respos.size() > oldres)
@@ -638,7 +588,7 @@ void GSSTreeSearcher::findTweeners(const GSSInternalNode* node,
 //identify and trees in this leaf that fit
 //if computeDist is true, compute a goodness of fit for reach result
 void GSSTreeSearcher::findTweeners(const GSSLeaf* node,
-		const MappableOctTree* min, const MappableOctTree* max,
+		const MappableOctTree* min, const MappableOctTree* max, const MappableOctTree* orig,
 		vector<result_info>& respos, bool computeDist)
 {
 	leavesVisited++;
@@ -650,9 +600,15 @@ void GSSTreeSearcher::findTweeners(const GSSLeaf* node,
 		if (fitsInbetween(&child->tree, &child->tree, min, max))
 		{
 			double goodness = 0;
-			if(computeDist)
-				goodness = shapeDistance(&child->tree, &child->tree, min, max);
-			respos.push_back(result_info(child->object_pos,goodness));
+			double goodness2 = 0;
+			if (computeDist)
+			{
+				if(orig)
+					goodness = volumeDist(orig,&child->tree);
+				else
+					goodness = shapeDistance(&child->tree, &child->tree, min, max);
+			}
+			respos.push_back(result_info(child->object_pos, goodness));
 			cnt++;
 		}
 	}

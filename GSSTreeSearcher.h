@@ -19,9 +19,6 @@
 using namespace boost;
 using namespace std;
 
-typedef Molecule Object; //eventually template this
-typedef ResultMolecules Results; //ditto
-
 class GSSTreeSearcher
 {
 	MemMapped objects; //memory mapped objects
@@ -34,10 +31,11 @@ class GSSTreeSearcher
 	float resolution;
 
 	void findTweeners(const GSSInternalNode* node, const MappableOctTree* min,
-			const MappableOctTree* max, vector<result_info>& res,
+			const MappableOctTree* max, const MappableOctTree* orig, vector<result_info>& res,
 			unsigned level, bool computeDist);
 	void findTweeners(const GSSLeaf* node, const MappableOctTree* min,
-			const MappableOctTree* max, vector<result_info>& res, bool computeDist);
+			const MappableOctTree* max, const MappableOctTree* orig, vector<result_info>& res,
+			bool computeDist);
 
 	struct ObjDist
 	{
@@ -45,7 +43,7 @@ class GSSTreeSearcher
 		double dist;
 
 		bool operator<(const ObjDist& rhs) const
-		{
+				{
 			return dist < rhs.dist;
 		}
 	};
@@ -55,7 +53,7 @@ class GSSTreeSearcher
 	{
 		unsigned k;
 		vector<ObjDist> objs;
-	public:
+		public:
 		TopKObj(unsigned K) :
 				k(K)
 		{
@@ -76,7 +74,7 @@ class GSSTreeSearcher
 			return objs.size();
 		}
 		const ObjDist& operator[](unsigned i) const
-		{
+				{
 			return objs[i];
 		}
 
@@ -87,9 +85,11 @@ class GSSTreeSearcher
 	void findNearest(const GSSLeaf* node, const MappableOctTree* obj,
 			TopKObj& res);
 
-	void findNearest(const GSSInternalNode* node, const MappableOctTree* minobj, const MappableOctTree* maxobj,
+	void findNearest(const GSSInternalNode* node, const MappableOctTree* minobj,
+			const MappableOctTree* maxobj,
 			TopKObj& res, unsigned level);
-	void findNearest(const GSSLeaf* node, const MappableOctTree* minobj, const MappableOctTree* maxobj,
+	void findNearest(const GSSLeaf* node, const MappableOctTree* minobj,
+			const MappableOctTree* maxobj,
 			TopKObj& res);
 
 	unsigned fitsCheck;
@@ -101,7 +101,10 @@ class GSSTreeSearcher
 	unsigned fullLeaves;
 	bool fitsInbetween(const MappableOctTree *MIV, const MappableOctTree *MSV,
 			const MappableOctTree *min, const MappableOctTree *max);
+
 public:
+	typedef shared_ptr<const MappableOctTree> ObjectTree;
+
 	GSSTreeSearcher(bool v = false) :
 			verbose(v), total(0)
 	{
@@ -116,37 +119,62 @@ public:
 		return total;
 	}
 
-	//return everything with a shape between smallObj and bigObj
-	void dc_search(const Object& smallObj, const Object& bigObj,
-			float smallShrink, float bigShrink, bool invertBig, bool loadObjs,
+	//return everything with a shape between smallTree and bigTree
+	void dc_search(ObjectTree smallTree, ObjectTree bigTree,  ObjectTree refTree, bool loadObjs,
 			Results& res);
 
-	//return everything with a shape between smallTree and bigTree
-	void dc_search(const MappableOctTree* smallTree,
-			const MappableOctTree* bigTree, bool loadObjs, ResultMolecules& res);
-
 	//linear scan
-	void dc_scan_search(const MappableOctTree* smallTree,
-			const MappableOctTree* bigTree, bool loadObjs, ResultMolecules& res);
-
+	void dc_scan_search(ObjectTree smallTree, ObjectTree bigTree, ObjectTree refTree, bool loadObjs,
+			Results& res);
 
 	//return k objects closest to obj
-	void nn_search(const Object& obj, unsigned k, bool loadObjs,
+	void nn_search(ObjectTree objTree, unsigned k, bool loadObjs,
 			Results& res);
 
 	//compute scores for all molecules in database
-	void nn_scan(const Object& obj, bool loadObjs,
+	void nn_scan(ObjectTree objTree, bool loadObjs,
 			Results& res);
 
 	//return k objects closes to small/big obj using shapeDistance
-	void nn_search(const MappableOctTree* smallTree,
-			const MappableOctTree* bigTree, unsigned k, bool loadObjs,
-			Results& res);
+	void nn_search(ObjectTree smallTree, ObjectTree bigTree, unsigned k,
+			bool loadObjs, Results& res);
 
 	//same as above, but evaluate entire database
-	void nn_scan(const MappableOctTree* smallTree,
-			const MappableOctTree* bigTree, bool loadObjs,
+	void nn_scan(ObjectTree smallTree, ObjectTree bigTree, bool loadObjs,
 			Results& res);
+
+	//given an object, return a tree
+	template<class Object>
+	ObjectTree createTreeFromObject(const Object& obj,
+			float shrink = 0, bool invert = false)
+	{
+		MappableOctTree *objTree = MappableOctTree::create(dimension,
+				resolution, obj);
+
+		if (shrink > 0)
+		{
+			//reduce the object
+			MGrid grid;
+			objTree->makeGrid(grid, resolution);
+			grid.shrink(shrink);
+			free(objTree);
+			objTree = MappableOctTree::createFromGrid(grid);
+		}
+		else if(shrink < 0) //grow
+		{
+			//expand the object
+			MGrid grid;
+			objTree->makeGrid(grid, resolution);
+			grid.grow(-shrink);
+			free(objTree);
+			objTree = MappableOctTree::createFromGrid(grid);
+		}
+
+		if (invert) //treat as excluded vol
+			objTree->invert();
+
+		return shared_ptr<const MappableOctTree>(objTree, free);
+	}
 
 	float getDimension() const
 	{

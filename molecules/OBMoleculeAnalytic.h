@@ -493,7 +493,7 @@ public:
 };
 
 //interface between molecular shape and the gss tree
-//defines interator type, intersection, and file create/write
+//defines iterator type, intersection, and file create/write
 class OBAMolecule
 {
 	//a little icky, make mutable so intersect can bump intersecting spheres
@@ -610,7 +610,7 @@ public:
 
 };
 
-// use openeye to read in from a file
+// use openbabel to read in from a file
 class OBAMolIterator
 {
 	OBConversion inconv;

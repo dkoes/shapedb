@@ -8,7 +8,7 @@
 #ifndef KSAMPLEPARTITIONER_H_
 #define KSAMPLEPARTITIONER_H_
 
-#include "GSSTreeCreator.h"
+#include "TopDownPartitioner.h"
 #include "MappableOctTree.h"
 
 class KSamplePartitioner: public TopDownPartitioner
