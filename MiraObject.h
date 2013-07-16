@@ -74,10 +74,6 @@ public:
 		if(X >= maxdim || Y >= maxdim || Z >= maxdim)
 			return false;
 
-		if(data[X][Y][Z])
-		{
-			printf("CONTANTS %f,%f,%f  %d,%d,%d\n",x,y,z,X,Y,Z);
-		}
 		return data[X][Y][Z];
 	}
 
@@ -131,7 +127,6 @@ public:
 		for(unsigned i = 0, n = maxdim*maxdim*maxdim; i < n; i++)
 		{
 			unsigned c = in.get();
-			if(c) cout << "READIN " << i << "\n";
 			data.origin()[i] = c;
 		}
 		return true;
