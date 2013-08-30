@@ -641,6 +641,7 @@ int main(int argc, char *argv[])
 
 			double less = 0, more = 0;
 			unsigned k = 1;
+			string mivfile, msvfile;
 
 			if (cmd == "DCSearch")
 			{
@@ -652,6 +653,12 @@ int main(int argc, char *argv[])
 			{
 				toks >> mira;
 				toks >> k;
+			}
+			else if(cmd == "DCSearch2")
+			{
+				toks >> mira;
+				toks >> mivfile;
+				toks >> msvfile;
 			}
 
 			vector<double> times;
@@ -677,6 +684,17 @@ int main(int argc, char *argv[])
 						MappableOctTree::createFromGrid(smallgrid));
 				bigTree = ObjectTree(MappableOctTree::createFromGrid(biggrid));
 			}
+			else if(cmd == "DCSearch2")
+			{
+				MiraObject miv, msv;
+				ifstream msvin(msvfile.c_str());
+				ifstream mivin(mivfile.c_str());
+				msv.read(msvin);
+				miv.read(mivin);
+
+				smallTree = gss.createTreeFromObject(miv);
+				bigTree = gss.createTreeFromObject(msv);
+			}
 
 			for (unsigned i = 0; i < TimeTrials; i++)
 			{
@@ -688,7 +706,7 @@ int main(int argc, char *argv[])
 
 				Timer t;
 
-				if (cmd == "DCSearch")
+				if (cmd == "DCSearch" || cmd == "DCSearch2")
 				{
 					gss.dc_search(smallTree, bigTree, objTree, Verbose, res);
 				}
@@ -879,6 +897,9 @@ int main(int argc, char *argv[])
 			}
 
 			vector<double> times;
+			ObjectTree smallTree, bigTree;
+			if (cmd == "DCSearch")
+				create_trees(gss, ligand, receptor, less, more, smallTree, bigTree);
 
 			if (ClearCacheFirst)
 				std::system("clearfilecache");
@@ -894,9 +915,6 @@ int main(int argc, char *argv[])
 
 				if (cmd == "DCSearch")
 				{
-					ObjectTree smallTree, bigTree;
-					create_trees(gss, ligand, receptor, less, more, smallTree,
-							bigTree);
 					do_dcsearch(gss, smallTree, bigTree, output);
 				}
 				else if (cmd == "NNSearch")
