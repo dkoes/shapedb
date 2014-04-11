@@ -104,6 +104,30 @@ public:
 		mols[i]->writeSDF(out, data);
 	}
 
+	void writeTitleScore(ostream& out, unsigned i) const
+	{
+		assert(i < mols.size());
+		out << mols[i]->getTitle() << "\t" << scores[i] << "\n";
+	}
+
+	//write structures to outfile (if defined) and output
+	//title/scores to stdout if print is true
+	void writeOutput(const std::string outfile, bool print) const
+	{
+		std::cout.precision(12);
+		if(print)
+		{
+			for (unsigned i = 0, n = size(); i < n; i++)
+				writeTitleScore(std::cout, i);
+		}
+
+		if(outfile.size() > 0)
+		{
+			ofstream out(outfile.c_str());
+			for (unsigned i = 0, n = size(); i < n; i++)
+				writeSDF(out, i);
+		}
+	}
 };
 
 #endif /* RESULTMOLECULES_H_ */

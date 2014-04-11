@@ -126,7 +126,7 @@ bool MatcherPacker::knnMergeClusters(const DataViewer *D,
 }
 
 //write dot file from graph
-static void writeDot(SmartGraph& g, SmartGraph::EdgeMap<double>& length,
+void writeDot(SmartGraph& g, SmartGraph::EdgeMap<double>& length,
 		SmartGraph::NodeMap<unsigned>& index,
 		ostream& out)
 {
@@ -148,7 +148,7 @@ static void writeDot(SmartGraph& g, SmartGraph::EdgeMap<double>& length,
 
 typedef pair<unsigned, unsigned> IndexPair;
 
-static void writeEGDot(SmartGraph& g, SmartGraph::EdgeMap<double>& length,
+void writeEGDot(SmartGraph& g, SmartGraph::EdgeMap<double>& length,
 		ostream& out, SmartGraph::NodeMap<IndexPair>& edgePairs,
 		unordered_set<unsigned>& matched)
 {

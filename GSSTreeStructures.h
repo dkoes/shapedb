@@ -66,7 +66,10 @@ private:
 
 public:
 	static void writeLeaf(const DataViewer *data, const Cluster& cluster, ostream& outNodes, ostream& outTrees);
-	const Child* getChild(unsigned i) const { return (Child*)&data[child_positions[i]]; }
+	const Child* getChild(unsigned i) const {
+#pragma GCC diagnostic ignored "-Warray-bounds"
+		return (Child*)&data[child_positions[i]];
+	}
 	unsigned size() const { return info.N; }
 	unsigned bytes() const;
 } __attribute__((__packed__));

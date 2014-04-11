@@ -32,7 +32,7 @@ struct MiraHeader
 	unsigned short flag; // 0x4 if RGB data, 0x8 if RGBA data, 0 = byte data
 	unsigned int map_offset; // must be 256
 	unsigned int voxel_offset; // equal to 256 + (xres + yres + zres) * sizeof(double)
-	unsigned char unused[104];
+	char unused[104]; //we put resolution = num here
 	char text[128]; // information text
 };
 
@@ -40,10 +40,12 @@ class MiraObject {
 	MiraHeader header;
 	boost::multi_array<bool, 3> data;
 	unsigned maxdim; //require cube
+	double resolution; //mira objects are resolution-less, so may to set manually
+						//our mira objects have the resolution in the unused field
 public:
 	typedef MiraIterator iterator;
 
-	MiraObject(): maxdim(0)
+	MiraObject(): maxdim(0), resolution(1)
 	{
 	}
 
@@ -51,6 +53,21 @@ public:
 	{
 	}
 
+	//get/set the resolution (scaling factor)
+	void setResolution(double r) { resolution = r; }
+	double getResolution() const { return resolution; }
+
+	unsigned getDimension() const { return maxdim; }
+
+	//return the number of "on" voxels
+	unsigned numSetBits() const {
+		unsigned cnt = 0;
+		for(unsigned i = 0; i < maxdim; i++)
+			for(unsigned j = 0; j < maxdim; j++)
+				for(unsigned k = 0; k < maxdim; k++)
+					cnt += data[i][j][k];
+		return cnt;
+	}
 
 	//NOTE: since I'm too lazy to implement a hierarchy of grids for fast
 	//intersection testing, I'm just going to return true since the tree
@@ -67,6 +84,9 @@ public:
 	//are centered at origin so translate
 	bool containsPoint(float x, float y, float z) const
 	{
+		x /= resolution;
+		y /= resolution;
+		z /= resolution;
 		unsigned X = round(-0.5+x+maxdim/2.0);
 		unsigned Y = round(-0.5+y+maxdim/2.0);
 		unsigned Z = round(-0.5+z+maxdim/2.0);
@@ -107,6 +127,13 @@ public:
 		header.text[127] = 0; //ensure null termination
 		if(fname.size() > 0)
 			strncpy(header.text, fname.c_str(), sizeof(header.text)-1);
+
+		const char* resprefix = "resolution = ";
+		unsigned prefixn = strlen(resprefix);
+		if(strncmp(header.unused,resprefix,prefixn) == 0)
+		{
+			resolution = atof(&header.unused[prefixn]);
+		}
 
 		//absorb map
 		unsigned voxeloff = header.voxel_offset;

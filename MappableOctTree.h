@@ -57,7 +57,9 @@ struct Vertex
 	}
 };
 
-#define MINDEX_BITS 31
+//this can be 15 or 31; 31 is needs for storing large, detailed objects,
+//15 is sufficient for molecular shape matching
+#define MINDEX_BITS 15
 struct MOctNode;
 struct MChildNode
 {

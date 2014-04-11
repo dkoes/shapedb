@@ -105,6 +105,8 @@ cl::opt<PackerEnum> PackerChoice(cl::desc("Packing algorithm:"),
 
 cl::opt<unsigned> K("k", cl::desc("k nearest neighbors to find for NNSearch"),
 		cl::init(1));
+cl::opt<double> NNThreshold("nn-threshold",cl::desc("Similarity cutoff for NNSearch"), cl::init(HUGE_VAL));
+
 cl::opt<unsigned> Knn("knn", cl::desc("K for knn graph creation"), cl::init(8));
 cl::opt<unsigned> Sentinals("sentinals",
 		cl::desc("Number of sentinals for knn initialization (zero random)"),
@@ -185,6 +187,7 @@ cl::opt<unsigned> SwitchToPack("switch-to-pack",
 cl::opt<unsigned> Pack("pack", cl::desc("Maximum quantities per a node"),
 		cl::init(16));
 
+cl::opt<bool> Print("print",cl::desc("Print text summary of output"),cl::init(false));
 cl::opt<bool> Verbose("v", cl::desc("Verbose output"));
 cl::opt<bool> UseUnnorm("use-unnorm",
 		cl::desc("Use unnormalized laplacian in spectral packing"),
@@ -249,13 +252,24 @@ static void create_trees(GSSTreeSearcher& gss, const string& includeMol,
 			ProbeRadius);
 	Molecule inMol = *imolitr;
 
-	Molecule::iterator exmolitr(excludeMol, dimension, resolution,
-			KeepHydrogens, ProbeRadius);
-	Molecule exMol = *exmolitr;
+	Molecule exMol;
 
-	//create trees
-	//receptor constraint, shrink by more and invert
-	bigTree = gss.createTreeFromObject(exMol, more, true);
+	if(filesystem::path(excludeMol).extension() != ".mira")
+	{
+		Molecule::iterator exmolitr(excludeMol, dimension, resolution,
+				KeepHydrogens, ProbeRadius);
+		exMol = *exmolitr;
+		//create trees
+		//receptor constraint, shrink by more and invert
+		bigTree = gss.createTreeFromObject(exMol, more, excludeMol.size() > 0 ); //if exclude empty, make don't invert
+	}
+	else //is mira object, don't need to compute grid
+	{
+		MiraObject obj;
+		ifstream mirain(excludeMol.c_str());
+		obj.read(mirain);
+		bigTree = gss.createTreeFromObject(obj, more, true);
+	}
 
 	//use the full shape of the ligand
 	smallTree = gss.createTreeFromObject(inMol, less);
@@ -281,54 +295,48 @@ static void do_dcsearch(GSSTreeSearcher& gss, ObjectTree smallTree,
 		ObjectTree bigTree, const string& output)
 {
 	ResultMolecules res(SingleConformer);
-
+	bool getres = output.size() > 0 || Print;
 	//search
 	if (!ScanOnly)
-		gss.dc_search(smallTree, bigTree, ObjectTree(), output.size() > 0, res);
+		gss.dc_search(smallTree, bigTree, ObjectTree(), getres, res);
 
 	if (ScanCheck || ScanOnly)
 	{
 		ResultMolecules res2(SingleConformer);
-		gss.dc_scan_search(smallTree, bigTree, ObjectTree(), output.size() > 0, res2);
+		gss.dc_scan_search(smallTree, bigTree, ObjectTree(), getres, res2);
 		if (res2.size() != res.size())
 		{
 			cerr << "Scanning found different number: " << res2.size() << "\n";
 		}
 	}
 
-	if (output.size() > 0)
-	{
-		ofstream outmols(output.c_str());
-		for (unsigned i = 0, n = res.size(); i < n; i++)
-			res.writeSDF(outmols, i);
-	}
+	res.writeOutput(output, Print);
 
 }
 
 void do_nnsearch(GSSTreeSearcher& gss, const string& input,
-		const string& output, unsigned k)
+		const string& output, unsigned k, double thresh)
 {
 	//read query molecule(s)
 	ResultMolecules res(SingleConformer);
 	Molecule::iterator molitr(input, gss.getDimension(), gss.getResolution(),
 			KeepHydrogens, ProbeRadius);
+	bool getresults = output.size() > 0 || Print;
 	for (; molitr; ++molitr)
 	{
 		const Molecule& mol = *molitr;
 		ObjectTree objTree = gss.createTreeFromObject(mol);
-		if (k < 1) //scan
+		if (k < 1 && !isfinite(thresh)) //scan
 		{
-			gss.nn_scan(objTree, output.size() > 0, res);
+			gss.nn_scan(objTree, getresults, res);
 		}
 		else
 		{
-			gss.nn_search(objTree, k, output.size() > 0, res);
+			gss.nn_search(objTree, k, thresh, getresults, res);
 		}
 	}
 
-	ofstream out(output.c_str());
-	for (unsigned i = 0, n = res.size(); i < n; i++)
-		res.writeSDF(out, i);
+	res.writeOutput(output, Print);
 }
 
 struct QInfo
@@ -356,6 +364,15 @@ struct QInfo
 	{
 	}
 };
+
+//attempt to clear the file system cache,
+//this is just for benchmarking purposes and requires the existance of clearfilecache
+//which is a setuid (gasp) program I wrote that does precisely that
+static void clear_cache()
+{
+#pragma GCC diagnostic ignored "-Wunused-result"
+	std::system("clearfilecache");
+}
 
 static void dumpTree(MappableOctTree *tree, ostream& out)
 {
@@ -385,6 +402,8 @@ static void dumpTree(MappableOctTree *tree, ostream& out)
 int main(int argc, char *argv[])
 {
 	cl::ParseCommandLineOptions(argc, argv);
+
+	bool getres = Output.size() > 0 || Print;
 
 	switch (Command)
 	{
@@ -515,7 +534,7 @@ int main(int argc, char *argv[])
 		}
 		else
 		{
-			gss.nn_search(objTree, K, true, res);
+			gss.nn_search(objTree, K, HUGE_VAL, true, res);
 		}
 
 		for (unsigned i = 0, n = res.size(); i < n; i++)
@@ -664,7 +683,7 @@ int main(int argc, char *argv[])
 			vector<double> times;
 
 			if (ClearCacheFirst)
-				std::system("clearfilecache");
+				clear_cache();
 
 			ifstream mirain(mira.c_str());
 			MiraObject obj;
@@ -700,7 +719,7 @@ int main(int argc, char *argv[])
 			{
 				if (ClearCache)
 				{
-					std::system("clearfilecache");
+					clear_cache();
 				}
 				StringResults res;
 
@@ -718,7 +737,7 @@ int main(int argc, char *argv[])
 					}
 					else
 					{
-						gss.nn_search(objTree, k, Verbose, res);
+						gss.nn_search(objTree, k, HUGE_VAL, Verbose, res);
 					}
 				}
 				else
@@ -759,34 +778,30 @@ int main(int argc, char *argv[])
 
 		setDistance(ShapeDist);
 
-		if (ExcludeMol.size() == 0 && K > 0)
+		if (ExcludeMol.size() == 0)
 		{
 			//actually do a nearest neighbor search intelligently
 			//using cutoffs within the tree search - this requires
 			//a backed-in distance funciton (ignores shapedist)
-			do_nnsearch(gss, IncludeMol, Output, K);
+			do_nnsearch(gss, IncludeMol, Output, K, NNThreshold);
 		}
 		else
 		{
-			//do a scan with shapedistance
+			//use shapedistance if two shapes are provided
 			ResultMolecules res(SingleConformer);
 			ObjectTree smallTree, bigTree;
 			create_trees(gss, IncludeMol, ExcludeMol, LessDist, MoreDist,
 					smallTree, bigTree);
 			if (K < 1) //scan
 			{
-				gss.nn_scan(smallTree, bigTree, Output.size() > 0, res);
+				gss.nn_scan(smallTree, bigTree, getres, res);
 			}
 			else //actually, also a scan
 			{
-				gss.nn_search(smallTree, bigTree, K, Output.size() > 0, res);
+				gss.nn_search(smallTree, bigTree, K, getres, res);
 			}
-			if (Output.size() > 0)
-			{
-				ofstream out(Output.c_str());
-				for (unsigned i = 0, n = res.size(); i < n; i++)
-					res.writeSDF(out, i);
-			}
+
+			res.writeOutput(Output, Print);
 		}
 	}
 		break;
@@ -828,12 +843,12 @@ int main(int argc, char *argv[])
 						-MoreDist);
 
 				if (!ScanOnly)
-					gss.dc_search(smallTree, bigTree, ObjectTree(), Output.size() > 1, res);
+					gss.dc_search(smallTree, bigTree, ObjectTree(), getres, res);
 
 				if (ScanCheck || ScanOnly)
 				{
 					ResultMolecules res2(SingleConformer);
-					gss.dc_scan_search(smallTree, bigTree, ObjectTree(), Output.size() > 1,
+					gss.dc_scan_search(smallTree, bigTree, ObjectTree(), getres,
 							res2);
 					if (res2.size() != res.size())
 					{
@@ -841,9 +856,8 @@ int main(int argc, char *argv[])
 					}
 				}
 
-				ofstream outmols(Output.c_str());
-				for (unsigned i = 0, n = res.size(); i < n; i++)
-					res.writeSDF(outmols, i);
+				res.writeOutput(Output, Print);
+
 			}
 		}
 	}
@@ -902,13 +916,13 @@ int main(int argc, char *argv[])
 				create_trees(gss, ligand, receptor, less, more, smallTree, bigTree);
 
 			if (ClearCacheFirst)
-				std::system("clearfilecache");
+				clear_cache();
 
 			for (unsigned i = 0; i < TimeTrials; i++)
 			{
 				if (ClearCache)
 				{
-					std::system("clearfilecache");
+					clear_cache();
 				}
 
 				Timer t;
@@ -919,7 +933,7 @@ int main(int argc, char *argv[])
 				}
 				else if (cmd == "NNSearch")
 				{
-					do_nnsearch(gss, ligand, output, k);
+					do_nnsearch(gss, ligand, output, k, HUGE_VAL);
 				}
 				else
 				{
@@ -1034,7 +1048,7 @@ int main(int argc, char *argv[])
 				if (qinfos[i].cmd == NNSearch)
 				{
 					gss.nn_search(gss.createTreeFromObject(qinfos[i].in),
-							qinfos[i].k, false, res);
+							qinfos[i].k, HUGE_VAL, false, res);
 				}
 				else
 				{
@@ -1254,6 +1268,7 @@ int main(int argc, char *argv[])
 					tree->makeGrid(grid, Resolution);
 
 					grid.shrink(LessDist);
+					grid.grow(MoreDist);
 					free(tree);
 					tree = MappableOctTree::createFromGrid(grid);
 				}

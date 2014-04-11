@@ -44,7 +44,6 @@ bool GSSTreeSearcher::load(const filesystem::path& dbpath)
 
 void GSSTreeSearcher::clear()
 {
-	total = 0;
 	objects.clear();
 	internalNodes.clear();
 	leaves.clear();
@@ -100,7 +99,7 @@ void GSSTreeSearcher::dc_search(ObjectTree smallobjTree,
 	if (verbose)
 	{
 		cout << "Found " << respos.size() << " objects out of " << total
-				<< " in " << t.elapsed() << "s (" << objload.elapsed()
+				<< " in " << t.elapsed() << " s (" << objload.elapsed()
 				<< " objload) with " << fitsCheck << " checks " << nodesVisited
 				<< " nodes " << leavesVisited << " leaves " << fullLeaves
 				<< " full leaves\n";
@@ -112,14 +111,17 @@ void GSSTreeSearcher::dc_search(ObjectTree smallobjTree,
 	}
 }
 
-void GSSTreeSearcher::TopKObj::add(file_index pos, double dist)
+void GSSTreeSearcher::TopObj::add(file_index pos, double dist)
 {
 	ObjDist x =
 			{ pos, dist };
-	objs.insert(lower_bound(objs.begin(), objs.end(), x), x);
+	if(dist < thresh)
+	{
+		objs.insert(lower_bound(objs.begin(), objs.end(), x), x);
 
-	if (objs.size() > k)
-		objs.resize(k);
+		if (objs.size() > k)
+			objs.resize(k);
+	}
 }
 
 struct ScoredChild
@@ -145,7 +147,7 @@ struct ScoredChild
 
 //explore children to find closest value
 void GSSTreeSearcher::findNearest(const GSSInternalNode* node,
-		const MappableOctTree* obj, TopKObj& res, unsigned level)
+		const MappableOctTree* obj, TopObj& res, unsigned level)
 {
 	nodesVisited++;
 	if (levelCnts.size() <= level)
@@ -206,7 +208,7 @@ void GSSTreeSearcher::findNearest(const GSSInternalNode* node,
 
 //add nearest neighbors to res if appropriate
 void GSSTreeSearcher::findNearest(const GSSLeaf* node,
-		const MappableOctTree* obj, TopKObj& res)
+		const MappableOctTree* obj, TopObj& res)
 {
 	leavesVisited++;
 	unsigned cnt = 0;
@@ -228,7 +230,7 @@ void GSSTreeSearcher::findNearest(const GSSLeaf* node,
 //add nearest neighbors to res if appropriate
 void GSSTreeSearcher::findNearest(const GSSLeaf* node,
 		const MappableOctTree* smallTree, const MappableOctTree* bigTree,
-		TopKObj& res)
+		TopObj& res)
 {
 	leavesVisited++;
 	unsigned cnt = 0;
@@ -261,7 +263,7 @@ void GSSTreeSearcher::nn_search(ObjectTree smallobjTree,
 	const MappableOctTree* smallTree = smallobjTree.get();
 	const MappableOctTree* bigTree = bigobjTree.get();
 	res.clear();
-	TopKObj ret(k);
+	TopObj ret(k);
 	Timer t;
 
 	const GSSLeaf* leaf = (GSSLeaf*) leaves.begin();
@@ -365,11 +367,11 @@ void GSSTreeSearcher::nn_scan(ObjectTree smallobjTree, ObjectTree bigobjTree,
 	}
 }
 
-void GSSTreeSearcher::nn_search(ObjectTree objectTree,	unsigned k, bool loadObjs,
+void GSSTreeSearcher::nn_search(ObjectTree objectTree,	unsigned k, double thresh, bool loadObjs,
 		Results& res)
 {
 	const MappableOctTree* objTree = objectTree.get();
-	TopKObj ret(k);
+	TopObj ret(k,thresh);
 	Timer t;
 	fitsCheck = 0;
 	fullLeaves = 0;
@@ -600,7 +602,6 @@ void GSSTreeSearcher::findTweeners(const GSSLeaf* node,
 		if (fitsInbetween(&child->tree, &child->tree, min, max))
 		{
 			double goodness = 0;
-			double goodness2 = 0;
 			if (computeDist)
 			{
 				if(orig)

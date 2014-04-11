@@ -31,10 +31,12 @@ class GSSTreeSearcher
 	float resolution;
 
 	void findTweeners(const GSSInternalNode* node, const MappableOctTree* min,
-			const MappableOctTree* max, const MappableOctTree* orig, vector<result_info>& res,
+			const MappableOctTree* max, const MappableOctTree* orig,
+			vector<result_info>& res,
 			unsigned level, bool computeDist);
 	void findTweeners(const GSSLeaf* node, const MappableOctTree* min,
-			const MappableOctTree* max, const MappableOctTree* orig, vector<result_info>& res,
+			const MappableOctTree* max, const MappableOctTree* orig,
+			vector<result_info>& res,
 			bool computeDist);
 
 	struct ObjDist
@@ -48,23 +50,27 @@ class GSSTreeSearcher
 		}
 	};
 
-	//maintain K best objects found
-	class TopKObj
+	//retain best k objects that are better than threshold
+	class TopObj
 	{
-		unsigned k;
 		vector<ObjDist> objs;
-		public:
-		TopKObj(unsigned K) :
-				k(K)
+		unsigned k;
+		double thresh;
+	public:
+		TopObj(unsigned _k, double t = HUGE_VAL): k(_k), thresh(t)
 		{
-			objs.reserve(K + 1);
+			if(k == 0) //then no limit
+				k = UINT_MAX;
+			else
+				objs.reserve(k+1);
 		}
 
 		void add(file_index pos, double dist);
+
 		double worst() const
 		{
 			if (objs.size() < k)
-				return HUGE_VAL;
+				return thresh;
 			else
 				return objs.back().dist;
 		}
@@ -73,6 +79,7 @@ class GSSTreeSearcher
 		{
 			return objs.size();
 		}
+
 		const ObjDist& operator[](unsigned i) const
 				{
 			return objs[i];
@@ -81,16 +88,16 @@ class GSSTreeSearcher
 	};
 
 	void findNearest(const GSSInternalNode* node, const MappableOctTree* obj,
-			TopKObj& res, unsigned level);
+			TopObj& res, unsigned level);
 	void findNearest(const GSSLeaf* node, const MappableOctTree* obj,
-			TopKObj& res);
+			TopObj& res);
 
 	void findNearest(const GSSInternalNode* node, const MappableOctTree* minobj,
 			const MappableOctTree* maxobj,
-			TopKObj& res, unsigned level);
+			TopObj& res, unsigned level);
 	void findNearest(const GSSLeaf* node, const MappableOctTree* minobj,
 			const MappableOctTree* maxobj,
-			TopKObj& res);
+			TopObj& res);
 
 	unsigned fitsCheck;
 	unsigned nodesVisited;
@@ -120,15 +127,17 @@ public:
 	}
 
 	//return everything with a shape between smallTree and bigTree
-	void dc_search(ObjectTree smallTree, ObjectTree bigTree,  ObjectTree refTree, bool loadObjs,
+	void dc_search(ObjectTree smallTree, ObjectTree bigTree, ObjectTree refTree,
+			bool loadObjs,
 			Results& res);
 
 	//linear scan
-	void dc_scan_search(ObjectTree smallTree, ObjectTree bigTree, ObjectTree refTree, bool loadObjs,
+	void dc_scan_search(ObjectTree smallTree, ObjectTree bigTree,
+			ObjectTree refTree, bool loadObjs,
 			Results& res);
 
-	//return k objects closest to obj
-	void nn_search(ObjectTree objTree, unsigned k, bool loadObjs,
+	//return k objects closest to obj and better than threshold
+	void nn_search(ObjectTree objTree, unsigned k, double thresh, bool loadObjs,
 			Results& res);
 
 	//compute scores for all molecules in database
@@ -160,7 +169,7 @@ public:
 			free(objTree);
 			objTree = MappableOctTree::createFromGrid(grid);
 		}
-		else if(shrink < 0) //grow
+		else if (shrink < 0) //grow
 		{
 			//expand the object
 			MGrid grid;
