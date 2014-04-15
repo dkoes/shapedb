@@ -390,6 +390,8 @@ static void dumpTree(MappableOctTree *tree, ostream& out)
 	{
 		if (filesystem::extension(Output.c_str()) == ".raw")
 			tree->dumpRawGrid(out, Resolution);
+		if (filesystem::extension(Output.c_str()) == ".map")
+			tree->dumpAD4Grid(out, Resolution);
 		else if (filesystem::extension(Output.c_str()) == ".mira")
 			tree->dumpMiraGrid(out, Resolution);
 		else if (filesystem::extension(Output.c_str()) == ".csv")

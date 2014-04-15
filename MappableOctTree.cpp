@@ -1058,6 +1058,33 @@ void MappableOctTree::dumpRawGrid(ostream& out, float res) const
 	}
 }
 
+//autodock 4 grid
+void MappableOctTree::dumpAD4Grid(ostream& out, float res) const
+{
+
+	unsigned max = ceil(dimension / res);
+
+	out << "GRID_PARAMETER_FILE\nGRID_DATA_FILE\nMACROMOLECULE\n";
+	out << "SPACING " << res << "\n";
+	out << "NELEMENTS " << max-1 << " " << max-1 << " " << max-1 << "\n";
+	out << "CENTER 0 0 0\n";
+	//now coordinates - z,y,x
+	//definitely not the most efficient way
+	for (unsigned k = 0; k < max; k++)
+	{
+		for (unsigned j = 0; j < max; j++)
+		{
+			for (unsigned i = 0; i < max; i++)
+			{
+				if (root.checkCoord(tree, i, j, k, max))
+					out << "1\n";
+				else
+					out << "0\n";
+			}
+		}
+	}
+}
+
 #include <arpa/inet.h>
 
 //sproxel csv format, voxelValue is the string to specify voxels occupied by the object
@@ -1068,9 +1095,9 @@ void MappableOctTree::dumpSproxelGrid(ostream& out, float res,
 	out << max << "," << max << "," << max << "\n";
 
 	string blank = "#00000000";
-	for (unsigned i = 0; i < max; i++)
-	{
-		for (unsigned j = 0; j < max; j++)
+	for (unsigned j = 0; j < max; j++)
+	{ //sproxel csv is in xz slices
+		for (unsigned i = 0; i < max; i++)
 		{
 			for (unsigned k = 0; k < max; k++)
 			{

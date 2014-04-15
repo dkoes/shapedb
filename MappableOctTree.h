@@ -248,6 +248,7 @@ public:
 	void dumpGrid(ostream& out, float res) const;
 	void dumpRawGrid(ostream& out, float res) const;
 	void dumpMiraGrid(ostream& out, float res) const;
+	void dumpAD4Grid(ostream& out, float res) const;
 	void dumpSproxelGrid(ostream& out, float res, const string& voxelValue =
 			"#FFFFFFFF") const;
 	void countLeavesAtDepths(vector<unsigned>& counts) const;
