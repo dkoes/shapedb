@@ -16,7 +16,7 @@ struct MolSphere
 	float x;
 	float y;
 	float z;
-	float r;
+	float r; //caching r^2 doesn't help
 
 	MolSphere(): x(0), y(0), z(0), r(0) {}
 	MolSphere(float X, float Y, float Z, float R): x(X), y(Y), z(Z), r(R) {}
