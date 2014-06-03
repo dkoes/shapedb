@@ -35,6 +35,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <boost/unordered_map.hpp>
 #include <openbabel/mol.h>
 #include <vector>
+#include <GraphMol/ROMol.h>
 
 using namespace OpenBabel;
 using namespace std;
@@ -148,6 +149,7 @@ public:
 	}
 
 	void copyFrom(OBMol& mol, bool deleteH=false);
+	void copyFrom(RDKit::ROMol& mol, bool deleteH=false);
 
 	//write custom binary data
 	bool writeBinary(ostream& out) const;

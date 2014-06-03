@@ -31,6 +31,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "boost/foreach.hpp"
 #include <boost/lexical_cast.hpp>
 #include <iomanip>
+#include <GraphMol/ROMol.h>
+#include <GraphMol/Atom.h>
+#include <GraphMol/AtomIterators.h>
+#include <GraphMol/BondIterators.h>
+
+using namespace RDKit;
 
 //copy data needed to write out pmol from obmol
 void PMolCreator::copyFrom(OBMol& mol, bool deleteH)
@@ -91,7 +97,7 @@ void PMolCreator::copyFrom(OBMol& mol, bool deleteH)
 		unsigned isoi = atom->GetIsotope();
 		if(isoi != 0)
 		{
-			int dmass = round(isotable.GetExactMass(isoi)-isotable.GetExactMass(0));
+			int dmass = ::round(isotable.GetExactMass(isoi)-isotable.GetExactMass(0));
 			if(dmass != 0)
 			{
 				iso.push_back(Property(ai, dmass));
@@ -139,6 +145,117 @@ void PMolCreator::copyFrom(OBMol& mol, bool deleteH)
 				nSrcs++;
 			}
 			bonds[btype][atomindex[a1->GetIdx()]].push_back(atomindex[a2->GetIdx()]);
+		}
+		bndSize[btype] += sizeof(unsigned char);
+	}
+
+}
+
+//copy data needed to write out pmol from romol
+void PMolCreator::copyFrom(ROMol& mol, bool deleteH)
+{
+	static OBIsotopeTable isotable;
+	const Conformer& conf = mol.getConformer();
+
+	mol.getProp("_Name",name);
+	//first construct atoms
+	int typeindex[256]; //position in atoms vector of an atom type, indexed by atomic number
+	int tmpatomindex[mol.getNumAtoms()]; //position within the atom type vector
+	memset(typeindex, -1, sizeof(typeindex));
+	memset(tmpatomindex, -1, sizeof(tmpatomindex));
+
+
+	for (ROMol::AtomIterator aitr = mol.beginAtoms(); aitr != mol.endAtoms(); ++aitr)
+	{
+		Atom *atom = *aitr;
+		unsigned int idx = atom->getIdx();
+		unsigned anum = atom->getAtomicNum();
+		assert(anum < 256);
+		if(deleteH && anum == 1)
+			continue;
+		int pos = typeindex[anum];
+		if (pos < 0) // no vector for this type yet
+		{
+			pos = typeindex[anum] = atoms.size();
+			atoms.push_back(AtomGroup(anum));
+		}
+
+		tmpatomindex[idx] = atoms[pos].coords.size();
+		RDGeom::Point3D pt = conf.getAtomPos(atom->getIdx());
+		atoms[pos].coords.push_back(FloatCoord(pt.x,pt.y,pt.z));
+	}
+	//create mapping to actual atom index
+	numAtoms = 0;
+	BOOST_FOREACH(AtomGroup& ag, atoms)
+	{	ag.startIndex = numAtoms;
+		numAtoms += ag.coords.size();
+	}
+
+	int atomindex[mol.getNumAtoms()]; //position within the atom type vector
+	memset(atomindex, -1, sizeof(atomindex));
+	for (ROMol::AtomIterator aitr = mol.beginAtoms(); aitr != mol.endAtoms(); ++aitr)
+	{
+		Atom *atom = *aitr;
+		unsigned int idx = atom->getIdx();
+		unsigned anum = atom->getAtomicNum();
+		if(deleteH && anum == 1)
+			continue;
+		unsigned ai = tmpatomindex[idx] + atoms[typeindex[anum]].startIndex;
+		atomindex[idx] = ai;
+		//also add properties
+		int charge = atom->getFormalCharge();
+		if(charge != 0)
+		{
+			chg.push_back(Property(ai, charge));
+		}
+
+		int dmass = atom->getIsotope();
+		if(dmass != 0)
+		{
+			iso.push_back(Property(ai, dmass));
+		}
+	}
+
+	//bonds are directly indexed by atom index
+	for(unsigned i = 0; i < MAX_BONDS; i++)
+	{
+		bonds[i].resize(numAtoms);
+	}
+
+	nSrcs = 0;
+	nDsts = 0;
+	//construct bounds, always putting atom with highest degree first
+	for (ROMol::BondIterator bitr = mol.beginBonds(); bitr != mol.endBonds(); ++bitr)
+	{
+		Bond *bond = *bitr;
+		int btype = bond->getBondTypeAsDouble() -1;
+		assert(btype >= 0 && btype < MAX_BONDS);
+		Atom *a1 = bond->getBeginAtom();
+		Atom *a2 = bond->getEndAtom();
+
+		if(deleteH && (a1->getAtomicNum() == 1 || a2->getAtomicNum() == 1))
+			continue;
+
+		nDsts++; //basically nubmer of bonds
+		if(a2->getExplicitValence() > a1->getExplicitValence())
+		{
+			//a2 goes first
+			if(bonds[btype][atomindex[a2->getIdx()]].size() == 0)
+			{
+				bndSize[btype] += 2*sizeof(unsigned char); //first time, size of src and size
+				nSrcs++;
+			}
+			bonds[btype][atomindex[a2->getIdx()]].push_back(atomindex[a1->getIdx()]);
+		}
+		else
+		{
+			//a1 goes first
+			if(bonds[btype][atomindex[a1->getIdx()]].size() == 0)
+			{
+				bndSize[btype] += 2*sizeof(unsigned char); //first time, size of src and size
+				nSrcs++;
+			}
+			bonds[btype][atomindex[a1->getIdx()]].push_back(atomindex[a2->getIdx()]);
 		}
 		bndSize[btype] += sizeof(unsigned char);
 	}

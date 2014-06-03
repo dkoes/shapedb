@@ -25,6 +25,7 @@
 								<option id="gnu.cpp.compiler.exe.debug.option.debugging.level.1462956469" name="Debug Level" superClass="gnu.cpp.compiler.exe.debug.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.1797101193" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="/usr/local/include/openbabel-2.0"/>
+									<listOptionValue builtIn="false" value="/usr/local/include/rdkit"/>
 									<listOptionValue builtIn="false" value="/usr/include/eigen3"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
 								</option>
@@ -42,6 +43,11 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug.1035050897" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug">
 								<option id="gnu.cpp.link.option.libs.1769803431" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="glpk"/>
+									<listOptionValue builtIn="false" value="DataStructs"/>
+									<listOptionValue builtIn="false" value="RDGeometryLib"/>
+									<listOptionValue builtIn="false" value="RDGeneral"/>
+									<listOptionValue builtIn="false" value="GraphMol"/>
+									<listOptionValue builtIn="false" value="tcmalloc_minimal"/>
 									<listOptionValue builtIn="false" value="emon"/>
 									<listOptionValue builtIn="false" value="openbabel"/>
 									<listOptionValue builtIn="false" value="ann"/>
@@ -57,6 +63,7 @@
 								</option>
 								<option id="gnu.cpp.link.option.paths.1815957130" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
 									<listOptionValue builtIn="false" value="/usr/local/lib"/>
+									<listOptionValue builtIn="false" value="/usr/local/lib/rdkit"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.424376227" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
@@ -98,6 +105,7 @@
 								<option id="gnu.cpp.compiler.exe.release.option.debugging.level.399790278" name="Debug Level" superClass="gnu.cpp.compiler.exe.release.option.debugging.level" value="gnu.cpp.compiler.debugging.level.default" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.1365754053" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="/usr/local/include/openbabel-2.0"/>
+									<listOptionValue builtIn="false" value="/usr/local/include/rdkit"/>
 									<listOptionValue builtIn="false" value="/usr/include/eigen3"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
 								</option>
@@ -115,6 +123,10 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.release.1621250117" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.release">
 								<option id="gnu.cpp.link.option.libs.236000983" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="glpk"/>
+									<listOptionValue builtIn="false" value="DataStructs"/>
+									<listOptionValue builtIn="false" value="RDGeometryLib"/>
+									<listOptionValue builtIn="false" value="RDGeneral"/>
+									<listOptionValue builtIn="false" value="GraphMol"/>
 									<listOptionValue builtIn="false" value="tcmalloc_minimal"/>
 									<listOptionValue builtIn="false" value="emon"/>
 									<listOptionValue builtIn="false" value="openbabel"/>
@@ -131,6 +143,7 @@
 								</option>
 								<option id="gnu.cpp.link.option.paths.311058408" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
 									<listOptionValue builtIn="false" value="/usr/local/lib"/>
+									<listOptionValue builtIn="false" value="/usr/local/lib/rdkit"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.965161860" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
@@ -172,6 +185,7 @@
 								<option id="gnu.cpp.compiler.exe.debug.option.debugging.level.1589953070" name="Debug Level" superClass="gnu.cpp.compiler.exe.debug.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.743915848" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="/usr/local/include/openbabel-2.0"/>
+									<listOptionValue builtIn="false" value="/usr/local/include/rdkit"/>
 									<listOptionValue builtIn="false" value="/usr/include/eigen3"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}}&quot;"/>
 								</option>
@@ -193,6 +207,11 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug.2061418021" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug">
 								<option id="gnu.cpp.link.option.libs.1267507203" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="glpk"/>
+									<listOptionValue builtIn="false" value="DataStructs"/>
+									<listOptionValue builtIn="false" value="RDGeometryLib"/>
+									<listOptionValue builtIn="false" value="RDGeneral"/>
+									<listOptionValue builtIn="false" value="GraphMol"/>
+									<listOptionValue builtIn="false" value="tcmalloc_minimal"/>
 									<listOptionValue builtIn="false" value="emon"/>
 									<listOptionValue builtIn="false" value="openbabel"/>
 									<listOptionValue builtIn="false" value="ann"/>
@@ -205,10 +224,10 @@
 									<listOptionValue builtIn="false" value="z"/>
 									<listOptionValue builtIn="false" value="pthread"/>
 									<listOptionValue builtIn="false" value="m"/>
-									<listOptionValue builtIn="false" value="tcmalloc_minimal"/>
 								</option>
 								<option id="gnu.cpp.link.option.paths.581059665" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
 									<listOptionValue builtIn="false" value="/usr/local/lib"/>
+									<listOptionValue builtIn="false" value="/usr/local/lib/rdkit"/>
 								</option>
 								<option id="gnu.cpp.link.option.debugging.prof.1131740751" name="Generate prof information (-p)" superClass="gnu.cpp.link.option.debugging.prof" value="true" valueType="boolean"/>
 								<option id="gnu.cpp.link.option.debugging.gprof.707295222" name="Generate gprof information (-pg)" superClass="gnu.cpp.link.option.debugging.gprof" value="true" valueType="boolean"/>
