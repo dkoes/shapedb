@@ -486,7 +486,7 @@ float Packer::makeKNNGraph(const DataViewer *D, vector<Cluster>& clusters,
 		}
 
 		typedef pair<unsigned, unsigned> UPair;
-		unordered_set<UPair> seen;
+		boost::unordered_set<UPair> seen;
 		for (unsigned i = 0; i < N; i++)
 		{
 			for (unsigned j = 0, nn = B[i].neighbors.size(); j < nn; j++)

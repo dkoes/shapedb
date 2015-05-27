@@ -13,7 +13,6 @@
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/filesystem.hpp>
 
-using namespace boost;
 using namespace std;
 
 //store infor for files that are being created and will be memory mapped
@@ -21,8 +20,8 @@ struct WorkFile
 {
 	//none of these has a real copy constructor
 	ofstream *file;
-	interprocess::mapped_region *map;
-	interprocess::file_mapping *mapping;
+	boost::interprocess::mapped_region *map;
+	boost::interprocess::file_mapping *mapping;
 
 	WorkFile(): file(NULL), map(NULL), mapping(NULL) {}
 	WorkFile(const char *name);

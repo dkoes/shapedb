@@ -16,7 +16,6 @@
 #include <vector>
 #include <cassert>
 using namespace std;
-using namespace boost;
 
 typedef unsigned long file_index;
 

@@ -16,7 +16,6 @@
 #include "MappableOctTree.h"
 #include "molecules/ResultMolecules.h"
 
-using namespace boost;
 using namespace std;
 
 class GSSTreeSearcher

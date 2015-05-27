@@ -1122,7 +1122,7 @@ void MappableOctTree::dumpMiraGrid(ostream& out, float res) const
 	MiraHeader fileheader =
 			{
 					{ 'V', 'O', 'X', 'E', 'L' }, 26, 1, htons(max), htons(max), htons(
-							max), 0, 256, (256 + 3 * max * sizeof(double)) };
+							max), 0, 256, (unsigned)(256 + 3 * max * sizeof(double)) };
 
 	//we store resolution information in unused part of header
 	stringstream str;

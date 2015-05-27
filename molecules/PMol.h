@@ -39,7 +39,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 using namespace OpenBabel;
 using namespace std;
-using namespace boost;
 
 #define MAX_BONDS 3
 

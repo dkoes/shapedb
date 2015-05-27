@@ -61,7 +61,6 @@
 #include "TopDownPartitioner.h"
 #include "packers/Packer.h"
 
-using namespace boost;
 using namespace std;
 
 #include "WorkFile.h"
@@ -114,7 +113,7 @@ class GSSTreeCreator
 
 	vector<WorkFile> nodes;
 
-	filesystem::path dbpath;
+	boost::filesystem::path dbpath;
 
 	GSSLevelCreator *leveler;
 
@@ -152,14 +151,15 @@ public:
 		}
 	}
 
-	bool create(filesystem::path dir, filesystem::path treedir, float dim,
+	bool create(boost::filesystem::path dir, boost::filesystem::path treedir, float dim,
 			float res);
 
 	//return true if successful
 	template <class Object, class ObjectIterator>
-	bool create(filesystem::path dir, ObjectIterator& itr,
+	bool create(boost::filesystem::path dir, ObjectIterator& itr,
 			float dim, float res)
 	{
+		using namespace boost;
 		dimension = dim;
 		resolution = res;
 		WorkFile currenttrees;
@@ -209,9 +209,10 @@ public:
 	//write out the object trees to the specified directory, with the object file
 	//and also indices for reading back in later to save having to regenerate trees
 	template <class Object, class ObjectIterator>
-	bool createTreesOnly(filesystem::path dir, ObjectIterator& itr, float dim,
+	bool createTreesOnly(boost::filesystem::path dir, ObjectIterator& itr, float dim,
 			float res)
 	{
+		using namespace boost;
 		dimension = dim;
 		resolution = res;
 		WorkFile currenttrees;

@@ -10,6 +10,8 @@
 #include "TopDownPartitioner.h"
 #include <climits>
 
+using namespace boost;
+
 //convience function for creating an indexed path name
 static string nextString(filesystem::path p, const char *base, unsigned i)
 {

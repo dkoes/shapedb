@@ -147,19 +147,20 @@ protected:
 	{
 	public:
 		virtual float get(unsigned i, unsigned j) = 0;
+		virtual ~DCache() {}
 
 	};
 
 	//stores and precomputes everything
 	class FullCache: public DCache
 	{
-		multi_array<float, 2> cache;
+		boost::multi_array<float, 2> cache;
 		const DataViewer* dv;
 
 	public:
 		//indices are assumed to be consecutive and sorted
 		FullCache(const DataViewer* D) :
-				cache(extents[D->size()][D->size()]), dv(D)
+				cache(boost::extents[D->size()][D->size()]), dv(D)
 		{
 			unsigned N = D->size();
 			for (unsigned i = 0; i < N; i++)

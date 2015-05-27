@@ -150,7 +150,7 @@ typedef pair<unsigned, unsigned> IndexPair;
 
 void writeEGDot(SmartGraph& g, SmartGraph::EdgeMap<double>& length,
 		ostream& out, SmartGraph::NodeMap<IndexPair>& edgePairs,
-		unordered_set<unsigned>& matched)
+		boost::unordered_set<unsigned>& matched)
 {
 	out << "graph name {" << endl;
 	out << "  node [ shape=ellipse, fontname=Helvetica, fontsize=10 ];" << endl;

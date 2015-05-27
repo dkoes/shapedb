@@ -55,7 +55,7 @@ void WorkFile::remove()
 	if(file == NULL)
 		return;
 	file->close();
-	filesystem::remove(mapping->get_name());
+	boost::filesystem::remove(mapping->get_name());
 
 	clear();
 }

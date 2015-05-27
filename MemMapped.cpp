@@ -12,6 +12,8 @@
 #include <cstdlib>
 #include <fcntl.h>
 
+using namespace boost;
+
 void MemMapped::clear()
 {
 	if(addr != NULL)
