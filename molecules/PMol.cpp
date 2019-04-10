@@ -37,8 +37,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <GraphMol/AtomIterators.h>
 #include <GraphMol/BondIterators.h>
 
-
 using namespace RDKit;
+using namespace boost;
+using namespace OpenBabel;
 
 //copy data needed to write out pmol from obmol
 void PMolCreator::copyFrom(OBMol& mol, bool deleteH)
@@ -97,7 +98,7 @@ void PMolCreator::copyFrom(OBMol& mol, bool deleteH)
 		unsigned isoi = atom->GetIsotope();
 		if(isoi != 0)
 		{
-			int dmass = ::round(OBElements::GetExactMass(anum, isoi)-OBElements::GetExactMass(anum,0));
+			int dmass = ::round(atom->GetExactMass()- OBElements::GetExactMass(atom->GetAtomicNum(),0));
 			if(dmass != 0)
 			{
 				iso.push_back(Property(ai, dmass));
@@ -156,7 +157,9 @@ void PMolCreator::copyFrom(ROMol& mol, bool deleteH)
 {
 	const Conformer& conf = mol.getConformer();
 
-	mol.getProp("_Name",name);
+	name.clear();
+	if(mol.hasProp("_Name"))
+		mol.getProp("_Name",name);
 	//first construct atoms
 	int typeindex[256]; //position in atoms vector of an atom type, indexed by atomic number
 	int tmpatomindex[mol.getNumAtoms()]; //position within the atom type vector
@@ -462,16 +465,16 @@ double PMol::getMolWeight() const
 
 //write sdf with associated meta data
 void PMol::writeSDF(ostream& out, const vector<ASDDataItem>& sddata,
-		const RMSDResult& rms)
+		const Orienter& rms)
 {
 	vector<FloatCoord> transformed;
 	FloatCoord *coords = header.coords;
-	if (rms.value() > 0)
+	if (!rms.isIdentity())
 	{
 		//transform a copy of the points
 		transformed.insert(transformed.begin(), coords, coords + header.nAtoms);
 		coords = &transformed[0];
-		rms.reorient(transformed.size(), (float*)coords);
+		rms.unorient(transformed.size(), (float*)coords);
 	}
 
 	//line 1 - name

@@ -1,4 +1,19 @@
 /*
+Pharmit
+Copyright (c) David Ryan Koes, University of Pittsburgh and contributors.
+All rights reserved.
+
+Pharmit is licensed under both the BSD 3-clause license and the GNU
+Public License version 2. Any use of the code that retains its reliance
+on the GPL-licensed OpenBabel library is subject to the terms of the GPL2.
+
+Use of the Pharmit code independently of OpenBabel (or any other
+GPL2 licensed software) may choose between the BSD or GPL licenses.
+
+See the LICENSE file provided with the distribution for more information.
+
+*/
+/*
  * GSSTreeSearcher.h
  *
  *  Created on: Oct 18, 2011
@@ -29,13 +44,13 @@ class GSSTreeSearcher
 	float dimension;
 	float resolution;
 
-	void findTweeners(const GSSInternalNode* node, const MappableOctTree* min,
+	unsigned findTweeners(const GSSInternalNode* node, const MappableOctTree* min,
 			const MappableOctTree* max, const MappableOctTree* orig,
-			vector<result_info>& res,
+			Results& res,
 			unsigned level, bool computeDist);
-	void findTweeners(const GSSLeaf* node, const MappableOctTree* min,
+	unsigned findTweeners(const GSSLeaf* node, const MappableOctTree* min,
 			const MappableOctTree* max, const MappableOctTree* orig,
-			vector<result_info>& res,
+			Results& res,
 			bool computeDist);
 
 	struct ObjDist
@@ -109,7 +124,7 @@ class GSSTreeSearcher
 			const MappableOctTree *min, const MappableOctTree *max);
 
 public:
-	typedef shared_ptr<const MappableOctTree> ObjectTree;
+	typedef boost::shared_ptr<const MappableOctTree> ObjectTree;
 
 	GSSTreeSearcher(bool v = false) :
 			verbose(v), total(0)
@@ -181,7 +196,7 @@ public:
 		if (invert) //treat as excluded vol
 			objTree->invert();
 
-		return shared_ptr<const MappableOctTree>(objTree, free);
+		return boost::shared_ptr<const MappableOctTree>(objTree, free);
 	}
 
 	float getDimension() const

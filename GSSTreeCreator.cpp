@@ -1,4 +1,19 @@
 /*
+Pharmit
+Copyright (c) David Ryan Koes, University of Pittsburgh and contributors.
+All rights reserved.
+
+Pharmit is licensed under both the BSD 3-clause license and the GNU
+Public License version 2. Any use of the code that retains its reliance
+on the GPL-licensed OpenBabel library is subject to the terms of the GPL2.
+
+Use of the Pharmit code independently of OpenBabel (or any other
+GPL2 licensed software) may choose between the BSD or GPL licenses.
+
+See the LICENSE file provided with the distribution for more information.
+
+*/
+/*
  * GSSTreeCreator.cpp
  *
  *  Created on: Oct 13, 2011
@@ -20,9 +35,8 @@ static string nextString(filesystem::path p, const char *base, unsigned i)
 	return filesystem::path(p / str.str()).string();
 }
 
-
 //creates the shape index, give that the objs and first level of trees have been created
-bool GSSTreeCreator::createIndex(vector<file_index>& objindices, vector<file_index>& treeindices, WorkFile& currenttrees)
+bool GSSTreeCreator::createIndex()
 {
 	Timer t;
 	WorkFile nexttrees;
@@ -42,6 +56,7 @@ bool GSSTreeCreator::createIndex(vector<file_index>& objindices, vector<file_ind
 	//map the data
 	currenttrees.switchToMap();
 	//this clears the indices
+	unsigned long numobjs = objindices.size();
 	LeafViewer leafdata(currenttrees.map->get_address(), treeindices,
 			objindices);
 	leveler->createNextLevel(leafdata, nodes.back().file, nodeindices,
@@ -79,7 +94,8 @@ bool GSSTreeCreator::createIndex(vector<file_index>& objindices, vector<file_ind
 	//output general info
 	filesystem::path infoname = dbpath / "info";
 	ofstream info(infoname.string().c_str());
-	info << dimension << " " << resolution << " " << nodes.size() << " " << objindices.size() << "\n";
+	info << dimension << " " << resolution << " " << nodes.size() << " "
+			<< numobjs << "\n";
 
 	//clear workfile memory
 	for (unsigned i = 0, n = nodes.size(); i < n; i++)
@@ -92,42 +108,22 @@ bool GSSTreeCreator::createIndex(vector<file_index>& objindices, vector<file_ind
 }
 
 //create index from existing trees, which are copied over
-bool GSSTreeCreator::create(filesystem::path dir, filesystem::path treedir, float dim,
+bool GSSTreeCreator::create(filesystem::path dir, filesystem::path treedir,
+		float dim,
 		float res)
 {
-	dimension = dim;
-	resolution = res;
-	WorkFile currenttrees;
-	//create directory
-	if (filesystem::exists(dir))
-	{
-		cerr << dir << " already exists.  Exiting\n";
-		return false;
-	}
-	if (!filesystem::create_directory(dir))
-	{
-		cerr << "Unable to create database directory ";
-		return false;
-	}
-	dbpath = dir;
-
-	filesystem::path objfile = dbpath / "objs";
-	string curtreesfile = filesystem::path(dbpath / "trees").string();
+	initialize(dir, dim, res);
 
 	Timer t;
-	//write out objects and trees
-	objects.set(objfile.string().c_str());
-	currenttrees.set(curtreesfile.c_str());
-
 	const int MAXBUF = 8192;
 	char buffer[MAXBUF];
 	//read in trees
 	filesystem::path srctreesname = treedir / "trees";
 	ifstream srctrees(srctreesname.string().c_str());
-	if(!srctrees)
+	if (!srctrees)
 		return false;
 	streamsize sz = 0;
-	while((sz = srctrees.readsome(buffer,MAXBUF)) > 0)
+	while ((sz = srctrees.readsome(buffer, MAXBUF)) > 0)
 	{
 		currenttrees.file->write(buffer, sz);
 	}
@@ -135,42 +131,41 @@ bool GSSTreeCreator::create(filesystem::path dir, filesystem::path treedir, floa
 	//read in objs
 	filesystem::path srcobjsname = treedir / "objs";
 	ifstream srcobjs(srcobjsname.string().c_str());
-	if(!srcobjs)
+	if (!srcobjs)
 		return false;
-	while((sz = srcobjs.readsome(buffer,MAXBUF)) > 0)
+	while ((sz = srcobjs.readsome(buffer, MAXBUF)) > 0)
 	{
 		objects.file->write(buffer, sz);
 	}
 
 	//read in treeindices
-	vector<file_index> treeindices;
+	treeindices.clear();
 	filesystem::path srctiname = treedir / "treeindices";
 	ifstream srcti(srctiname.string().c_str());
-	if(!srcti)
+	if (!srcti)
 		return false;
 	file_index ind;
-	while(srcti.read((char*)&ind,sizeof(file_index)))
+	while (srcti.read((char*) &ind, sizeof(file_index)))
 	{
 		treeindices.push_back(ind);
 	}
 
 	//read in objindices
-	vector<file_index> objindices;
+	objindices.clear();
 	filesystem::path srcoiname = treedir / "objindices";
 	ifstream srcoi(srcoiname.string().c_str());
-	if(!srcoi)
+	if (!srcoi)
 		return false;
-	while(srcoi.read((char*)&ind,sizeof(file_index)))
+	while (srcoi.read((char*) &ind, sizeof(file_index)))
 	{
 		objindices.push_back(ind);
 	}
 	cout << "Read/write trees\t" << t.elapsed() << "\n";
 	t.restart();
 
-	return createIndex(objindices, treeindices, currenttrees);
+	return createIndex();
 
 }
-
 
 //recursive helper for optimizing level output
 //return new position
@@ -252,8 +247,9 @@ void GSSTreeCreator::getNodesForSuperNode(const GSSInternalNode* node,
 			const GSSNodeCommon* next =
 					(const GSSNodeCommon*) ((const char*) nodes[curlevel - 1].map->get_address()
 							+ child->position());
-			assert(!next->isLeaf);// for simplicity always have root be internal node
-			getNodesForSuperNode((const GSSInternalNode*)next, newroots, curlevel-1, stoplevel);
+			assert(!next->isLeaf); // for simplicity always have root be internal node
+			getNodesForSuperNode((const GSSInternalNode*) next, newroots,
+					curlevel - 1, stoplevel);
 		}
 	}
 }
@@ -281,7 +277,7 @@ void GSSTreeCreator::optimizeLevels()
 	const GSSNodeCommon* root =
 			(GSSNodeCommon*) nodes.back().map->get_address();
 
-	if(root->isLeaf)
+	if (root->isLeaf)
 	{
 		file_index ls, le;
 		optimizeLevelsR(outnodes, outleaves, root, nodes.size() - 1, ls, le);
@@ -294,14 +290,16 @@ void GSSTreeCreator::optimizeLevels()
 	else //construct super node
 	{
 		unsigned stopLevel = 1;
-		if(nodes.size() > superNodeDepth+1)
-			stopLevel = nodes.size()-superNodeDepth-1;
+		if (nodes.size() > superNodeDepth + 1)
+			stopLevel = nodes.size() - superNodeDepth - 1;
 
 		vector<GSSInternalNode*> superroots;
-		getNodesForSuperNode((const GSSInternalNode*)root, superroots, nodes.size()-1, stopLevel);
-		GSSInternalNode* newnode = GSSInternalNode::createMergedNode(superroots);
+		getNodesForSuperNode((const GSSInternalNode*) root, superroots,
+				nodes.size() - 1, stopLevel);
+		GSSInternalNode* newnode = GSSInternalNode::createMergedNode(
+				superroots);
 		//cout << "Supernode children " << newnode->size() << "\n";
-		for(unsigned i = 0, n = superroots.size(); i < n; i++)
+		for (unsigned i = 0, n = superroots.size(); i < n; i++)
 		{
 			free(superroots[i]);
 		}
@@ -338,14 +336,11 @@ void GSSTreeCreator::optimizeLevels()
 		}
 	}
 
-
-
-
 }
 
 //print out some distributions
 void GSSTreeCreator::printStats(ostream& out) const
-{
+		{
 	out << "Nodes " << numNodes << "  Leaves " << numLeaves << "\n";
 
 	unsigned mind = min(nodeContentDistribution.size(),

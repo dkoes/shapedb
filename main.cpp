@@ -1,22 +1,18 @@
 /*
- ShapeDB
- Copyright (C) 2011  David Ryan Koes and the University of Pittsburgh
+Pharmit
+Copyright (c) David Ryan Koes, University of Pittsburgh and contributors.
+All rights reserved.
 
- This program is free software; you can redistribute it and/or
- modify it under the terms of the GNU General Public License
- as published by the Free Software Foundation; either version 2
- of the License, or (at your option) any later version.
+Pharmit is licensed under both the BSD 3-clause license and the GNU
+Public License version 2. Any use of the code that retains its reliance
+on the GPL-licensed OpenBabel library is subject to the terms of the GPL2.
 
- This program is distributed in the hope that it will be useful,
- but WITHOUT ANY WARRANTY; without even the implied warranty of
- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- GNU General Public License for more details.
+Use of the Pharmit code independently of OpenBabel (or any other
+GPL2 licensed software) may choose between the BSD or GPL licenses.
 
- You should have received a copy of the GNU General Public License
- along with this program; if not, write to the Free Software
- Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
- */
+See the LICENSE file provided with the distribution for more information.
 
+*/
 /*
  * main.cpp
  *
@@ -43,7 +39,6 @@
 #include "molecules/Molecule.h"
 #include "KSamplePartitioner.h"
 #include "packers/Packers.h"
-#include <boost/shared_ptr.hpp>
 #include "Timer.h"
 #include "MiraObject.h"
 
@@ -278,7 +273,7 @@ static void create_trees(GSSTreeSearcher& gss, const string& includeMol,
 	{
 		//change small tree to just be interaction points
 		MGrid igrid(dimension, resolution);
-		inMol.computeInteractionGridPoints(exMol, igrid, interactionDistance,
+		inMol.computeInteractionGridPoints(exMol.getMol(), igrid, interactionDistance,
 				interactionMaxClusterDist, interactionMinCluster,
 				interactionPointRadius);
 
@@ -1128,11 +1123,12 @@ int main(int argc, char *argv[])
 		}
 		//compute interaction points as single zero-radius points
 		MGrid igrid(dimension, resolution);
-		inMol.computeInteractionGridPoints(exMol, igrid, interactionDistance,
+		inMol.computeInteractionGridPoints(exMol.getMol(), igrid, interactionDistance,
 				interactionMaxClusterDist, interactionMinCluster, 0);
 
 		vector<MGrid::Point> ipts;
 		igrid.getSetPoints(ipts);
+
 		unsigned max = 1 << ipts.size();
 
 		//for each subset of interaction points (even empty - receptor only)
@@ -1144,6 +1140,7 @@ int main(int argc, char *argv[])
 			{
 				if ((1 << p) & i) //use it
 				{
+//					cout << "(" << ipts[p].x <<","<<ipts[p].y<<","<<ipts[p].z<<") ";
 					if (interactionPointRadius == 0)
 					{
 						igrid.setPoint(ipts[p].x, ipts[p].y, ipts[p].z);
@@ -1155,6 +1152,7 @@ int main(int argc, char *argv[])
 					}
 				}
 			}
+//	cout << "\n";
 			igrid &= lgrid;
 			ObjectTree smallTree(MappableOctTree::createFromGrid(igrid), free);
 
@@ -1178,7 +1176,10 @@ int main(int argc, char *argv[])
 
 			//do a filter with DC
 			stringstream dcoutname;
-			dcoutname << Output << "_dc_" << i << ".sdf";
+			if(Output.size() > 0)
+				dcoutname << Output << "_dc_" << i << ".sdf";
+			if(Print)
+				cout << "# DCPTS " << i << "\n";
 			do_dcsearch(gss, smallTree, bigTree, dcoutname.str());
 
 		}
@@ -1238,7 +1239,7 @@ int main(int argc, char *argv[])
 			Molecule receptor = *exmolitr;
 
 			MGrid igrid(MaxDimension, Resolution);
-			ligand.computeInteractionGridPoints(receptor, igrid,
+			ligand.computeInteractionGridPoints(receptor.getMol(), igrid,
 					interactionDistance, interactionMaxClusterDist,
 					interactionMinCluster, interactionPointRadius);
 

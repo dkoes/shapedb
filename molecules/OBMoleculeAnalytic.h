@@ -38,6 +38,7 @@ class OBAMolOutput;
 //defines iterator type, intersection, and file create/write
 class OBAMolecule
 {
+protected:
 	//a little icky, make mutable so intersect can bump intersecting spheres
 	//to the front of the list; this ends up being more efficient than filtering
 	//all the intersecting spheres
@@ -46,11 +47,6 @@ class OBAMolecule
 	OBMol mol;
 	float adjustAmount;
 	float probe;
-
-	OBMol& getMol()
-	{
-		return mol;
-	}
 
 	void set(const OBMol& m, float dimension, float resolution, float prb = 1.4,
 			float adj = 0)
@@ -106,6 +102,12 @@ public:
 	{
 	}
 
+	OBMol& getMol()
+	{
+		return mol;
+	}
+
+
 	bool intersects(const Cube& cube) const
 	{
 		for (unsigned i = 0, n = checkers.size(); i < n; i++)
@@ -137,13 +139,18 @@ public:
 		return false;
 	}
 
-	//computes a set of solitary grid points that represent the interaction between
+	//computes a set of points that represent the interaction between
 	//this ligand and the provided receptor in some way
-	void computeInteractionGridPoints(OBAMolecule& receptor, MGrid& grid,
+	void computeInteractionPoints(OBMol& rmol, vector<Eigen::Vector3d>& points,
+			double interactionDist=6.0, double maxClusterDist=4.0,
+			unsigned minClusterPoints=3.0);
+
+	//takes interaction points and puts them in a grid
+	void computeInteractionGridPoints(OBMol& rmol, MGrid& grid,
 			double interactionDist, double maxClusterDist,
 			unsigned minClusterPoints, double interactionPointRadius);
 
-	void write(ostream& out) const
+	virtual void write(ostream& out) const
 	{
 		OBMol m(mol);
 		PMolCreator pmol(m, true);
