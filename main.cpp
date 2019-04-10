@@ -1261,15 +1261,20 @@ int main(int argc, char *argv[])
 			for (Molecule::iterator mitr(Input, MaxDimension, Resolution,
 					KeepHydrogens, ProbeRadius); mitr; ++mitr)
 			{
+        Timer t;
+
 				MappableOctTree *tree = MappableOctTree::create(MaxDimension,
 						Resolution, *mitr);
-
+				cout << "Tree time: " << t.elapsed() << "\n";
+				t.restart();
 				if (LessDist >= 0)
 				{
 					MGrid grid;
 					tree->makeGrid(grid, Resolution);
-
+	        cout << "Grid time: " << t.elapsed() << "\n";
+	        t.restart();
 					grid.shrink(LessDist);
+          cout << "Shrink time: " << t.elapsed() << "\n";
 					grid.grow(MoreDist);
 					free(tree);
 					tree = MappableOctTree::createFromGrid(grid);
