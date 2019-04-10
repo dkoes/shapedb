@@ -2,9 +2,8 @@ ShapeDB - Indexed molecular shape search.
 
 Building
 ========
-Unfortunately I haven't setup a traditional build system yet.  You need to 
-import the project source into an Eclipse project and build using the automated
-makefiles.
+The project is built using Eclipse.  Auto-generated makefiles can be found
+in the Release directory.  You will likely have to edit these.
 
 Usage
 =====
@@ -16,17 +15,17 @@ a canonical frame of reference (as done with VAMS) or to fragments (FOMS).
 
 ### Building a database
 ```
-ShapeDB -Create -in mols.sdf -db shape.db
+ShapeDB -Create -in selfaligned_actives_f.sdf -db foo.db
 ```
 
 ### Searching a database
 Similarity search:
 ```
-ShapeDB -NNSearch -k 0 -less 0 -more 0 -ligand ref.pdb -db shape.db -print -single-conformer
+ShapeDB -NNSearch -k 3  -ligand salig.pdb -db foo.db -print -single-conformer -out hits.sdf
 ```
 Distance constrain search:
 ```
-ShapeDB -DCSearch -less 2.0 -more 2.0 -use-interaction-points -interaction-point-radius=1.0 -ligand ref.pdb -receptor rec.pdb -db shape.db -print -single-conformer -v
+ShapeDB -DCSearch -less 2.0 -more 2.0 -ligand salig.sdf -receptor sarec.pdb -db foo.db -print -single-conformer -out hits.sdf
 ```
 
 
